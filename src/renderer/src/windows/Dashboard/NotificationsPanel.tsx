@@ -7,6 +7,7 @@
 import { useEffect, useState } from 'react'
 import { useGitHubStore } from '../../store/githubStore'
 import { NotificationItem } from './NotificationItem'
+import { Skeleton } from '../../components/ui/Skeleton'
 import type { GitHubNotification, NotificationReason } from '@shared/types/github'
 
 const REASON_ORDER: NotificationReason[] = [
@@ -151,9 +152,7 @@ export function NotificationsPanel(): React.ReactElement {
         <h2 className="text-text-primary mb-3 text-sm font-semibold tracking-wide uppercase">
           GitHub Notifications
         </h2>
-        <div className="text-text-secondary animate-pulse py-4 text-center text-sm">
-          Loading notifications...
-        </div>
+        <Skeleton lines={5} />
       </section>
     )
   }

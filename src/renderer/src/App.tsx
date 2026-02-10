@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react'
+import { Toaster } from 'react-hot-toast'
 import { Dashboard } from './windows/Dashboard/Dashboard'
 import { QuickCaptureOverlay } from './windows/QuickCapture/QuickCaptureOverlay'
 import { WhatsNextOverlay } from './windows/WhatsNext/WhatsNextOverlay'
+import { ErrorBoundary } from './components/ErrorBoundary'
+import { OfflineBanner } from './components/OfflineBanner'
 
 type AppRoute = 'dashboard' | 'quick-capture' | 'whats-next'
 
@@ -21,14 +24,29 @@ function App(): React.JSX.Element {
     return () => window.removeEventListener('hashchange', onHashChange)
   }, [])
 
-  switch (route) {
-    case 'quick-capture':
-      return <QuickCaptureOverlay />
-    case 'whats-next':
-      return <WhatsNextOverlay />
-    default:
-      return <Dashboard />
-  }
+  // Overlays don't need ErrorBoundary/Toaster chrome
+  if (route === 'quick-capture') return <QuickCaptureOverlay />
+  if (route === 'whats-next') return <WhatsNextOverlay />
+
+  return (
+    <ErrorBoundary>
+      <OfflineBanner />
+      <Dashboard />
+      <Toaster
+        position="bottom-right"
+        toastOptions={{
+          duration: 3000,
+          style: {
+            background: 'rgba(30, 32, 44, 0.95)',
+            color: '#e8eaf0',
+            border: '1px solid rgba(100, 110, 140, 0.25)',
+            backdropFilter: 'blur(12px)',
+            fontSize: '13px',
+          },
+        }}
+      />
+    </ErrorBoundary>
+  )
 }
 
 export default App

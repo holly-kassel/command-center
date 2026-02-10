@@ -3,6 +3,7 @@ import type { TodaySection, VaultStatus, WeeklyNote } from '../shared/types/obsi
 import type { CalendarEvent } from '../shared/types/calendar'
 import type { GitHubNotification } from '../shared/types/github'
 import type { ParsedSlackThread } from '../shared/types/slack'
+import type { AppSettings } from '../shared/types/settings'
 
 interface ObsidianApi {
   findVault(): Promise<string>
@@ -40,12 +41,20 @@ interface SlackApi {
   saveToObsidian(thread: ParsedSlackThread, customTitle?: string): Promise<{ success: boolean; path: string }>
 }
 
+interface SettingsApi {
+  getAll(): Promise<AppSettings>
+  update(partial: Partial<AppSettings>): Promise<AppSettings>
+  get<K extends keyof AppSettings>(key: K): Promise<AppSettings[K]>
+  browseVaultPath(): Promise<string | null>
+}
+
 interface Api {
   obsidian: ObsidianApi
   auth: AuthApi
   calendar: CalendarApi
   github: GitHubApi
   slack: SlackApi
+  settings: SettingsApi
 }
 
 declare global {

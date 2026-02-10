@@ -4,6 +4,7 @@ import type { TodaySection, VaultStatus, WeeklyNote } from '../shared/types/obsi
 import type { CalendarEvent } from '../shared/types/calendar'
 import type { GitHubNotification } from '../shared/types/github'
 import type { ParsedSlackThread } from '../shared/types/slack'
+import type { AppSettings } from '../shared/types/settings'
 
 // Obsidian API exposed to renderer
 const obsidianApi = {
@@ -66,6 +67,17 @@ const slackApi = {
     ipcRenderer.invoke('slack:saveToObsidian', thread, customTitle),
 }
 
+// Settings API exposed to renderer
+const settingsApi = {
+  getAll: (): Promise<AppSettings> => ipcRenderer.invoke('settings:getAll'),
+  update: (partial: Partial<AppSettings>): Promise<AppSettings> =>
+    ipcRenderer.invoke('settings:update', partial),
+  get: <K extends keyof AppSettings>(key: K): Promise<AppSettings[K]> =>
+    ipcRenderer.invoke('settings:get', key),
+  browseVaultPath: (): Promise<string | null> =>
+    ipcRenderer.invoke('settings:browseVaultPath'),
+}
+
 // Custom APIs for renderer
 const api = {
   obsidian: obsidianApi,
@@ -73,6 +85,7 @@ const api = {
   calendar: calendarApi,
   github: githubApi,
   slack: slackApi,
+  settings: settingsApi,
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to

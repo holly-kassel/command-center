@@ -8,6 +8,7 @@ import { useEffect } from 'react'
 import { useCalendarStore } from '../../store/calendarStore'
 import { MeetingCard } from './MeetingCard'
 import { CountdownTimer } from './CountdownTimer'
+import { Skeleton } from '../../components/ui/Skeleton'
 
 export function CalendarSection(): React.ReactElement {
   const {
@@ -70,9 +71,7 @@ export function CalendarSection(): React.ReactElement {
         <h2 className="text-text-primary mb-3 text-sm font-semibold tracking-wide uppercase">
           Calendar
         </h2>
-        <div className="text-text-secondary animate-pulse py-4 text-center text-sm">
-          Loading events...
-        </div>
+        <Skeleton lines={4} />
       </section>
     )
   }

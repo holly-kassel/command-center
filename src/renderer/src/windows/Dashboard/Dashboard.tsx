@@ -4,7 +4,7 @@
  * Main layout assembling all sections into a cohesive grid.
  * Time-based greeting, auto-refresh, responsive layout.
  */
-import { useCallback } from 'react'
+import { useCallback, useState } from 'react'
 import { useObsidianStore } from '../../store/obsidianStore'
 import { useCalendarStore } from '../../store/calendarStore'
 import { useGitHubStore } from '../../store/githubStore'
@@ -15,6 +15,7 @@ import { NotificationsPanel } from './NotificationsPanel'
 import { FocusSection } from './FocusSection'
 import { TodayView } from './TodayView'
 import { SlackParserPanel } from './SlackParserPanel'
+import { SettingsPanel } from '../Settings/SettingsPanel'
 
 // ─── Helpers ──────────────────────────────────────────────────
 
@@ -37,6 +38,7 @@ function getFormattedDate(): string {
 // ─── Component ────────────────────────────────────────────────
 
 export function Dashboard(): React.ReactElement {
+  const [showSettings, setShowSettings] = useState(false)
   const obsidianInit = useObsidianStore((s) => s.initialize)
   const obsidianRefresh = useObsidianStore((s) => s.refreshAll)
   const calendarInit = useCalendarStore((s) => s.initialize)
@@ -82,13 +84,22 @@ export function Dashboard(): React.ReactElement {
                 {getFormattedDate()}
               </p>
             </div>
-            <button
-              onClick={refreshAll}
-              className="text-text-muted hover:text-focus text-sm transition-colors"
-              title="Refresh all"
-            >
-              ↻
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowSettings(true)}
+                className="text-text-muted hover:text-accent text-sm transition-colors"
+                title="Settings"
+              >
+                ⚙
+              </button>
+              <button
+                onClick={refreshAll}
+                className="text-text-muted hover:text-focus text-sm transition-colors"
+                title="Refresh all"
+              >
+                ↻
+              </button>
+            </div>
           </div>
 
           {/* Quick Capture — full width */}
@@ -123,6 +134,21 @@ export function Dashboard(): React.ReactElement {
           </div>
         </div>
       </div>
+
+      {/* Settings slide-over */}
+      {showSettings && (
+        <div className="fixed inset-0 z-50 flex justify-end">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            onClick={() => setShowSettings(false)}
+          />
+          {/* Panel */}
+          <div className="relative w-full max-w-md bg-background border-l border-surface-border/40 overflow-y-auto p-6 shadow-2xl">
+            <SettingsPanel onClose={() => setShowSettings(false)} />
+          </div>
+        </div>
+      )}
     </div>
   )
 }

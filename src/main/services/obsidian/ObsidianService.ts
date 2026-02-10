@@ -195,11 +195,11 @@ export class ObsidianService {
   }
 
   /**
-   * Toggle a checkbox at a given line offset within today's section.
-   * lineOffset is 0-based relative to the section content.
-   * Switches `- [ ]` ↔ `- [x]` (or `* [ ]` ↔ `* [x]`).
+   * Toggle the Nth checkbox (0-based) within today's section.
+   * Finds all `- [ ]` / `- [x]` lines in today's section of the file,
+   * then toggles the one at the given index.
    */
-  async toggleCheckbox(lineOffset: number): Promise<void> {
+  async toggleCheckbox(checkboxIndex: number): Promise<void> {
     if (!this.vaultPath) {
       throw new Error('Vault path not set')
     }
@@ -224,24 +224,31 @@ export class ObsidianService {
         throw new Error(`Could not find section for ${dayOfWeek}`)
       }
 
-      const absoluteLine = sectionStart + lineOffset
-      if (absoluteLine >= sectionEnd) {
-        throw new Error(`Line offset ${lineOffset} is out of section bounds`)
+      // Find all checkbox lines in this section
+      const checkboxLines: number[] = []
+      for (let i = sectionStart; i < sectionEnd; i++) {
+        if (lines[i].match(/^\s*[-*]\s\[[ xX]\]/)) {
+          checkboxLines.push(i)
+        }
       }
 
+      if (checkboxIndex < 0 || checkboxIndex >= checkboxLines.length) {
+        throw new Error(`Checkbox index ${checkboxIndex} out of range (${checkboxLines.length} checkboxes found)`)
+      }
+
+      const absoluteLine = checkboxLines[checkboxIndex]
       const line = lines[absoluteLine]
+
       if (line.match(/^(\s*[-*]\s)\[ \]/)) {
         lines[absoluteLine] = line.replace(/^(\s*[-*]\s)\[ \]/, '$1[x]')
       } else if (line.match(/^(\s*[-*]\s)\[x\]/i)) {
         lines[absoluteLine] = line.replace(/^(\s*[-*]\s)\[x\]/i, '$1[ ]')
-      } else {
-        throw new Error(`Line ${lineOffset} is not a checkbox`)
       }
 
       await writeFile(filePath, lines.join('\n'), 'utf-8')
       await unlink(backupPath)
 
-      log.info(`[Obsidian] Toggled checkbox at line ${absoluteLine} in ${dayOfWeek}`)
+      log.info(`[Obsidian] Toggled checkbox #${checkboxIndex} (line ${absoluteLine}) in ${dayOfWeek}`)
     } catch (error) {
       if (existsSync(backupPath)) {
         try {

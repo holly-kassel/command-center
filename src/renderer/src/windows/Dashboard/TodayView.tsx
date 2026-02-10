@@ -5,7 +5,7 @@
  * rendered markdown content, interactive checkboxes,
  * and an inline markdown editor toggle.
  */
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { useObsidianStore } from '../../store/obsidianStore'
@@ -18,19 +18,6 @@ export function TodayView(): React.JSX.Element {
   const [saving, setSaving] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const checkboxIndexRef = useRef(0)
-
-  // Pre-compute the line offsets of all checkboxes in order of appearance
-  const checkboxLineOffsets = useMemo(() => {
-    if (!todaySection?.content) return []
-    const offsets: number[] = []
-    const lines = todaySection.content.split('\n')
-    for (let i = 0; i < lines.length; i++) {
-      if (lines[i].match(/^\s*[-*]\s\[[ xX]\]/)) {
-        offsets.push(i)
-      }
-    }
-    return offsets
-  }, [todaySection?.content])
 
   // Reset the checkbox counter before each render
   checkboxIndexRef.current = 0
@@ -84,22 +71,25 @@ export function TodayView(): React.JSX.Element {
     }
   }
 
-  // Handle checkbox clicks in rendered markdown
-  const handleCheckboxToggle = async (lineOffset: number): Promise<void> => {
-    try {
-      await toggleCheckbox(lineOffset)
-    } catch {
-      toast.error('Failed to toggle checkbox')
-    }
-  }
+  // Handle checkbox clicks — passes the Nth checkbox index directly
+  const handleCheckboxToggle = useCallback(
+    async (index: number): Promise<void> => {
+      try {
+        await toggleCheckbox(index)
+      } catch {
+        toast.error('Failed to toggle checkbox')
+      }
+    },
+    [toggleCheckbox]
+  )
 
-  // Custom checkbox renderer — uses a render-time counter to map
-  // each checkbox to its pre-computed line offset in the markdown source
+  // Custom checkbox renderer — uses a render-time counter so each
+  // checkbox gets its sequential index (0, 1, 2, ...) which maps
+  // directly to the Nth checkbox in the file's day section
   const CheckboxInput = useCallback(
     (props: React.InputHTMLAttributes<HTMLInputElement>) => {
       if (props.type === 'checkbox') {
         const idx = checkboxIndexRef.current++
-        const lineOffset = checkboxLineOffsets[idx]
 
         return (
           <input
@@ -107,17 +97,13 @@ export function TodayView(): React.JSX.Element {
             checked={props.checked}
             disabled={false}
             className="cursor-pointer accent-primary w-4 h-4 mr-1.5 align-middle rounded"
-            onChange={() => {
-              if (lineOffset !== undefined) {
-                handleCheckboxToggle(lineOffset)
-              }
-            }}
+            onChange={() => handleCheckboxToggle(idx)}
           />
         )
       }
       return <input {...props} />
     },
-    [checkboxLineOffsets, handleCheckboxToggle]
+    [handleCheckboxToggle]
   )
 
   if (isLoading) {

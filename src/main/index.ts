@@ -1,11 +1,14 @@
 import 'dotenv/config'
-import { app, shell, BrowserWindow, ipcMain } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, globalShortcut } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { registerObsidianIpc, initObsidian, registerAuthIpc, registerCalendarIpc, registerGitHubIpc } from './ipc'
+import { HotkeyManager } from './services/hotkey/HotkeyManager'
 
-function createWindow(): void {
+const hotkeyManager = new HotkeyManager()
+
+function createWindow(): BrowserWindow {
   // Create the browser window.
   const mainWindow = new BrowserWindow({
     width: 1400,
@@ -39,6 +42,8 @@ function createWindow(): void {
   } else {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
+
+  return mainWindow
 }
 
 // This method will be called when Electron has finished
@@ -65,7 +70,10 @@ app.whenReady().then(() => {
   registerGitHubIpc()
   initObsidian()
 
-  createWindow()
+  const mainWindow = createWindow()
+
+  // Register global hotkeys for overlay windows
+  hotkeyManager.registerHotkeys(mainWindow)
 
   app.on('activate', function () {
     // On macOS it's common to re-create a window in the app when the
@@ -81,6 +89,10 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit()
   }
+})
+
+app.on('will-quit', () => {
+  hotkeyManager.unregisterAll()
 })
 
 // In this file you can include the rest of your app's specific main process

@@ -7,6 +7,7 @@
  */
 import { useEffect, useState, useCallback } from 'react'
 import type { CalendarEvent } from '../../../../shared/types/calendar'
+import { SamoyedMascot } from '../../components/SamoyedMascot'
 
 interface WhatsNextData {
   nextMeeting: CalendarEvent | null
@@ -68,7 +69,10 @@ export function WhatsNextOverlay(): React.JSX.Element {
 
         {/* Header */}
         <div className="px-4 pt-4 pb-2 flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-text-secondary uppercase tracking-wider">What's Next</h2>
+          <div className="flex items-center gap-2">
+            <SamoyedMascot size={24} className="mascot-entrance" />
+            <h2 className="text-sm font-semibold text-text-secondary uppercase tracking-wider">What's Next</h2>
+          </div>
           <span className="text-[11px] text-text-muted">⎋ close</span>
         </div>
 

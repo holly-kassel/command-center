@@ -257,3 +257,37 @@ section.rounded-xl {
   --tw-prose-code: var(--color-accent);
   --tw-prose-hr: var(--color-border);
 }
+
+/* ─── Mascot animations ──────────────────────────────── */
+@keyframes mascot-bounce {
+  0%, 100% { transform: translateY(0); }
+  15% { transform: translateY(-12px) rotate(-3deg); }
+  30% { transform: translateY(0) rotate(0deg); }
+  45% { transform: translateY(-8px) rotate(2deg); }
+  60% { transform: translateY(0) rotate(0deg); }
+  75% { transform: translateY(-4px); }
+  90% { transform: translateY(0); }
+}
+
+.mascot-bounce {
+  animation: mascot-bounce 0.8s ease-in-out;
+}
+
+@keyframes mascot-entrance {
+  0% { transform: scale(0.3) translateY(20px); opacity: 0; }
+  50% { transform: scale(1.1) translateY(-4px); opacity: 1; }
+  100% { transform: scale(1) translateY(0); opacity: 1; }
+}
+
+.mascot-entrance {
+  animation: mascot-entrance 0.4s ease-out;
+}
+
+.mascot-idle {
+  animation: mascot-idle 3s ease-in-out infinite;
+}
+
+@keyframes mascot-idle {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-2px); }
+}

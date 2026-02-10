@@ -6,6 +6,7 @@
  * press Escape to dismiss.
  */
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { SamoyedMascot } from '../../components/SamoyedMascot'
 
 export function QuickCaptureOverlay(): React.JSX.Element {
   const [text, setText] = useState('')
@@ -59,7 +60,11 @@ export function QuickCaptureOverlay(): React.JSX.Element {
         {/* Input area */}
         <div className="p-4">
           <div className="flex items-center gap-3">
-            <span className="text-xl">⚡</span>
+            <SamoyedMascot
+              size={32}
+              bounce={status === 'saved'}
+              className={status === 'saved' ? '' : 'mascot-entrance'}
+            />
             <input
               ref={inputRef}
               type="text"

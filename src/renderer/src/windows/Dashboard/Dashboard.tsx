@@ -17,6 +17,7 @@ import { TodayView } from './TodayView'
 import { SlackParserPanel } from './SlackParserPanel'
 import { SettingsPanel } from '../Settings/SettingsPanel'
 import { FocusModeOverlay } from '../FocusMode/FocusModeOverlay'
+import { SamoyedMascot } from '../../components/SamoyedMascot'
 
 // ─── Helpers ──────────────────────────────────────────────────
 
@@ -92,13 +93,16 @@ export function Dashboard(): React.ReactElement {
         <div className="max-w-7xl mx-auto space-y-4">
           {/* Header — greeting + date + refresh */}
           <div className="flex items-end justify-between">
-            <div>
-              <h1 className="text-xl font-bold bg-gradient-to-r from-focus via-primary to-accent bg-clip-text text-transparent">
-                {getGreeting()}, Holly
-              </h1>
-              <p className="text-text-tertiary text-xs mt-0.5">
-                {getFormattedDate()}
-              </p>
+            <div className="flex items-center gap-3">
+              <SamoyedMascot size={44} className="mascot-idle drop-shadow-sm" />
+              <div>
+                <h1 className="text-xl font-bold bg-gradient-to-r from-focus via-primary to-accent bg-clip-text text-transparent">
+                  {getGreeting()}, Holly
+                </h1>
+                <p className="text-text-tertiary text-xs mt-0.5">
+                  {getFormattedDate()}
+                </p>
+              </div>
             </div>
             <div className="flex items-center gap-2">
               <button

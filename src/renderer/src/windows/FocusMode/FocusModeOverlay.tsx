@@ -98,7 +98,7 @@ export function FocusModeOverlay({ onExit }: { onExit: () => void }): React.Reac
     : null
 
   return (
-    <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-gradient-to-b from-neutral-900 via-[#0f1117] to-neutral-800">
+    <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-background">
       {/* Escape hint */}
       <div className="absolute top-6 right-6 text-text-muted text-xs opacity-60">
         Press <kbd className="px-1.5 py-0.5 rounded bg-surface-muted text-text-tertiary text-[10px] font-mono">Esc</kbd> to exit
@@ -129,7 +129,7 @@ export function FocusModeOverlay({ onExit }: { onExit: () => void }): React.Reac
               cy={radius + strokeWidth}
               r={radius}
               fill="none"
-              stroke="rgba(100, 110, 140, 0.15)"
+              stroke="var(--color-surface-border)"
               strokeWidth={strokeWidth}
             />
             {/* Progress ring */}
@@ -138,7 +138,7 @@ export function FocusModeOverlay({ onExit }: { onExit: () => void }): React.Reac
               cy={radius + strokeWidth}
               r={radius}
               fill="none"
-              stroke={timerState === 'complete' ? '#fbbf24' : '#10b981'}
+              stroke={timerState === 'complete' ? 'var(--color-warning)' : 'var(--color-focus)'}
               strokeWidth={strokeWidth}
               strokeLinecap="round"
               strokeDasharray={circumference}

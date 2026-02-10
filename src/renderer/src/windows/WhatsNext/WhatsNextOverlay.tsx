@@ -63,49 +63,47 @@ export function WhatsNextOverlay(): React.JSX.Element {
          onKeyDown={handleKeyDown}
          tabIndex={0}
          style={{ background: 'transparent' }}>
-      <div className="w-full max-w-sm rounded-2xl shadow-2xl border border-white/10 overflow-hidden"
-           style={{ background: 'rgba(15, 17, 23, 0.92)', backdropFilter: 'blur(24px)' }}>
+      <div className="w-full max-w-sm rounded-2xl shadow-2xl border border-surface-border overflow-hidden"
+           style={{ background: 'var(--color-surface)', backdropFilter: 'blur(24px)' }}>
 
         {/* Header */}
         <div className="px-4 pt-4 pb-2 flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-white/60 uppercase tracking-wider">What's Next</h2>
-          <span className="text-[11px] text-white/20">⎋ close</span>
+          <h2 className="text-sm font-semibold text-text-secondary uppercase tracking-wider">What's Next</h2>
+          <span className="text-[11px] text-text-muted">⎋ close</span>
         </div>
 
         {loading ? (
-          <div className="px-4 pb-4 text-white/30 text-sm">Loading…</div>
+          <div className="px-4 pb-4 text-text-muted text-sm">Loading…</div>
         ) : (
           <div className="px-4 pb-4 space-y-3">
 
             {/* Next Meeting */}
-            <div className="rounded-xl p-3 border border-white/5"
-                 style={{ background: 'rgba(96, 165, 250, 0.08)' }}>
+            <div className="rounded-xl p-3 border border-surface-border bg-primary-light">
               <div className="flex items-center gap-2 mb-1">
-                <span className="text-blue-400">📅</span>
-                <span className="text-xs font-medium text-blue-400/80 uppercase tracking-wide">Next Meeting</span>
+                <span className="text-primary">📅</span>
+                <span className="text-xs font-medium text-primary/80 uppercase tracking-wide">Next Meeting</span>
               </div>
               {data.nextMeeting ? (
                 <div>
-                  <p className="text-white font-medium text-sm leading-snug">
+                  <p className="text-text-primary font-medium text-sm leading-snug">
                     {data.nextMeeting.subject}
                   </p>
-                  <p className="text-white/40 text-xs mt-1">
+                  <p className="text-text-tertiary text-xs mt-1">
                     {formatTime(data.nextMeeting.start)} · {formatTimeUntil(data.nextMeeting.start)}
                   </p>
                 </div>
               ) : (
-                <p className="text-white/30 text-sm">No more meetings today 🎉</p>
+                <p className="text-text-muted text-sm">No more meetings today 🎉</p>
               )}
             </div>
 
             {/* Current Focus */}
-            <div className="rounded-xl p-3 border border-white/5"
-                 style={{ background: 'rgba(52, 211, 153, 0.08)' }}>
+            <div className="rounded-xl p-3 border border-surface-border bg-focus-light">
               <div className="flex items-center gap-2 mb-1">
-                <span className="text-emerald-400">🎯</span>
-                <span className="text-xs font-medium text-emerald-400/80 uppercase tracking-wide">Current Focus</span>
+                <span className="text-focus">🎯</span>
+                <span className="text-xs font-medium text-focus/80 uppercase tracking-wide">Current Focus</span>
               </div>
-              <p className="text-white text-sm leading-snug">
+              <p className="text-text-primary text-sm leading-snug">
                 {data.currentFocus || 'No focus set'}
               </p>
             </div>

@@ -53,8 +53,8 @@ export function QuickCaptureOverlay(): React.JSX.Element {
   return (
     <div className="h-screen w-screen flex items-center justify-center p-4"
          style={{ background: 'transparent', WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
-      <div className="w-full max-w-xl rounded-2xl shadow-2xl border border-white/10 overflow-hidden"
-           style={{ background: 'rgba(15, 17, 23, 0.92)', backdropFilter: 'blur(24px)' }}>
+      <div className="w-full max-w-xl rounded-2xl shadow-2xl border border-surface-border overflow-hidden"
+           style={{ background: 'var(--color-surface)', backdropFilter: 'blur(24px)' }}>
 
         {/* Input area */}
         <div className="p-4">
@@ -67,21 +67,21 @@ export function QuickCaptureOverlay(): React.JSX.Element {
               onChange={(e) => setText(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="Quick thought..."
-              className="flex-1 bg-transparent text-white text-lg placeholder-white/30
-                         outline-none border-none caret-emerald-400"
+              className="flex-1 bg-transparent text-text-primary text-lg placeholder-text-muted
+                         outline-none border-none caret-focus"
               autoFocus
             />
             {status === 'saved' && (
-              <span className="text-emerald-400 text-sm font-medium animate-pulse">✓ Saved</span>
+              <span className="text-focus text-sm font-medium animate-pulse">✓ Saved</span>
             )}
             {status === 'saving' && (
-              <span className="text-white/40 text-sm">Saving…</span>
+              <span className="text-text-tertiary text-sm">Saving…</span>
             )}
           </div>
         </div>
 
         {/* Hint bar */}
-        <div className="flex items-center justify-between px-4 py-2 border-t border-white/5 text-[11px] text-white/25">
+        <div className="flex items-center justify-between px-4 py-2 border-t border-surface-border text-[11px] text-text-muted">
           <span>⏎ Save</span>
           <span>⎋ Dismiss</span>
         </div>

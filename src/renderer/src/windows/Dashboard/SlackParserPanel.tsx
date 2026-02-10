@@ -52,21 +52,21 @@ export function SlackParserPanel(): React.JSX.Element {
   }, [])
 
   return (
-    <div className="rounded-2xl border border-white/10 p-4"
+    <div className="rounded-2xl border border-surface-border p-4"
          style={{ background: 'var(--color-surface)' }}>
 
       {/* Header */}
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <span className="text-lg">💬</span>
-          <h2 className="text-sm font-semibold text-white/60 uppercase tracking-wider">
+          <h2 className="text-sm font-semibold text-text-secondary uppercase tracking-wider">
             Slack Thread
           </h2>
         </div>
         {state !== 'input' && (
           <button
             onClick={handleReset}
-            className="text-xs text-white/30 hover:text-white/60 transition-colors"
+            className="text-xs text-text-muted hover:text-text-secondary transition-colors"
           >
             ← New Thread
           </button>
@@ -86,8 +86,8 @@ export function SlackParserPanel(): React.JSX.Element {
             value={rawText}
             onChange={(e) => setRawText(e.target.value)}
             placeholder="Paste a Slack thread here..."
-            className="w-full h-32 bg-white/5 border border-white/10 rounded-xl p-3
-                       text-white/80 text-sm placeholder-white/20 resize-none
+            className="w-full h-32 bg-surface-muted border border-surface-border rounded-xl p-3
+                       text-text-primary text-sm placeholder-text-muted resize-none
                        outline-none focus:border-primary/40 transition-colors"
           />
           <button
@@ -110,13 +110,13 @@ export function SlackParserPanel(): React.JSX.Element {
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2
-                       text-white text-sm outline-none focus:border-primary/40 transition-colors"
+            className="w-full bg-surface-muted border border-surface-border rounded-lg px-3 py-2
+                       text-text-primary text-sm outline-none focus:border-primary/40 transition-colors"
             placeholder="Thread title..."
           />
 
           {/* Stats */}
-          <div className="flex gap-3 text-xs text-white/30">
+          <div className="flex gap-3 text-xs text-text-muted">
             <span>{parsed.messages.length} messages</span>
             <span>·</span>
             <span>{parsed.participants.length} participants</span>
@@ -125,12 +125,12 @@ export function SlackParserPanel(): React.JSX.Element {
           {/* Message preview */}
           <div className="max-h-48 overflow-y-auto space-y-2 pr-1">
             {parsed.messages.map((msg, i) => (
-              <div key={i} className="rounded-lg p-2 bg-white/5 border border-white/5">
+              <div key={i} className="rounded-lg p-2 bg-surface-secondary border border-surface-border">
                 <div className="flex items-center gap-2 mb-1">
                   <span className="text-xs font-medium text-accent">{msg.author}</span>
-                  <span className="text-[10px] text-white/20">{msg.timestamp}</span>
+                  <span className="text-[10px] text-text-muted">{msg.timestamp}</span>
                 </div>
-                <p className="text-xs text-white/60 leading-relaxed whitespace-pre-wrap">
+                <p className="text-xs text-text-secondary leading-relaxed whitespace-pre-wrap">
                   {msg.content.length > 200 ? msg.content.slice(0, 200) + '…' : msg.content}
                 </p>
               </div>
@@ -152,12 +152,12 @@ export function SlackParserPanel(): React.JSX.Element {
       {state === 'saved' && (
         <div className="text-center py-4 space-y-2">
           <div className="text-2xl">✅</div>
-          <p className="text-sm text-white/60">Thread saved to Obsidian</p>
-          <p className="text-[10px] text-white/20 break-all">{savedPath}</p>
+          <p className="text-sm text-text-secondary">Thread saved to Obsidian</p>
+          <p className="text-[10px] text-text-muted break-all">{savedPath}</p>
           <button
             onClick={handleReset}
-            className="mt-2 px-4 py-1.5 rounded-lg text-xs text-white/40
-                       hover:text-white/60 bg-white/5 hover:bg-white/10 transition-all"
+            className="mt-2 px-4 py-1.5 rounded-lg text-xs text-text-tertiary
+                       hover:text-text-secondary bg-surface-muted hover:bg-surface-hover transition-all"
           >
             Parse Another
           </button>

@@ -6,19 +6,24 @@
  */
 import hotToast from 'react-hot-toast'
 
+/** Shared toast style using CSS variables for theme compatibility */
+const baseStyle = {
+  background: 'var(--color-surface)',
+  color: 'var(--color-text-primary)',
+  backdropFilter: 'blur(12px)',
+  fontSize: '13px',
+}
+
 export const toast = {
   success: (message: string): void => {
     hotToast.success(message, {
       style: {
-        background: 'rgba(30, 32, 44, 0.95)',
-        color: '#e8eaf0',
-        border: '1px solid rgba(52, 211, 153, 0.3)',
-        backdropFilter: 'blur(12px)',
-        fontSize: '13px',
+        ...baseStyle,
+        border: '1px solid var(--color-focus)',
       },
       iconTheme: {
-        primary: '#34d399',
-        secondary: '#0f1117',
+        primary: 'var(--color-focus)',
+        secondary: 'var(--color-background)',
       },
     })
   },
@@ -26,15 +31,12 @@ export const toast = {
   error: (message: string): void => {
     hotToast.error(message, {
       style: {
-        background: 'rgba(30, 32, 44, 0.95)',
-        color: '#e8eaf0',
-        border: '1px solid rgba(251, 113, 133, 0.3)',
-        backdropFilter: 'blur(12px)',
-        fontSize: '13px',
+        ...baseStyle,
+        border: '1px solid var(--color-urgent)',
       },
       iconTheme: {
-        primary: '#fb7185',
-        secondary: '#0f1117',
+        primary: 'var(--color-urgent)',
+        secondary: 'var(--color-background)',
       },
     })
   },
@@ -43,11 +45,8 @@ export const toast = {
     hotToast(message, {
       icon: 'ℹ️',
       style: {
-        background: 'rgba(30, 32, 44, 0.95)',
-        color: '#e8eaf0',
-        border: '1px solid rgba(96, 165, 250, 0.3)',
-        backdropFilter: 'blur(12px)',
-        fontSize: '13px',
+        ...baseStyle,
+        border: '1px solid var(--color-primary)',
       },
     })
   },

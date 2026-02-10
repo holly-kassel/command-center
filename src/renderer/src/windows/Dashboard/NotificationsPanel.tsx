@@ -88,6 +88,9 @@ export function NotificationsPanel(): React.ReactElement {
     setShowPATInput(false)
   }
 
+  // Memoize grouping (must be before early returns to preserve hook order)
+  const groups = useMemo(() => groupByReason(notifications), [notifications])
+
   // ─── Not configured ────────────────────────────────────────────
   if (!isConfigured) {
     return (
@@ -158,7 +161,6 @@ export function NotificationsPanel(): React.ReactElement {
   }
 
   // ─── Configured ────────────────────────────────────────────────
-  const groups = useMemo(() => groupByReason(notifications), [notifications])
 
   return (
     <section className="rounded-xl border border-surface-border/60 bg-surface-secondary/30 p-4">

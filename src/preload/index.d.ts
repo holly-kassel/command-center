@@ -1,6 +1,7 @@
 import { ElectronAPI } from '@electron-toolkit/preload'
 import type { TodaySection, VaultStatus, WeeklyNote } from '../shared/types/obsidian'
 import type { CalendarEvent } from '../shared/types/calendar'
+import type { GitHubNotification } from '../shared/types/github'
 
 interface ObsidianApi {
   findVault(): Promise<string>
@@ -26,10 +27,18 @@ interface CalendarApi {
   refresh(): Promise<{ success: boolean }>
 }
 
+interface GitHubApi {
+  getNotifications(): Promise<GitHubNotification[]>
+  markAsRead(threadId: string): Promise<{ success: boolean; error?: string }>
+  isConfigured(): Promise<boolean>
+  setPAT(pat: string): Promise<{ success: boolean; error?: string }>
+}
+
 interface Api {
   obsidian: ObsidianApi
   auth: AuthApi
   calendar: CalendarApi
+  github: GitHubApi
 }
 
 declare global {

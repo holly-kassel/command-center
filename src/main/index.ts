@@ -3,7 +3,7 @@ import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
-import { registerObsidianIpc, initObsidian, registerAuthIpc, registerCalendarIpc } from './ipc'
+import { registerObsidianIpc, initObsidian, registerAuthIpc, registerCalendarIpc, registerGitHubIpc } from './ipc'
 
 function createWindow(): void {
   // Create the browser window.
@@ -62,6 +62,7 @@ app.whenReady().then(() => {
   registerObsidianIpc()
   registerAuthIpc()
   registerCalendarIpc()
+  registerGitHubIpc()
   initObsidian()
 
   createWindow()

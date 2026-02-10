@@ -1,3 +1,3 @@
 // GitHub service - MCP client integration
-// Epic 4: GitHub Integration
-export {}
+export { McpClient } from './McpClient'
+export { GitHubService, getGitHubService } from './GitHubService'

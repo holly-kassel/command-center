@@ -3,3 +3,4 @@
 export { registerObsidianIpc, initObsidian } from './obsidian'
 export { registerAuthIpc } from './auth'
 export { registerCalendarIpc } from './calendar'
+export { registerGitHubIpc } from './github'

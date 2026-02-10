@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 import type { TodaySection, VaultStatus, WeeklyNote } from '../shared/types/obsidian'
 import type { CalendarEvent } from '../shared/types/calendar'
+import type { GitHubNotification } from '../shared/types/github'
 
 // Obsidian API exposed to renderer
 const obsidianApi = {
@@ -44,11 +45,24 @@ const calendarApi = {
     ipcRenderer.invoke('calendar:refresh'),
 }
 
+// GitHub API exposed to renderer
+const githubApi = {
+  getNotifications: (): Promise<GitHubNotification[]> =>
+    ipcRenderer.invoke('github:getNotifications'),
+  markAsRead: (threadId: string): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke('github:markAsRead', threadId),
+  isConfigured: (): Promise<boolean> =>
+    ipcRenderer.invoke('github:isConfigured'),
+  setPAT: (pat: string): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke('github:setPAT', pat),
+}
+
 // Custom APIs for renderer
 const api = {
   obsidian: obsidianApi,
   auth: authApi,
   calendar: calendarApi,
+  github: githubApi,
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to

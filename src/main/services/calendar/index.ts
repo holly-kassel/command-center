@@ -1,3 +1,2 @@
 // Calendar service - Microsoft Graph API integration
-// Epic 3: Calendar Integration
-export {}
+export { CalendarService, getCalendarService } from './CalendarService'

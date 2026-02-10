@@ -1,3 +1,3 @@
 // Auth service - MSAL / safeStorage credential management
-// Epic 1: Foundation
-export {}
+export { credentialManager } from './CredentialManager'
+export { GraphAuthService, getGraphAuthService } from './OAuthFlow'

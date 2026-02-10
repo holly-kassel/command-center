@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 import type { TodaySection, VaultStatus, WeeklyNote } from '../shared/types/obsidian'
+import type { CalendarEvent } from '../shared/types/calendar'
 
 // Obsidian API exposed to renderer
 const obsidianApi = {
@@ -22,9 +23,32 @@ const obsidianApi = {
   },
 }
 
+// Auth API exposed to renderer
+const authApi = {
+  loginMicrosoft: (): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke('auth:loginMicrosoft'),
+  isAuthenticated: (): Promise<boolean> => ipcRenderer.invoke('auth:isAuthenticated'),
+  logout: (): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke('auth:logout'),
+}
+
+// Calendar API exposed to renderer
+const calendarApi = {
+  getTodayEvents: (): Promise<CalendarEvent[]> =>
+    ipcRenderer.invoke('calendar:getTodayEvents'),
+  getNextMeeting: (): Promise<CalendarEvent | null> =>
+    ipcRenderer.invoke('calendar:getNextMeeting'),
+  getEvents: (startISO: string, endISO: string): Promise<CalendarEvent[]> =>
+    ipcRenderer.invoke('calendar:getEvents', startISO, endISO),
+  refresh: (): Promise<{ success: boolean }> =>
+    ipcRenderer.invoke('calendar:refresh'),
+}
+
 // Custom APIs for renderer
 const api = {
   obsidian: obsidianApi,
+  auth: authApi,
+  calendar: calendarApi,
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to

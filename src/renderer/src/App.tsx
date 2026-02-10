@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useObsidianStore } from './store/obsidianStore'
 import { QuickCaptureBox } from './windows/Dashboard/QuickCaptureBox'
 import { TodayView } from './windows/Dashboard/TodayView'
+import { CalendarSection } from './windows/Dashboard/CalendarSection'
 
 function App(): React.JSX.Element {
   const initialize = useObsidianStore((s) => s.initialize)
@@ -32,6 +33,9 @@ function App(): React.JSX.Element {
 
         {/* Quick Capture */}
         <QuickCaptureBox />
+
+        {/* Calendar - next meeting + today's events */}
+        <CalendarSection />
 
         {/* Today's Section */}
         <TodayView />

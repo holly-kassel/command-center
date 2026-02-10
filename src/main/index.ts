@@ -1,8 +1,9 @@
+import 'dotenv/config'
 import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
-import { registerObsidianIpc, initObsidian } from './ipc'
+import { registerObsidianIpc, initObsidian, registerAuthIpc, registerCalendarIpc } from './ipc'
 
 function createWindow(): void {
   // Create the browser window.
@@ -57,8 +58,10 @@ app.whenReady().then(() => {
   // IPC test
   ipcMain.on('ping', () => console.log('pong'))
 
-  // Register Obsidian IPC handlers and initialize service
+  // Register IPC handlers
   registerObsidianIpc()
+  registerAuthIpc()
+  registerCalendarIpc()
   initObsidian()
 
   createWindow()

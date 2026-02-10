@@ -5,7 +5,7 @@
  * rendered markdown content, interactive checkboxes,
  * and an inline markdown editor toggle.
  */
-import { useState, useRef, useEffect, useCallback, type Components } from 'react'
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { useObsidianStore } from '../../store/obsidianStore'
@@ -17,6 +17,23 @@ export function TodayView(): React.JSX.Element {
   const [draft, setDraft] = useState('')
   const [saving, setSaving] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const checkboxIndexRef = useRef(0)
+
+  // Pre-compute the line offsets of all checkboxes in order of appearance
+  const checkboxLineOffsets = useMemo(() => {
+    if (!todaySection?.content) return []
+    const offsets: number[] = []
+    const lines = todaySection.content.split('\n')
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].match(/^\s*[-*]\s\[[ xX]\]/)) {
+        offsets.push(i)
+      }
+    }
+    return offsets
+  }, [todaySection?.content])
+
+  // Reset the checkbox counter before each render
+  checkboxIndexRef.current = 0
 
   // When entering edit mode, seed the draft with current content
   const startEditing = useCallback(() => {
@@ -76,24 +93,22 @@ export function TodayView(): React.JSX.Element {
     }
   }
 
-  // Build custom components for ReactMarkdown with interactive checkboxes
-  const markdownComponents: Components = {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    input: ({ node, ...props }) => {
+  // Custom checkbox renderer — uses a render-time counter to map
+  // each checkbox to its pre-computed line offset in the markdown source
+  const CheckboxInput = useCallback(
+    (props: React.InputHTMLAttributes<HTMLInputElement>) => {
       if (props.type === 'checkbox') {
-        // Find which line this checkbox is on by matching its position
-        // react-markdown passes sourcePosition from remark
-        const sourcePos = node?.position
-        const lineOffset = sourcePos ? sourcePos.start.line - 1 : -1
+        const idx = checkboxIndexRef.current++
+        const lineOffset = checkboxLineOffsets[idx]
 
         return (
           <input
-            {...props}
             type="checkbox"
+            checked={props.checked}
             disabled={false}
             className="cursor-pointer accent-primary w-4 h-4 mr-1.5 align-middle rounded"
             onChange={() => {
-              if (lineOffset >= 0) {
+              if (lineOffset !== undefined) {
                 handleCheckboxToggle(lineOffset)
               }
             }}
@@ -102,7 +117,8 @@ export function TodayView(): React.JSX.Element {
       }
       return <input {...props} />
     },
-  }
+    [checkboxLineOffsets, handleCheckboxToggle]
+  )
 
   if (isLoading) {
     return (
@@ -215,7 +231,7 @@ export function TodayView(): React.JSX.Element {
           </div>
         ) : (
           <div className="prose prose-sm max-w-none text-text-primary prose-headings:text-text-primary prose-a:text-primary break-words overflow-hidden [&_li]:marker:text-text-tertiary">
-            <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+            <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ input: CheckboxInput }}>
               {todaySection.content}
             </ReactMarkdown>
           </div>

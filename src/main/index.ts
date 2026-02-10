@@ -8,9 +8,9 @@ import { registerObsidianIpc, initObsidian, registerAuthIpc, registerCalendarIpc
 function createWindow(): void {
   // Create the browser window.
   const mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
-    minWidth: 800,
+    width: 1400,
+    height: 900,
+    minWidth: 900,
     minHeight: 600,
     show: false,
     title: 'Command Center',

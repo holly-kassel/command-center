@@ -1,8 +1,10 @@
 // Dashboard window components
+export { Dashboard } from './Dashboard'
 export { QuickCaptureBox } from './QuickCaptureBox'
 export { TodayView } from './TodayView'
 export { CalendarSection } from './CalendarSection'
 export { MeetingCard } from './MeetingCard'
 export { CountdownTimer } from './CountdownTimer'
+export { FocusSection } from './FocusSection'
 export { NotificationsPanel } from './NotificationsPanel'
 export { NotificationItem } from './NotificationItem'

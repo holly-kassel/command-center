@@ -135,6 +135,126 @@ export class ObsidianService {
     return parsed
   }
 
+  // ─── Update today's content ──────────────────────────────────────
+
+  /**
+   * Replace today's section content in the weekly note file.
+   * Used by the inline markdown editor and checkbox toggling.
+   *
+   * Strategy:
+   * 1. Read the full weekly note
+   * 2. Find today's section boundaries
+   * 3. Replace the content between boundaries with new content
+   * 4. Write back with backup safety
+   */
+  async updateTodayContent(newContent: string): Promise<void> {
+    if (!this.vaultPath) {
+      throw new Error('Vault path not set')
+    }
+
+    const filePath = getWeekFilePath(this.vaultPath)
+    if (!existsSync(filePath)) {
+      throw new Error(`Weekly note not found: ${filePath}`)
+    }
+
+    const backupPath = `${filePath}.backup`
+    const now = new Date()
+    const dayOfWeek = getDayOfWeek(now)
+
+    try {
+      await copyFile(filePath, backupPath)
+
+      const content = await readFile(filePath, 'utf-8')
+      const lines = content.split('\n')
+
+      const { sectionStart, sectionEnd } = findDaySection(lines, dayOfWeek)
+      if (sectionStart === -1) {
+        throw new Error(`Could not find section for ${dayOfWeek} in ${filePath}`)
+      }
+
+      // Replace the section content (between header and next section)
+      const newLines = newContent.split('\n')
+      lines.splice(sectionStart, sectionEnd - sectionStart, ...newLines)
+
+      await writeFile(filePath, lines.join('\n'), 'utf-8')
+      await unlink(backupPath)
+
+      log.info(`[Obsidian] Updated ${dayOfWeek} section content`)
+    } catch (error) {
+      if (existsSync(backupPath)) {
+        try {
+          await copyFile(backupPath, filePath)
+          await unlink(backupPath)
+          log.info('[Obsidian] Restored from backup after error')
+        } catch {
+          log.error('[Obsidian] Failed to restore backup')
+        }
+      }
+      throw error
+    }
+  }
+
+  /**
+   * Toggle a checkbox at a given line offset within today's section.
+   * lineOffset is 0-based relative to the section content.
+   * Switches `- [ ]` ↔ `- [x]` (or `* [ ]` ↔ `* [x]`).
+   */
+  async toggleCheckbox(lineOffset: number): Promise<void> {
+    if (!this.vaultPath) {
+      throw new Error('Vault path not set')
+    }
+
+    const filePath = getWeekFilePath(this.vaultPath)
+    if (!existsSync(filePath)) {
+      throw new Error(`Weekly note not found: ${filePath}`)
+    }
+
+    const backupPath = `${filePath}.backup`
+    const now = new Date()
+    const dayOfWeek = getDayOfWeek(now)
+
+    try {
+      await copyFile(filePath, backupPath)
+
+      const content = await readFile(filePath, 'utf-8')
+      const lines = content.split('\n')
+
+      const { sectionStart, sectionEnd } = findDaySection(lines, dayOfWeek)
+      if (sectionStart === -1) {
+        throw new Error(`Could not find section for ${dayOfWeek}`)
+      }
+
+      const absoluteLine = sectionStart + lineOffset
+      if (absoluteLine >= sectionEnd) {
+        throw new Error(`Line offset ${lineOffset} is out of section bounds`)
+      }
+
+      const line = lines[absoluteLine]
+      if (line.match(/^(\s*[-*]\s)\[ \]/)) {
+        lines[absoluteLine] = line.replace(/^(\s*[-*]\s)\[ \]/, '$1[x]')
+      } else if (line.match(/^(\s*[-*]\s)\[x\]/i)) {
+        lines[absoluteLine] = line.replace(/^(\s*[-*]\s)\[x\]/i, '$1[ ]')
+      } else {
+        throw new Error(`Line ${lineOffset} is not a checkbox`)
+      }
+
+      await writeFile(filePath, lines.join('\n'), 'utf-8')
+      await unlink(backupPath)
+
+      log.info(`[Obsidian] Toggled checkbox at line ${absoluteLine} in ${dayOfWeek}`)
+    } catch (error) {
+      if (existsSync(backupPath)) {
+        try {
+          await copyFile(backupPath, filePath)
+          await unlink(backupPath)
+        } catch {
+          log.error('[Obsidian] Failed to restore backup')
+        }
+      }
+      throw error
+    }
+  }
+
   // ─── Quick Capture (append to today) ─────────────────────────────
 
   /**

@@ -13,6 +13,8 @@ interface ObsidianApi {
   getCurrentFocus(): Promise<string | null>
   getWeeklyNote(): Promise<WeeklyNote | null>
   appendToToday(text: string): Promise<void>
+  updateTodayContent(content: string): Promise<void>
+  toggleCheckbox(lineOffset: number): Promise<void>
   onFileChanged(callback: (data: { filePath: string }) => void): () => void
   onSyncUpdate(callback: (data: { todaySection: TodaySection | null; currentFocus: string | null }) => void): () => void
 }

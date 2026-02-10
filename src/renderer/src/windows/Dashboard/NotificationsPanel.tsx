@@ -163,7 +163,7 @@ export function NotificationsPanel(): React.ReactElement {
   // ─── Configured ────────────────────────────────────────────────
 
   return (
-    <section className="rounded-xl border border-surface-border/60 bg-surface-secondary/30 p-4">
+    <section className="rounded-xl border border-surface-border/60 bg-surface-secondary/30 p-4 overflow-hidden">
       {/* Header */}
       <div className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-2">

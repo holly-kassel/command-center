@@ -84,6 +84,24 @@ export function registerObsidianIpc(): void {
       throw error
     }
   })
+
+  ipcMain.handle('obsidian:updateTodayContent', async (_event, content: string) => {
+    try {
+      await obsidian.updateTodayContent(content)
+    } catch (error) {
+      log.error('[IPC] obsidian:updateTodayContent error:', error)
+      throw error
+    }
+  })
+
+  ipcMain.handle('obsidian:toggleCheckbox', async (_event, lineOffset: number) => {
+    try {
+      await obsidian.toggleCheckbox(lineOffset)
+    } catch (error) {
+      log.error('[IPC] obsidian:toggleCheckbox error:', error)
+      throw error
+    }
+  })
 }
 
 /**

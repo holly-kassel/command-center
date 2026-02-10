@@ -107,9 +107,9 @@ export const NotificationItem = memo(function NotificationItem({
       </span>
 
       {/* Content */}
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1 overflow-hidden">
         <div className="text-text-tertiary text-xs">{notification.repository}</div>
-        <div className="text-text-primary mt-0.5 truncate text-sm">{notification.title}</div>
+        <div className="text-text-primary mt-0.5 truncate text-sm break-all">{notification.title}</div>
         <div className="text-text-tertiary mt-0.5 text-xs">{timeAgo(notification.updatedAt)}</div>
       </div>
 

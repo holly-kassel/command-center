@@ -19,6 +19,8 @@ interface ObsidianState {
   initialize: () => Promise<void>
   fetchTodaySection: () => Promise<void>
   appendToToday: (text: string) => Promise<void>
+  updateTodayContent: (content: string) => Promise<void>
+  toggleCheckbox: (lineOffset: number) => Promise<void>
   refreshAll: () => Promise<void>
 }
 
@@ -68,12 +70,33 @@ export const useObsidianStore = create<ObsidianState>((set, get) => ({
   appendToToday: async (text: string) => {
     try {
       await window.api.obsidian.appendToToday(text)
-      // Refresh after appending
       await get().fetchTodaySection()
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to append'
       set({ error: message })
-      throw error // Re-throw so UI can show toast
+      throw error
+    }
+  },
+
+  updateTodayContent: async (content: string) => {
+    try {
+      await window.api.obsidian.updateTodayContent(content)
+      await get().fetchTodaySection()
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to save'
+      set({ error: message })
+      throw error
+    }
+  },
+
+  toggleCheckbox: async (lineOffset: number) => {
+    try {
+      await window.api.obsidian.toggleCheckbox(lineOffset)
+      await get().fetchTodaySection()
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to toggle checkbox'
+      set({ error: message })
+      throw error
     }
   },
 

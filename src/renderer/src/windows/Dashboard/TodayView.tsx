@@ -2,13 +2,107 @@
  * TodayView
  *
  * Displays today's section from the weekly note with
- * rendered markdown content and current focus indicator.
+ * rendered markdown content, interactive checkboxes,
+ * and an inline markdown editor toggle.
  */
+import { useState, useRef, useEffect, useCallback, type Components } from 'react'
 import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { useObsidianStore } from '../../store/obsidianStore'
+import { toast } from '../../utils/toast'
 
 export function TodayView(): React.JSX.Element {
-  const { todaySection, currentFocus, isLoading, error, vaultStatus } = useObsidianStore()
+  const { todaySection, currentFocus, isLoading, error, vaultStatus, updateTodayContent, toggleCheckbox } = useObsidianStore()
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState('')
+  const [saving, setSaving] = useState(false)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  // When entering edit mode, seed the draft with current content
+  const startEditing = useCallback(() => {
+    if (todaySection) {
+      setDraft(todaySection.content)
+      setEditing(true)
+    }
+  }, [todaySection])
+
+  // Auto-focus and auto-resize textarea
+  useEffect(() => {
+    if (editing && textareaRef.current) {
+      textareaRef.current.focus()
+      autoResize(textareaRef.current)
+    }
+  }, [editing])
+
+  const autoResize = (el: HTMLTextAreaElement): void => {
+    el.style.height = 'auto'
+    el.style.height = `${el.scrollHeight}px`
+  }
+
+  const handleSave = async (): Promise<void> => {
+    setSaving(true)
+    try {
+      await updateTodayContent(draft)
+      setEditing(false)
+      toast.saved('Note saved')
+    } catch {
+      toast.error('Failed to save')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleCancel = (): void => {
+    setEditing(false)
+    setDraft('')
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>): void => {
+    if (e.key === 's' && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault()
+      handleSave()
+    }
+    if (e.key === 'Escape') {
+      handleCancel()
+    }
+  }
+
+  // Handle checkbox clicks in rendered markdown
+  const handleCheckboxToggle = async (lineOffset: number): Promise<void> => {
+    try {
+      await toggleCheckbox(lineOffset)
+    } catch {
+      toast.error('Failed to toggle checkbox')
+    }
+  }
+
+  // Build custom components for ReactMarkdown with interactive checkboxes
+  const markdownComponents: Components = {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    input: ({ node, ...props }) => {
+      if (props.type === 'checkbox') {
+        // Find which line this checkbox is on by matching its position
+        // react-markdown passes sourcePosition from remark
+        const sourcePos = node?.position
+        const lineOffset = sourcePos ? sourcePos.start.line - 1 : -1
+
+        return (
+          <input
+            {...props}
+            type="checkbox"
+            disabled={false}
+            className="cursor-pointer accent-primary w-4 h-4 mr-1.5 align-middle rounded"
+            onChange={() => {
+              if (lineOffset >= 0) {
+                handleCheckboxToggle(lineOffset)
+              }
+            }}
+          />
+        )
+      }
+      return <input {...props} />
+    },
+  }
 
   if (isLoading) {
     return (
@@ -56,24 +150,76 @@ export function TodayView(): React.JSX.Element {
 
   return (
     <div className="space-y-4">
-      {/* Header with day name and focus */}
+      {/* Header with day name, focus, and edit toggle */}
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold text-text-primary">
           {todaySection.dayOfWeek}
           <span className="text-text-muted font-normal text-sm ml-2">{todaySection.date}</span>
         </h2>
-        {currentFocus && (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-warning-light text-warning text-xs font-medium">
-            🔔 {currentFocus}
-          </span>
-        )}
+        <div className="flex items-center gap-2">
+          {currentFocus && (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-warning-light text-warning text-xs font-medium">
+              🔔 {currentFocus}
+            </span>
+          )}
+          {!editing && (
+            <button
+              onClick={startEditing}
+              className="p-1.5 rounded-md text-text-muted hover:text-text-primary hover:bg-surface-muted transition-colors"
+              title="Edit markdown"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/>
+                <path d="m15 5 4 4"/>
+              </svg>
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* Today's content rendered as markdown */}
+      {/* Content: edit mode or rendered view */}
       <div className="card">
-        <div className="prose prose-sm max-w-none text-text-primary prose-headings:text-text-primary prose-a:text-primary">
-          <ReactMarkdown>{todaySection.content}</ReactMarkdown>
-        </div>
+        {editing ? (
+          <div className="space-y-3">
+            <textarea
+              ref={textareaRef}
+              value={draft}
+              onChange={(e) => {
+                setDraft(e.target.value)
+                autoResize(e.target)
+              }}
+              onKeyDown={handleKeyDown}
+              className="w-full bg-transparent text-text-primary font-mono text-sm leading-relaxed resize-none outline-none border border-border rounded-lg p-3 focus:border-primary/50 focus:ring-1 focus:ring-primary/20 transition-colors min-h-[200px]"
+              spellCheck={false}
+            />
+            <div className="flex items-center justify-between">
+              <span className="text-text-muted text-xs">
+                ⌘S save · Esc cancel
+              </span>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleCancel}
+                  className="px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary rounded-md hover:bg-surface-muted transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="px-3 py-1.5 text-xs bg-primary/20 text-primary rounded-md hover:bg-primary/30 transition-colors disabled:opacity-50"
+                >
+                  {saving ? 'Saving…' : 'Save'}
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="prose prose-sm max-w-none text-text-primary prose-headings:text-text-primary prose-a:text-primary break-words overflow-hidden [&_li]:marker:text-text-tertiary">
+            <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+              {todaySection.content}
+            </ReactMarkdown>
+          </div>
+        )}
       </div>
     </div>
   )

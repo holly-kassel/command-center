@@ -135,27 +135,27 @@ export function Dashboard(): React.ReactElement {
           {/* Main grid: 3 columns on lg, 1 on small */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             {/* Calendar — spans 2 cols */}
-            <div className="lg:col-span-2">
+            <div className="lg:col-span-2 min-w-0">
               <CalendarSection />
             </div>
 
             {/* Focus — right column */}
-            <div>
+            <div className="min-w-0">
               <FocusSection />
             </div>
 
             {/* Today's notes — spans 2 cols */}
-            <div className="lg:col-span-2">
+            <div className="lg:col-span-2 min-w-0">
               <TodayView />
             </div>
 
             {/* Notifications — right column */}
-            <div>
+            <div className="min-w-0">
               <NotificationsPanel />
             </div>
 
             {/* Slack Parser — spans 2 cols */}
-            <div className="lg:col-span-2">
+            <div className="lg:col-span-2 min-w-0">
               <SlackParserPanel />
             </div>
           </div>

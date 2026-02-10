@@ -82,6 +82,7 @@ body {
   padding: 1.25rem;
   box-shadow: var(--shadow-card);
   transition: box-shadow 0.2s ease, border-color 0.2s ease;
+  overflow: hidden;
 }
 
 .card:hover {
@@ -256,6 +257,19 @@ section.rounded-xl {
   --tw-prose-quotes: var(--color-text-secondary);
   --tw-prose-code: var(--color-accent);
   --tw-prose-hr: var(--color-border);
+}
+
+/* ─── Mascot animations ──────────────────────────────── */
+
+/* ─── Interactive checkboxes in rendered markdown ───── */
+.prose li:has(> input[type='checkbox']) {
+  list-style: none;
+  margin-left: -1.25em;
+}
+
+.prose li:has(> input[type='checkbox']:checked) {
+  text-decoration: line-through;
+  opacity: 0.6;
 }
 
 /* ─── Mascot animations ──────────────────────────────── */

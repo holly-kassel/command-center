@@ -17,6 +17,10 @@ const obsidianApi = {
   getWeeklyNote: (): Promise<WeeklyNote | null> => ipcRenderer.invoke('obsidian:getWeeklyNote'),
   appendToToday: (text: string): Promise<void> =>
     ipcRenderer.invoke('obsidian:appendToToday', text),
+  updateTodayContent: (content: string): Promise<void> =>
+    ipcRenderer.invoke('obsidian:updateTodayContent', content),
+  toggleCheckbox: (lineOffset: number): Promise<void> =>
+    ipcRenderer.invoke('obsidian:toggleCheckbox', lineOffset),
   onFileChanged: (callback: (data: { filePath: string }) => void): (() => void) => {
     const handler = (_event: Electron.IpcRendererEvent, data: { filePath: string }): void => {
       callback(data)

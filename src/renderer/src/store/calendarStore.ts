@@ -100,3 +100,11 @@ export const useCalendarStore = create<CalendarState>((set, get) => ({
     })
   },
 }))
+
+// Listen for push updates from SyncManager
+window.api.calendar.onSyncUpdate((events) => {
+  useCalendarStore.setState({ events, lastRefresh: Date.now() })
+})
+window.api.calendar.onNextMeetingUpdate((meeting) => {
+  useCalendarStore.setState({ nextMeeting: meeting })
+})

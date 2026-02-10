@@ -24,6 +24,11 @@ const obsidianApi = {
     ipcRenderer.on('obsidian:file-changed', handler)
     return () => ipcRenderer.removeListener('obsidian:file-changed', handler)
   },
+  onSyncUpdate: (callback: (data: { todaySection: unknown; currentFocus: string | null }) => void): (() => void) => {
+    const handler = (_e: Electron.IpcRendererEvent, data: { todaySection: unknown; currentFocus: string | null }): void => callback(data)
+    ipcRenderer.on('sync:obsidian', handler)
+    return () => ipcRenderer.removeListener('sync:obsidian', handler)
+  },
 }
 
 // Auth API exposed to renderer
@@ -45,6 +50,16 @@ const calendarApi = {
     ipcRenderer.invoke('calendar:getEvents', startISO, endISO),
   refresh: (): Promise<{ success: boolean }> =>
     ipcRenderer.invoke('calendar:refresh'),
+  onSyncUpdate: (callback: (events: CalendarEvent[]) => void): (() => void) => {
+    const handler = (_e: Electron.IpcRendererEvent, events: CalendarEvent[]): void => callback(events)
+    ipcRenderer.on('sync:calendar', handler)
+    return () => ipcRenderer.removeListener('sync:calendar', handler)
+  },
+  onNextMeetingUpdate: (callback: (meeting: CalendarEvent | null) => void): (() => void) => {
+    const handler = (_e: Electron.IpcRendererEvent, meeting: CalendarEvent | null): void => callback(meeting)
+    ipcRenderer.on('sync:nextMeeting', handler)
+    return () => ipcRenderer.removeListener('sync:nextMeeting', handler)
+  },
 }
 
 // GitHub API exposed to renderer
@@ -57,6 +72,11 @@ const githubApi = {
     ipcRenderer.invoke('github:isConfigured'),
   setPAT: (pat: string): Promise<{ success: boolean; error?: string }> =>
     ipcRenderer.invoke('github:setPAT', pat),
+  onSyncUpdate: (callback: (notifications: GitHubNotification[]) => void): (() => void) => {
+    const handler = (_e: Electron.IpcRendererEvent, notifs: GitHubNotification[]): void => callback(notifs)
+    ipcRenderer.on('sync:github', handler)
+    return () => ipcRenderer.removeListener('sync:github', handler)
+  },
 }
 
 // Slack API exposed to renderer

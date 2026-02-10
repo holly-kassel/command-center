@@ -5,8 +5,10 @@ import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { registerObsidianIpc, initObsidian, registerAuthIpc, registerCalendarIpc, registerGitHubIpc, registerSlackIpc, registerSettingsIpc } from './ipc'
 import { HotkeyManager } from './services/hotkey/HotkeyManager'
+import { getSyncManager } from './services/sync/SyncManager'
 
 const hotkeyManager = new HotkeyManager()
+const syncManager = getSyncManager()
 
 function createWindow(): BrowserWindow {
   // Create the browser window.
@@ -77,6 +79,9 @@ app.whenReady().then(() => {
   // Register global hotkeys for overlay windows
   hotkeyManager.registerHotkeys(mainWindow)
 
+  // Start auto-sync (calendar, github, obsidian)
+  syncManager.startAutoSync(mainWindow)
+
   app.on('activate', function () {
     // On macOS it's common to re-create a window in the app when the
     // dock icon is clicked and there are no other windows open.
@@ -95,6 +100,7 @@ app.on('window-all-closed', () => {
 
 app.on('will-quit', () => {
   hotkeyManager.unregisterAll()
+  syncManager.stopAutoSync()
 })
 
 // In this file you can include the rest of your app's specific main process

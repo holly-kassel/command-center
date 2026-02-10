@@ -101,3 +101,12 @@ export const useGitHubStore = create<GitHubState>((set, get) => ({
     }
   },
 }))
+
+// Listen for push updates from SyncManager
+window.api.github.onSyncUpdate((notifications) => {
+  useGitHubStore.setState({
+    notifications,
+    actionableCount: notifications.filter((n) => n.unread).length,
+    lastRefresh: Date.now(),
+  })
+})

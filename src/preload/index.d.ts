@@ -14,6 +14,7 @@ interface ObsidianApi {
   getWeeklyNote(): Promise<WeeklyNote | null>
   appendToToday(text: string): Promise<void>
   onFileChanged(callback: (data: { filePath: string }) => void): () => void
+  onSyncUpdate(callback: (data: { todaySection: TodaySection | null; currentFocus: string | null }) => void): () => void
 }
 
 interface AuthApi {
@@ -27,6 +28,8 @@ interface CalendarApi {
   getNextMeeting(): Promise<CalendarEvent | null>
   getEvents(startISO: string, endISO: string): Promise<CalendarEvent[]>
   refresh(): Promise<{ success: boolean }>
+  onSyncUpdate(callback: (events: CalendarEvent[]) => void): () => void
+  onNextMeetingUpdate(callback: (meeting: CalendarEvent | null) => void): () => void
 }
 
 interface GitHubApi {
@@ -34,6 +37,7 @@ interface GitHubApi {
   markAsRead(threadId: string): Promise<{ success: boolean; error?: string }>
   isConfigured(): Promise<boolean>
   setPAT(pat: string): Promise<{ success: boolean; error?: string }>
+  onSyncUpdate(callback: (notifications: GitHubNotification[]) => void): () => void
 }
 
 interface SlackApi {

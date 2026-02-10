@@ -93,3 +93,12 @@ export const useObsidianStore = create<ObsidianState>((set, get) => ({
     }
   },
 }))
+
+// Listen for push updates from SyncManager
+window.api.obsidian.onSyncUpdate(({ todaySection, currentFocus }) => {
+  useObsidianStore.setState({
+    todaySection,
+    currentFocus,
+    error: null,
+  })
+})

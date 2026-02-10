@@ -340,9 +340,6 @@ export function SettingsPanel({ onClose }: { onClose: () => void }): React.React
               </button>
             ))}
           </div>
-          <p className="text-xs text-text-muted mt-1 italic">
-            Light theme coming soon — Aurora Dark is the default
-          </p>
         </Label>
       </Section>
 

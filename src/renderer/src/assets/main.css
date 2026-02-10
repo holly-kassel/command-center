@@ -184,3 +184,75 @@ section.rounded-xl {
   @apply px-4 py-2 rounded-xl text-text-muted hover:text-text-secondary
          text-sm transition-colors;
 }
+
+/* ─────────────────────────────────────────────────────── */
+/* Aurora Light Theme                                      */
+/* ─────────────────────────────────────────────────────── */
+[data-theme='light'] {
+  --color-focus: #059669;
+  --color-focus-light: #d1fae5;
+  --color-warning: #d97706;
+  --color-warning-light: #fef3c7;
+  --color-urgent: #e11d48;
+  --color-urgent-light: #ffe4e6;
+  --color-primary: #2563eb;
+  --color-primary-light: #dbeafe;
+  --color-accent: #7c3aed;
+  --color-accent-light: #ede9fe;
+
+  --color-surface: rgba(255, 255, 255, 0.85);
+  --color-surface-hover: rgba(243, 244, 246, 0.9);
+  --color-surface-muted: rgba(229, 231, 235, 0.6);
+  --color-surface-secondary: rgba(249, 250, 251, 0.7);
+  --color-surface-border: rgba(209, 213, 219, 0.6);
+  --color-background: #f8f9fb;
+  --color-background-dark: #eef0f4;
+
+  --color-text-primary: #1f2937;
+  --color-text-secondary: #4b5563;
+  --color-text-tertiary: #6b7280;
+  --color-text-muted: #9ca3af;
+  --color-text-inverse: #f9fafb;
+
+  --color-border: rgba(209, 213, 219, 0.5);
+  --color-border-focus: #059669;
+
+  --shadow-card: 0 1px 3px 0 rgba(0, 0, 0, 0.06), 0 1px 2px -1px rgba(0, 0, 0, 0.06);
+  --shadow-card-hover: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -2px rgba(0, 0, 0, 0.06);
+}
+
+[data-theme='light'] .bg-background {
+  background:
+    radial-gradient(ellipse 80% 50% at 20% 0%, rgba(99, 102, 241, 0.04) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 40% at 80% 100%, rgba(52, 211, 153, 0.03) 0%, transparent 50%),
+    radial-gradient(ellipse 40% 30% at 50% 50%, rgba(167, 139, 250, 0.02) 0%, transparent 50%),
+    var(--color-background);
+}
+
+[data-theme='light'] .card {
+  background: rgba(255, 255, 255, 0.75);
+  border-color: rgba(209, 213, 219, 0.4);
+}
+
+[data-theme='light'] .card:hover {
+  border-color: rgba(209, 213, 219, 0.6);
+}
+
+[data-theme='light'] ::-webkit-scrollbar-thumb {
+  background: rgba(156, 163, 175, 0.3);
+}
+
+[data-theme='light'] ::-webkit-scrollbar-thumb:hover {
+  background: rgba(156, 163, 175, 0.5);
+}
+
+[data-theme='light'] .prose {
+  --tw-prose-body: var(--color-text-primary);
+  --tw-prose-headings: var(--color-text-primary);
+  --tw-prose-links: var(--color-primary);
+  --tw-prose-bold: var(--color-text-primary);
+  --tw-prose-bullets: var(--color-text-tertiary);
+  --tw-prose-quotes: var(--color-text-secondary);
+  --tw-prose-code: var(--color-accent);
+  --tw-prose-hr: var(--color-border);
+}

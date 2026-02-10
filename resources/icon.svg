@@ -1,0 +1,111 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Aurora gradient background -->
+    <linearGradient id="aurora" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e1b4b"/>
+      <stop offset="30%" stop-color="#1e3a5f"/>
+      <stop offset="60%" stop-color="#064e3b"/>
+      <stop offset="100%" stop-color="#1e1b4b"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="45%" r="45%">
+      <stop offset="0%" stop-color="rgba(52,211,153,0.15)"/>
+      <stop offset="60%" stop-color="rgba(96,165,250,0.08)"/>
+      <stop offset="100%" stop-color="transparent"/>
+    </radialGradient>
+    <!-- Fur highlight gradient -->
+    <radialGradient id="furHighlight" cx="50%" cy="35%" r="50%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="70%" stop-color="#f0f0f0"/>
+      <stop offset="100%" stop-color="#e0e0e5"/>
+    </radialGradient>
+    <!-- Nose gradient -->
+    <radialGradient id="nose" cx="45%" cy="40%" r="50%">
+      <stop offset="0%" stop-color="#3a3a3a"/>
+      <stop offset="100%" stop-color="#1a1a1a"/>
+    </radialGradient>
+    <!-- Cheek blush -->
+    <radialGradient id="blush" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="rgba(251,191,36,0.18)"/>
+      <stop offset="100%" stop-color="transparent"/>
+    </radialGradient>
+    <!-- Aurora shimmer on ears -->
+    <linearGradient id="earShimmer" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="rgba(167,139,250,0.15)"/>
+      <stop offset="50%" stop-color="rgba(52,211,153,0.1)"/>
+      <stop offset="100%" stop-color="rgba(96,165,250,0.15)"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Rounded square background -->
+  <rect x="16" y="16" width="480" height="480" rx="112" ry="112" fill="url(#aurora)"/>
+  <rect x="16" y="16" width="480" height="480" rx="112" ry="112" fill="url(#glow)"/>
+
+  <!-- Subtle aurora streaks -->
+  <ellipse cx="180" cy="120" rx="140" ry="40" fill="rgba(167,139,250,0.06)" transform="rotate(-15 180 120)"/>
+  <ellipse cx="340" cy="400" rx="120" ry="35" fill="rgba(52,211,153,0.05)" transform="rotate(10 340 400)"/>
+
+  <!-- =====  SAMOYED ===== -->
+
+  <!-- Fluffy body / chest (behind head) -->
+  <ellipse cx="256" cy="410" rx="130" ry="80" fill="#f5f5f5" opacity="0.9"/>
+
+  <!-- Left ear -->
+  <ellipse cx="175" cy="160" rx="48" ry="62" fill="url(#furHighlight)" transform="rotate(-12 175 160)"/>
+  <ellipse cx="175" cy="160" rx="35" ry="45" fill="url(#earShimmer)" transform="rotate(-12 175 160)"/>
+
+  <!-- Right ear -->
+  <ellipse cx="337" cy="160" rx="48" ry="62" fill="url(#furHighlight)" transform="rotate(12 337 160)"/>
+  <ellipse cx="337" cy="160" rx="35" ry="45" fill="url(#earShimmer)" transform="rotate(12 337 160)"/>
+
+  <!-- Head — big fluffy circle -->
+  <circle cx="256" cy="260" r="130" fill="url(#furHighlight)"/>
+
+  <!-- Fluffy cheek fur (left) -->
+  <ellipse cx="160" cy="290" rx="55" ry="50" fill="#f8f8f8"/>
+  <!-- Fluffy cheek fur (right) -->
+  <ellipse cx="352" cy="290" rx="55" ry="50" fill="#f8f8f8"/>
+
+  <!-- Forehead fur tuft -->
+  <ellipse cx="256" cy="155" rx="60" ry="30" fill="#fafafa"/>
+
+  <!-- Eyes — dark and sparkly -->
+  <!-- Left eye -->
+  <ellipse cx="215" cy="245" rx="16" ry="17" fill="#1a1a1a"/>
+  <circle cx="210" cy="240" r="5" fill="rgba(255,255,255,0.85)"/>
+  <circle cx="220" cy="248" r="2.5" fill="rgba(255,255,255,0.5)"/>
+
+  <!-- Right eye -->
+  <ellipse cx="297" cy="245" rx="16" ry="17" fill="#1a1a1a"/>
+  <circle cx="292" cy="240" r="5" fill="rgba(255,255,255,0.85)"/>
+  <circle cx="302" cy="248" r="2.5" fill="rgba(255,255,255,0.5)"/>
+
+  <!-- Snout area — slightly lighter -->
+  <ellipse cx="256" cy="300" rx="52" ry="40" fill="#fefefe"/>
+
+  <!-- Nose -->
+  <ellipse cx="256" cy="286" rx="18" ry="13" fill="url(#nose)"/>
+  <!-- Nose highlight -->
+  <ellipse cx="252" cy="283" rx="6" ry="4" fill="rgba(255,255,255,0.2)"/>
+
+  <!-- Mouth — the famous Samoyed smile! -->
+  <path d="M 235 298 Q 245 316 256 308 Q 267 316 277 298"
+        fill="none" stroke="#2a2a2a" stroke-width="2.5" stroke-linecap="round"/>
+
+  <!-- Tongue peeking out -->
+  <ellipse cx="256" cy="314" rx="8" ry="10" fill="#f87171" opacity="0.8"/>
+
+  <!-- Cheek blush (subtle warmth) -->
+  <circle cx="192" cy="275" r="22" fill="url(#blush)"/>
+  <circle cx="320" cy="275" r="22" fill="url(#blush)"/>
+
+  <!-- Subtle aurora reflection on fur -->
+  <circle cx="256" cy="260" r="128" fill="none" stroke="rgba(52,211,153,0.06)" stroke-width="3"/>
+
+  <!-- Tiny sparkle near left ear (aurora accent) -->
+  <circle cx="140" cy="130" r="3" fill="#34d399" opacity="0.7"/>
+  <circle cx="145" cy="125" r="1.5" fill="#60a5fa" opacity="0.5"/>
+
+  <!-- Tiny sparkle near right ear -->
+  <circle cx="375" cy="135" r="2.5" fill="#a78bfa" opacity="0.6"/>
+  <circle cx="370" cy="128" r="1.5" fill="#34d399" opacity="0.4"/>
+</svg>

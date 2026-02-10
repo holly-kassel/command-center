@@ -72,6 +72,13 @@ export function Dashboard(): React.ReactElement {
     return () => cleanup?.()
   }, [])
 
+  // Listen for Settings from app menu (Cmd+,)
+  useEffect(() => {
+    const handler = (): void => setShowSettings(true)
+    const cleanup = window.api.settings.onOpenSettings?.(handler)
+    return () => cleanup?.()
+  }, [])
+
   return (
     <div className="h-screen flex flex-col bg-background overflow-hidden">
       {/* Titlebar drag region */}

@@ -101,6 +101,11 @@ const settingsApi = {
     ipcRenderer.on('app:toggleFocusMode', handler)
     return () => ipcRenderer.removeListener('app:toggleFocusMode', handler)
   },
+  onOpenSettings: (callback: () => void): (() => void) => {
+    const handler = (): void => callback()
+    ipcRenderer.on('menu:openSettings', handler)
+    return () => ipcRenderer.removeListener('menu:openSettings', handler)
+  },
 }
 
 // Custom APIs for renderer

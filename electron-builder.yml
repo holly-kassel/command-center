@@ -1,5 +1,5 @@
 appId: com.hollykassel.command-center
-productName: Command Center
+productName: "Holly's Command Center"
 directories:
   buildResources: build
 files:
@@ -26,6 +26,8 @@ mac:
     - NSDocumentsFolderUsageDescription: Application requests access to the user's Documents folder.
     - NSDownloadsFolderUsageDescription: Application requests access to the user's Downloads folder.
   notarize: false
+  icon: build/icon.icns
+  category: public.app-category.productivity
 dmg:
   artifactName: ${name}-${version}.${ext}
 linux:

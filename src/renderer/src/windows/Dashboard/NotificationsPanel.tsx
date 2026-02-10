@@ -4,7 +4,7 @@
  * Shows actionable GitHub notifications grouped by reason.
  * Includes PAT setup flow and auto-refresh.
  */
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useGitHubStore } from '../../store/githubStore'
 import { NotificationItem } from './NotificationItem'
 import { Skeleton } from '../../components/ui/Skeleton'
@@ -158,7 +158,7 @@ export function NotificationsPanel(): React.ReactElement {
   }
 
   // ─── Configured ────────────────────────────────────────────────
-  const groups = groupByReason(notifications)
+  const groups = useMemo(() => groupByReason(notifications), [notifications])
 
   return (
     <section className="rounded-xl border border-surface-border/60 bg-surface-secondary/30 p-4">

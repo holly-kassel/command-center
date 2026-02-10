@@ -5,6 +5,7 @@
  * click-to-open, and mark-as-read button.
  */
 import type { GitHubNotification, NotificationReason } from '@shared/types/github'
+import { memo } from 'react'
 
 interface NotificationItemProps {
   notification: GitHubNotification
@@ -78,7 +79,7 @@ function timeAgo(isoDate: string): string {
   return `${days}d ago`
 }
 
-export function NotificationItem({
+export const NotificationItem = memo(function NotificationItem({
   notification,
   onMarkAsRead,
 }: NotificationItemProps): React.ReactElement {
@@ -127,4 +128,4 @@ export function NotificationItem({
       )}
     </div>
   )
-}
+})

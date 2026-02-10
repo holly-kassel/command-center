@@ -1,6 +1,6 @@
 {
   "name": "command-center",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Personal productivity dashboard — calendar, Obsidian notes, GitHub notifications, and quick capture in one place",
   "main": "./out/main/index.js",
   "author": "Holly Kassel",

@@ -6,6 +6,7 @@ import icon from '../../resources/icon.png?asset'
 import { registerObsidianIpc, initObsidian, registerAuthIpc, registerCalendarIpc, registerGitHubIpc, registerSlackIpc, registerSettingsIpc } from './ipc'
 import { HotkeyManager } from './services/hotkey/HotkeyManager'
 import { getSyncManager } from './services/sync/SyncManager'
+import { buildAppMenu } from './menu'
 
 const hotkeyManager = new HotkeyManager()
 const syncManager = getSyncManager()
@@ -75,6 +76,9 @@ app.whenReady().then(() => {
   initObsidian()
 
   const mainWindow = createWindow()
+
+  // Build native app menu
+  buildAppMenu()
 
   // Register global hotkeys for overlay windows
   hotkeyManager.registerHotkeys(mainWindow)

@@ -4,6 +4,7 @@
  * Displays a single calendar event with time, title, location, and join button.
  */
 import type { CalendarEvent } from '@shared/types/calendar'
+import { memo } from 'react'
 
 interface MeetingCardProps {
   event: CalendarEvent
@@ -14,7 +15,7 @@ function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
 
-export function MeetingCard({ event, isNext }: MeetingCardProps): React.ReactElement {
+export const MeetingCard = memo(function MeetingCard({ event, isNext }: MeetingCardProps): React.ReactElement {
   const isPast = new Date(event.end).getTime() < Date.now()
   const isNow =
     new Date(event.start).getTime() <= Date.now() &&
@@ -82,4 +83,4 @@ export function MeetingCard({ event, isNext }: MeetingCardProps): React.ReactEle
       </div>
     </div>
   )
-}
+})

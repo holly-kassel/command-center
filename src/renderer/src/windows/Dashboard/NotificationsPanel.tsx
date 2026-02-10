@@ -228,7 +228,7 @@ export function NotificationsPanel(): React.ReactElement {
           All caught up! 🎉
         </div>
       ) : (
-        <div className="max-h-[400px] overflow-y-auto space-y-3 pr-1">
+        <div className="max-h-[700px] overflow-y-auto space-y-3 pr-1">
           {REASON_ORDER.map((reason) => {
             const items = groups.get(reason)
             if (!items || items.length === 0) return null

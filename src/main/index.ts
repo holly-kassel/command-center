@@ -1,5 +1,5 @@
 import 'dotenv/config'
-import { app, shell, BrowserWindow, ipcMain } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, nativeImage } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
@@ -55,6 +55,11 @@ function createWindow(): BrowserWindow {
 app.whenReady().then(() => {
   // Set app user model id for windows
   electronApp.setAppUserModelId('com.hollykassel.command-center')
+
+  // Set Dock icon on macOS
+  if (process.platform === 'darwin' && app.dock) {
+    app.dock.setIcon(nativeImage.createFromPath(icon))
+  }
 
   // Default open or close DevTools by F12 in development
   // and ignore CommandOrControl + R in production.

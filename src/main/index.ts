@@ -19,6 +19,7 @@ function createWindow(): BrowserWindow {
     minWidth: 900,
     minHeight: 600,
     show: false,
+    backgroundColor: '#0f1117',
     title: 'Command Center',
     titleBarStyle: 'hiddenInset',
     trafficLightPosition: { x: 15, y: 10 },

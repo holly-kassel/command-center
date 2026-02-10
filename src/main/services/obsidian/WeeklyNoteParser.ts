@@ -233,18 +233,28 @@ export async function getTodaySection(vaultPath: string): Promise<TodaySection |
 
 /**
  * Extract the current focus/priority from today's section.
- * Looks for bold markers like **🔔 Triage:**, **Priority:**, **Focus:**
+ * Looks for:
+ *  - Bold markers: **🔔 Triage: ...**, **Priority: ...**, **Focus: ...**
+ *  - Quick capture format: 🎯 Focus: ...
+ * Returns the LAST (most recent) match so focus updates take effect.
  */
 export function extractCurrentFocus(dayContent: string): string | null {
   const lines = dayContent.split('\n')
+  let lastFocus: string | null = null
   for (const line of lines) {
     // Match bold markers: **🔔 Triage: ...**, **Priority: ...**, **Focus: ...**
-    const match = line.match(/\*\*(?:🔔\s*)?(?:Triage|Priority|Focus):\s*(.*?)\*\*/)
-    if (match) {
-      return match[1].trim()
+    const boldMatch = line.match(/\*\*(?:🔔\s*)?(?:Triage|Priority|Focus):\s*(.*?)\*\*/)
+    if (boldMatch) {
+      lastFocus = boldMatch[1].trim()
+      continue
+    }
+    // Match quick capture format: 🎯 Focus: ...
+    const emojiMatch = line.match(/🎯\s*Focus:\s*(.+)/)
+    if (emojiMatch) {
+      lastFocus = emojiMatch[1].trim()
     }
   }
-  return null
+  return lastFocus
 }
 
 /**

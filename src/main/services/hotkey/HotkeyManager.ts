@@ -31,10 +31,25 @@ export class HotkeyManager {
     })
     console.log('[HotkeyManager] Cmd+Shift+N (whats next) registered:', nextOk)
 
+    const focusOk = globalShortcut.register('CommandOrControl+Shift+F', () => {
+      this.toggleFocusMode()
+    })
+    console.log('[HotkeyManager] Cmd+Shift+F (focus mode) registered:', focusOk)
+
     // Listen for overlay close requests from renderer
     ipcMain.on('overlay:close', (_event) => {
       this.hideAll()
     })
+  }
+
+  // ── Focus Mode ─────────────────────────────────────────────
+
+  private toggleFocusMode(): void {
+    if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+      this.mainWindow.webContents.send('app:toggleFocusMode')
+      this.mainWindow.show()
+      this.mainWindow.focus()
+    }
   }
 
   // ── Quick Capture ──────────────────────────────────────────────

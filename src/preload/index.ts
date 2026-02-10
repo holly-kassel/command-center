@@ -96,6 +96,11 @@ const settingsApi = {
     ipcRenderer.invoke('settings:get', key),
   browseVaultPath: (): Promise<string | null> =>
     ipcRenderer.invoke('settings:browseVaultPath'),
+  onFocusModeToggle: (callback: () => void): (() => void) => {
+    const handler = (): void => callback()
+    ipcRenderer.on('app:toggleFocusMode', handler)
+    return () => ipcRenderer.removeListener('app:toggleFocusMode', handler)
+  },
 }
 
 // Custom APIs for renderer

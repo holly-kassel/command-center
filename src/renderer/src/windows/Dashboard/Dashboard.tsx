@@ -4,7 +4,7 @@
  * Main layout assembling all sections into a cohesive grid.
  * Time-based greeting, auto-refresh, responsive layout.
  */
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useObsidianStore } from '../../store/obsidianStore'
 import { useCalendarStore } from '../../store/calendarStore'
 import { useGitHubStore } from '../../store/githubStore'
@@ -16,6 +16,7 @@ import { FocusSection } from './FocusSection'
 import { TodayView } from './TodayView'
 import { SlackParserPanel } from './SlackParserPanel'
 import { SettingsPanel } from '../Settings/SettingsPanel'
+import { FocusModeOverlay } from '../FocusMode/FocusModeOverlay'
 
 // ─── Helpers ──────────────────────────────────────────────────
 
@@ -39,6 +40,7 @@ function getFormattedDate(): string {
 
 export function Dashboard(): React.ReactElement {
   const [showSettings, setShowSettings] = useState(false)
+  const [showFocusMode, setShowFocusMode] = useState(false)
   const obsidianInit = useObsidianStore((s) => s.initialize)
   const obsidianRefresh = useObsidianStore((s) => s.refreshAll)
   const calendarInit = useCalendarStore((s) => s.initialize)
@@ -63,6 +65,13 @@ export function Dashboard(): React.ReactElement {
   // Auto-refresh sets up the interval (5 min)
   useAutoRefresh(initAll, 5 * 60 * 1000)
 
+  // Listen for focus mode toggle from main process (Cmd+Shift+F)
+  useEffect(() => {
+    const handler = (): void => setShowFocusMode((v) => !v)
+    const cleanup = window.api.settings.onFocusModeToggle?.(handler)
+    return () => cleanup?.()
+  }, [])
+
   return (
     <div className="h-screen flex flex-col bg-background overflow-hidden">
       {/* Titlebar drag region */}
@@ -85,6 +94,13 @@ export function Dashboard(): React.ReactElement {
               </p>
             </div>
             <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowFocusMode(true)}
+                className="text-text-muted hover:text-focus text-sm transition-colors"
+                title="Focus Mode (⌘⇧F)"
+              >
+                🎯
+              </button>
               <button
                 onClick={() => setShowSettings(true)}
                 className="text-text-muted hover:text-accent text-sm transition-colors"
@@ -134,6 +150,11 @@ export function Dashboard(): React.ReactElement {
           </div>
         </div>
       </div>
+
+      {/* Focus Mode overlay */}
+      {showFocusMode && (
+        <FocusModeOverlay onExit={() => setShowFocusMode(false)} />
+      )}
 
       {/* Settings slide-over */}
       {showSettings && (

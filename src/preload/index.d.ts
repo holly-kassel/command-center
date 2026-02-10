@@ -50,6 +50,7 @@ interface SettingsApi {
   update(partial: Partial<AppSettings>): Promise<AppSettings>
   get<K extends keyof AppSettings>(key: K): Promise<AppSettings[K]>
   browseVaultPath(): Promise<string | null>
+  onFocusModeToggle(callback: () => void): () => void
 }
 
 interface Api {

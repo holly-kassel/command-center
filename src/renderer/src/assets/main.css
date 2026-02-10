@@ -168,3 +168,19 @@ section.rounded-xl {
 .settings-btn-ghost {
   @apply text-text-muted hover:text-text-secondary transition-colors;
 }
+
+/* Focus Mode buttons */
+.focus-btn-primary {
+  @apply px-5 py-2.5 rounded-xl bg-focus/20 text-focus
+         hover:bg-focus/30 text-sm font-semibold transition-all
+         border border-focus/30 backdrop-blur-sm;
+}
+.focus-btn-secondary {
+  @apply px-5 py-2.5 rounded-xl bg-surface-muted/40 text-text-secondary
+         hover:bg-surface-hover hover:text-text-primary text-sm font-medium
+         border border-surface-border/40 backdrop-blur-sm transition-all;
+}
+.focus-btn-ghost {
+  @apply px-4 py-2 rounded-xl text-text-muted hover:text-text-secondary
+         text-sm transition-colors;
+}

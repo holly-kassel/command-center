@@ -36,9 +36,9 @@
     </linearGradient>
   </defs>
 
-  <!-- Rounded square background -->
-  <rect x="16" y="16" width="480" height="480" rx="112" ry="112" fill="url(#aurora)"/>
-  <rect x="16" y="16" width="480" height="480" rx="112" ry="112" fill="url(#glow)"/>
+  <!-- Full-bleed background (macOS applies its own icon mask) -->
+  <rect x="0" y="0" width="512" height="512" fill="url(#aurora)"/>
+  <rect x="0" y="0" width="512" height="512" fill="url(#glow)"/>
 
   <!-- Subtle aurora streaks -->
   <ellipse cx="180" cy="120" rx="140" ry="40" fill="rgba(167,139,250,0.06)" transform="rotate(-15 180 120)"/>

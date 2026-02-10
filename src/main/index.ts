@@ -3,7 +3,7 @@ import { app, shell, BrowserWindow, ipcMain, globalShortcut } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
-import { registerObsidianIpc, initObsidian, registerAuthIpc, registerCalendarIpc, registerGitHubIpc } from './ipc'
+import { registerObsidianIpc, initObsidian, registerAuthIpc, registerCalendarIpc, registerGitHubIpc, registerSlackIpc } from './ipc'
 import { HotkeyManager } from './services/hotkey/HotkeyManager'
 
 const hotkeyManager = new HotkeyManager()
@@ -68,6 +68,7 @@ app.whenReady().then(() => {
   registerAuthIpc()
   registerCalendarIpc()
   registerGitHubIpc()
+  registerSlackIpc()
   initObsidian()
 
   const mainWindow = createWindow()

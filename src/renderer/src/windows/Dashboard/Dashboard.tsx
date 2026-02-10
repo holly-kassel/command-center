@@ -14,6 +14,7 @@ import { CalendarSection } from './CalendarSection'
 import { NotificationsPanel } from './NotificationsPanel'
 import { FocusSection } from './FocusSection'
 import { TodayView } from './TodayView'
+import { SlackParserPanel } from './SlackParserPanel'
 
 // ─── Helpers ──────────────────────────────────────────────────
 
@@ -113,6 +114,11 @@ export function Dashboard(): React.ReactElement {
             {/* Notifications — right column */}
             <div>
               <NotificationsPanel />
+            </div>
+
+            {/* Slack Parser — spans 2 cols */}
+            <div className="lg:col-span-2">
+              <SlackParserPanel />
             </div>
           </div>
         </div>

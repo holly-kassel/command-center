@@ -3,6 +3,7 @@ import { electronAPI } from '@electron-toolkit/preload'
 import type { TodaySection, VaultStatus, WeeklyNote } from '../shared/types/obsidian'
 import type { CalendarEvent } from '../shared/types/calendar'
 import type { GitHubNotification } from '../shared/types/github'
+import type { ParsedSlackThread } from '../shared/types/slack'
 
 // Obsidian API exposed to renderer
 const obsidianApi = {
@@ -57,12 +58,21 @@ const githubApi = {
     ipcRenderer.invoke('github:setPAT', pat),
 }
 
+// Slack API exposed to renderer
+const slackApi = {
+  parseThread: (rawText: string): Promise<ParsedSlackThread> =>
+    ipcRenderer.invoke('slack:parseThread', rawText),
+  saveToObsidian: (thread: ParsedSlackThread, customTitle?: string): Promise<{ success: boolean; path: string }> =>
+    ipcRenderer.invoke('slack:saveToObsidian', thread, customTitle),
+}
+
 // Custom APIs for renderer
 const api = {
   obsidian: obsidianApi,
   auth: authApi,
   calendar: calendarApi,
   github: githubApi,
+  slack: slackApi,
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to

@@ -2,6 +2,7 @@ import { ElectronAPI } from '@electron-toolkit/preload'
 import type { TodaySection, VaultStatus, WeeklyNote } from '../shared/types/obsidian'
 import type { CalendarEvent } from '../shared/types/calendar'
 import type { GitHubNotification } from '../shared/types/github'
+import type { ParsedSlackThread } from '../shared/types/slack'
 
 interface ObsidianApi {
   findVault(): Promise<string>
@@ -34,11 +35,17 @@ interface GitHubApi {
   setPAT(pat: string): Promise<{ success: boolean; error?: string }>
 }
 
+interface SlackApi {
+  parseThread(rawText: string): Promise<ParsedSlackThread>
+  saveToObsidian(thread: ParsedSlackThread, customTitle?: string): Promise<{ success: boolean; path: string }>
+}
+
 interface Api {
   obsidian: ObsidianApi
   auth: AuthApi
   calendar: CalendarApi
   github: GitHubApi
+  slack: SlackApi
 }
 
 declare global {

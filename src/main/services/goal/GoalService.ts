@@ -45,7 +45,7 @@ export class GoalService {
   private store: InstanceType<typeof ElectronStore>
 
   constructor() {
-    this.store = new ElectronStore({
+    this.store = new (ElectronStore.default || ElectronStore)({
       name: 'goal-data',
       defaults: STORE_DEFAULTS,
     })

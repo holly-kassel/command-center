@@ -8,16 +8,22 @@ import { useCallback, useEffect, useState } from 'react'
 import { useObsidianStore } from '../../store/obsidianStore'
 import { useCalendarStore } from '../../store/calendarStore'
 import { useGitHubStore } from '../../store/githubStore'
+import { useRitualStore } from '../../store/ritualStore'
+import { useGoalStore } from '../../store/goalStore'
 import { useAutoRefresh } from '../../hooks/useAutoRefresh'
 import { QuickCaptureBox } from './QuickCaptureBox'
 import { CalendarSection } from './CalendarSection'
 import { NotificationsPanel } from './NotificationsPanel'
+import { PullRequestsPanel } from './PullRequestsPanel'
 import { FocusSection } from './FocusSection'
 import { TodayView } from './TodayView'
-import { SlackParserPanel } from './SlackParserPanel'
 import { SettingsPanel } from '../Settings/SettingsPanel'
 import { FocusModeOverlay } from '../FocusMode/FocusModeOverlay'
 import { SamoyedMascot } from '../../components/SamoyedMascot'
+import { RitualMetrics } from '../../components/rituals/RitualMetrics'
+import { MorningRitualFlow } from '../../components/rituals/MorningRitualFlow'
+import { EveningRitualFlow } from '../../components/rituals/EveningRitualFlow'
+import { GoalsPanel } from '../../components/goals/GoalsPanel'
 
 // ─── Helpers ──────────────────────────────────────────────────
 
@@ -48,20 +54,31 @@ export function Dashboard(): React.ReactElement {
   const calendarRefresh = useCalendarStore((s) => s.refreshAll)
   const githubInit = useGitHubStore((s) => s.initialize)
   const githubRefresh = useGitHubStore((s) => s.fetchNotifications)
+  const ritualInit = useRitualStore((s) => s.initialize)
+  const ritualRefresh = useRitualStore((s) => s.refreshAll)
+  const activeRitual = useRitualStore((s) => s.activeRitual)
+  const startRitual = useRitualStore((s) => s.startRitual)
+  const endRitual = useRitualStore((s) => s.endRitual)
+  const goalInit = useGoalStore((s) => s.initialize)
+  const goalRefresh = useGoalStore((s) => s.refreshAll)
 
   // Initialize all services once on mount
   const initAll = useCallback(() => {
     obsidianInit()
     calendarInit()
     githubInit()
-  }, [obsidianInit, calendarInit, githubInit])
+    ritualInit()
+    goalInit()
+  }, [obsidianInit, calendarInit, githubInit, ritualInit, goalInit])
 
   // Refresh data sources every 5 minutes
   const refreshAll = useCallback(() => {
     obsidianRefresh()
     calendarRefresh()
     githubRefresh()
-  }, [obsidianRefresh, calendarRefresh, githubRefresh])
+    ritualRefresh()
+    goalRefresh()
+  }, [obsidianRefresh, calendarRefresh, githubRefresh, ritualRefresh, goalRefresh])
 
   // Auto-refresh sets up the interval (5 min)
   useAutoRefresh(initAll, 5 * 60 * 1000)
@@ -132,39 +149,42 @@ export function Dashboard(): React.ReactElement {
           {/* Quick Capture — full width */}
           <QuickCaptureBox />
 
-          {/* Main grid: 3 columns on lg, 1 on small */}
+          {/* Main grid: 2 columns on lg */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            {/* Calendar — spans 2 cols */}
-            <div className="lg:col-span-2 min-w-0">
-              <CalendarSection />
-            </div>
-
-            {/* Focus — right column */}
-            <div className="min-w-0">
-              <FocusSection />
-            </div>
-
-            {/* Today's notes — spans 2 cols */}
+            {/* Today's notes — left, spans 2 cols */}
             <div className="lg:col-span-2 min-w-0">
               <TodayView />
             </div>
 
-            {/* Notifications — right column */}
-            <div className="min-w-0">
+            {/* Right column — Rituals + Calendar + Focus + Notifications + PRs stacked */}
+            <div className="min-w-0 space-y-4">
+              <RitualMetrics
+                onStartMorning={() => startRitual('morning')}
+                onStartEvening={() => startRitual('evening')}
+              />
+              <CalendarSection />
+              <FocusSection />
               <NotificationsPanel />
-            </div>
-
-            {/* Slack Parser — spans 2 cols */}
-            <div className="lg:col-span-2 min-w-0">
-              <SlackParserPanel />
+              <PullRequestsPanel />
             </div>
           </div>
+
+          {/* Goals — full width row below main grid */}
+          <GoalsPanel compact />
         </div>
       </div>
 
       {/* Focus Mode overlay */}
       {showFocusMode && (
         <FocusModeOverlay onExit={() => setShowFocusMode(false)} />
+      )}
+
+      {/* Ritual flow overlays */}
+      {activeRitual === 'morning' && (
+        <MorningRitualFlow onComplete={endRitual} onClose={endRitual} />
+      )}
+      {activeRitual === 'evening' && (
+        <EveningRitualFlow onComplete={endRitual} onClose={endRitual} />
       )}
 
       {/* Settings slide-over */}

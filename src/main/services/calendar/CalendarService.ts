@@ -6,6 +6,7 @@
  */
 import log from 'electron-log'
 import { getGraphAuthService } from '../auth/OAuthFlow'
+import { settings } from '../../config/settings'
 import type { CalendarEvent } from '../../../shared/types/calendar'
 
 const GRAPH_BASE = 'https://graph.microsoft.com/v1.0'
@@ -72,7 +73,8 @@ export class CalendarService {
     const now = new Date()
     const start = new Date(now.getFullYear(), now.getMonth(), now.getDate())
     const end = new Date(start.getTime() + 24 * 60 * 60 * 1000)
-    return this.getEvents(start, end)
+    const events = await this.getEvents(start, end)
+    return this.filterEvents(events)
   }
 
   /**
@@ -96,6 +98,21 @@ export class CalendarService {
   }
 
   // ─── Internal ─────────────────────────────────────────────────
+
+  /**
+   * Filter events by meeting filter patterns from settings.
+   * Case-insensitive substring match against event title.
+   */
+  private filterEvents(events: CalendarEvent[]): CalendarEvent[] {
+    const patterns = settings.get('meetingFilterPatterns') || []
+    if (patterns.length === 0) return events
+
+    const lowerPatterns = patterns.map((p) => p.toLowerCase())
+    return events.filter((event) => {
+      const title = event.title.toLowerCase()
+      return !lowerPatterns.some((pattern) => title.includes(pattern))
+    })
+  }
 
   private parseGraphEvents(
     items: Record<string, unknown>[]

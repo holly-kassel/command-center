@@ -49,4 +49,13 @@ export function registerGitHubIpc(): void {
       }
     }
   })
+
+  ipcMain.handle('github:getPullRequests', async () => {
+    try {
+      return await github.getMyPullRequests()
+    } catch (error) {
+      log.error('[IPC] github:getPullRequests error:', error)
+      throw error
+    }
+  })
 }

@@ -36,3 +36,30 @@ export interface GitHubStatus {
   configured: boolean
   connected: boolean
 }
+
+/** PR review status */
+export type PRReviewStatus = 'approved' | 'changes_requested' | 'review_required' | 'commented' | 'pending'
+
+/** PR merge state */
+export type PRState = 'open' | 'closed' | 'merged'
+
+/** How the user is involved in this PR */
+export type PRInvolvement = 'author' | 'review_requested' | 'assigned' | 'mentioned'
+
+/** A GitHub pull request involving the user */
+export interface GitHubPullRequest {
+  id: number
+  number: number
+  title: string
+  repository: string
+  url: string
+  state: PRState
+  draft: boolean
+  author: string
+  involvement: PRInvolvement
+  reviewStatus: PRReviewStatus
+  createdAt: string
+  updatedAt: string
+  additions: number
+  deletions: number
+}

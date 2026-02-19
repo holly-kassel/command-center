@@ -4,12 +4,14 @@
  * Manages notification state, PAT configuration, and MCP connection status.
  */
 import { create } from 'zustand'
-import type { GitHubNotification } from '@shared/types/github'
+import type { GitHubNotification, GitHubPullRequest } from '@shared/types/github'
 
 interface GitHubState {
   notifications: GitHubNotification[]
+  pullRequests: GitHubPullRequest[]
   isConfigured: boolean
   isLoading: boolean
+  isPRsLoading: boolean
   error: string | null
   lastRefresh: number | null
 
@@ -19,14 +21,17 @@ interface GitHubState {
   // Actions
   initialize: () => Promise<void>
   fetchNotifications: () => Promise<void>
+  fetchPullRequests: () => Promise<void>
   markAsRead: (threadId: string) => Promise<void>
   setPAT: (pat: string) => Promise<void>
 }
 
 export const useGitHubStore = create<GitHubState>((set, get) => ({
   notifications: [],
+  pullRequests: [],
   isConfigured: false,
   isLoading: false,
+  isPRsLoading: false,
   error: null,
   lastRefresh: null,
   actionableCount: 0,
@@ -37,7 +42,10 @@ export const useGitHubStore = create<GitHubState>((set, get) => ({
       set({ isConfigured: configured })
 
       if (configured) {
-        await get().fetchNotifications()
+        await Promise.all([
+          get().fetchNotifications(),
+          get().fetchPullRequests(),
+        ])
       }
     } catch (error) {
       console.error('[GitHubStore] init error:', error)
@@ -63,6 +71,17 @@ export const useGitHubStore = create<GitHubState>((set, get) => ({
       } else {
         set({ isLoading: false, error: msg })
       }
+    }
+  },
+
+  fetchPullRequests: async () => {
+    try {
+      set({ isPRsLoading: true })
+      const pullRequests = await window.api.github.getPullRequests()
+      set({ pullRequests, isPRsLoading: false })
+    } catch (error) {
+      console.error('[GitHubStore] fetchPullRequests error:', error)
+      set({ isPRsLoading: false })
     }
   },
 

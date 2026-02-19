@@ -1,10 +1,21 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
-import type { TodaySection, VaultStatus, WeeklyNote } from '../shared/types/obsidian'
+import type { TodaySection, VaultStatus, WeeklyNote, SlashCommandResult, SlashCommandInfo } from '../shared/types/obsidian'
 import type { CalendarEvent } from '../shared/types/calendar'
-import type { GitHubNotification } from '../shared/types/github'
+import type { GitHubNotification, GitHubPullRequest } from '../shared/types/github'
 import type { ParsedSlackThread } from '../shared/types/slack'
 import type { AppSettings } from '../shared/types/settings'
+import type { DailyLog, Streak, StreakType, WeeklyRitualMetrics } from '../shared/types/ritual'
+import type {
+  Goal,
+  GoalWithChildren,
+  GoalTaskLink,
+  CreateGoalInput,
+  UpdateGoalInput,
+  GoalLevel,
+  GoalCategory,
+  GoalStatus,
+} from '../shared/types/goal'
 
 // Obsidian API exposed to renderer
 const obsidianApi = {
@@ -21,6 +32,10 @@ const obsidianApi = {
     ipcRenderer.invoke('obsidian:updateTodayContent', content),
   toggleCheckbox: (lineOffset: number): Promise<void> =>
     ipcRenderer.invoke('obsidian:toggleCheckbox', lineOffset),
+  executeSlashCommand: (text: string): Promise<SlashCommandResult> =>
+    ipcRenderer.invoke('obsidian:executeSlashCommand', text),
+  getSlashCommands: (): Promise<SlashCommandInfo[]> =>
+    ipcRenderer.invoke('obsidian:getSlashCommands'),
   onFileChanged: (callback: (data: { filePath: string }) => void): (() => void) => {
     const handler = (_event: Electron.IpcRendererEvent, data: { filePath: string }): void => {
       callback(data)
@@ -70,6 +85,8 @@ const calendarApi = {
 const githubApi = {
   getNotifications: (): Promise<GitHubNotification[]> =>
     ipcRenderer.invoke('github:getNotifications'),
+  getPullRequests: (): Promise<GitHubPullRequest[]> =>
+    ipcRenderer.invoke('github:getPullRequests'),
   markAsRead: (threadId: string): Promise<{ success: boolean; error?: string }> =>
     ipcRenderer.invoke('github:markAsRead', threadId),
   isConfigured: (): Promise<boolean> =>
@@ -89,6 +106,80 @@ const slackApi = {
     ipcRenderer.invoke('slack:parseThread', rawText),
   saveToObsidian: (thread: ParsedSlackThread, customTitle?: string): Promise<{ success: boolean; path: string }> =>
     ipcRenderer.invoke('slack:saveToObsidian', thread, customTitle),
+}
+
+// Ritual API exposed to renderer
+const ritualApi = {
+  getDailyLog: (date: string): Promise<DailyLog> =>
+    ipcRenderer.invoke('ritual:getDailyLog', date),
+  getTodayLog: (): Promise<DailyLog> =>
+    ipcRenderer.invoke('ritual:getTodayLog'),
+  saveDailyLog: (date: string, partial: Partial<DailyLog>): Promise<DailyLog> =>
+    ipcRenderer.invoke('ritual:saveDailyLog', date, partial),
+  getLogsInRange: (start: string, end: string): Promise<DailyLog[]> =>
+    ipcRenderer.invoke('ritual:getLogsInRange', start, end),
+  getStreak: (type: StreakType): Promise<Streak> =>
+    ipcRenderer.invoke('ritual:getStreak', type),
+  getAllStreaks: (): Promise<Record<StreakType, Streak>> =>
+    ipcRenderer.invoke('ritual:getAllStreaks'),
+  updateStreak: (type: StreakType): Promise<Streak> =>
+    ipcRenderer.invoke('ritual:updateStreak', type),
+  checkFullDayStreak: (): Promise<Streak | null> =>
+    ipcRenderer.invoke('ritual:checkFullDayStreak'),
+  getWeeklyMetrics: (weekStart?: string): Promise<WeeklyRitualMetrics> =>
+    ipcRenderer.invoke('ritual:getWeeklyMetrics', weekStart),
+  onSyncUpdate: (callback: (data: { todayLog: DailyLog; streaks: Record<StreakType, Streak> }) => void): (() => void) => {
+    const handler = (_e: Electron.IpcRendererEvent, data: { todayLog: DailyLog; streaks: Record<StreakType, Streak> }): void => callback(data)
+    ipcRenderer.on('sync:ritual', handler)
+    return () => ipcRenderer.removeListener('sync:ritual', handler)
+  },
+}
+
+// Goal API exposed to renderer
+const goalApi = {
+  create: (input: CreateGoalInput): Promise<Goal> =>
+    ipcRenderer.invoke('goal:create', input),
+  get: (id: string): Promise<Goal | null> =>
+    ipcRenderer.invoke('goal:get', id),
+  getAll: (): Promise<Goal[]> =>
+    ipcRenderer.invoke('goal:getAll'),
+  update: (id: string, updates: UpdateGoalInput): Promise<Goal | null> =>
+    ipcRenderer.invoke('goal:update', id, updates),
+  delete: (id: string): Promise<boolean> =>
+    ipcRenderer.invoke('goal:delete', id),
+  getByLevel: (level: GoalLevel): Promise<Goal[]> =>
+    ipcRenderer.invoke('goal:getByLevel', level),
+  getByCategory: (category: GoalCategory): Promise<Goal[]> =>
+    ipcRenderer.invoke('goal:getByCategory', category),
+  getByStatus: (status: GoalStatus): Promise<Goal[]> =>
+    ipcRenderer.invoke('goal:getByStatus', status),
+  getActive: (): Promise<Goal[]> =>
+    ipcRenderer.invoke('goal:getActive'),
+  getChildren: (parentId: string): Promise<Goal[]> =>
+    ipcRenderer.invoke('goal:getChildren', parentId),
+  getTree: (): Promise<GoalWithChildren[]> =>
+    ipcRenderer.invoke('goal:getTree'),
+  getSuggestedParents: (level: GoalLevel): Promise<Goal[]> =>
+    ipcRenderer.invoke('goal:getSuggestedParents', level),
+  linkTask: (goalId: string, taskText: string): Promise<GoalTaskLink> =>
+    ipcRenderer.invoke('goal:linkTask', goalId, taskText),
+  unlinkTask: (linkId: string): Promise<boolean> =>
+    ipcRenderer.invoke('goal:unlinkTask', linkId),
+  getTaskLinks: (goalId: string): Promise<GoalTaskLink[]> =>
+    ipcRenderer.invoke('goal:getTaskLinks', goalId),
+  getAllTaskLinks: (): Promise<GoalTaskLink[]> =>
+    ipcRenderer.invoke('goal:getAllTaskLinks'),
+  updateTaskCompletion: (taskText: string, completed: boolean): Promise<GoalTaskLink[]> =>
+    ipcRenderer.invoke('goal:updateTaskCompletion', taskText, completed),
+  recalculateProgress: (goalId: string): Promise<number> =>
+    ipcRenderer.invoke('goal:recalculateProgress', goalId),
+  getSummary: (): Promise<{ totalActive: number; byLevel: Record<GoalLevel, number>; byCategory: Record<GoalCategory, number>; completedThisWeek: number }> =>
+    ipcRenderer.invoke('goal:getSummary'),
+  onSyncUpdate: (callback: (data: { goals: Goal[]; summary: { totalActive: number; completedThisWeek: number } }) => void): (() => void) => {
+    const handler = (_e: Electron.IpcRendererEvent, data: { goals: Goal[]; summary: { totalActive: number; completedThisWeek: number } }): void => callback(data)
+    ipcRenderer.on('sync:goal', handler)
+    return () => ipcRenderer.removeListener('sync:goal', handler)
+  },
 }
 
 // Settings API exposed to renderer
@@ -119,6 +210,8 @@ const api = {
   calendar: calendarApi,
   github: githubApi,
   slack: slackApi,
+  ritual: ritualApi,
+  goal: goalApi,
   settings: settingsApi,
 }
 

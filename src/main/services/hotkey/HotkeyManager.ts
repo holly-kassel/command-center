@@ -6,7 +6,7 @@
  *  - Quick Capture  (Cmd+Shift+Space)
  *  - What's Next     (Cmd+Shift+N)
  */
-import { globalShortcut, BrowserWindow, screen, ipcMain } from 'electron'
+import { globalShortcut, BrowserWindow, screen, ipcMain, app } from 'electron'
 import { join } from 'path'
 import { is } from '@electron-toolkit/utils'
 
@@ -39,6 +39,16 @@ export class HotkeyManager {
     // Listen for overlay close requests from renderer
     ipcMain.on('overlay:close', (_event) => {
       this.hideAll()
+    })
+
+    // Listen for overlay resize requests (e.g. multiline slash commands)
+    ipcMain.on('overlay:resize', (_event, { width, height }: { width: number; height: number }) => {
+      if (this.quickCaptureWindow && !this.quickCaptureWindow.isDestroyed()) {
+        const { width: screenW, height: screenH } = screen.getPrimaryDisplay().workAreaSize
+        const x = Math.round((screenW - width) / 2)
+        const y = Math.round(screenH / 3)
+        this.quickCaptureWindow.setBounds({ x, y, width, height }, true)
+      }
     })
   }
 
@@ -182,11 +192,17 @@ export class HotkeyManager {
     if (this.whatsNextWindow && !this.whatsNextWindow.isDestroyed()) {
       this.whatsNextWindow.hide()
     }
+    // On macOS, hiding the overlay returns focus to the main window.
+    // Hide the app so the user stays in whatever they were working in.
+    if (process.platform === 'darwin') {
+      app.hide()
+    }
   }
 
   unregisterAll(): void {
     globalShortcut.unregisterAll()
     ipcMain.removeAllListeners('overlay:close')
+    ipcMain.removeAllListeners('overlay:resize')
     if (this.quickCaptureWindow && !this.quickCaptureWindow.isDestroyed()) {
       this.quickCaptureWindow.close()
     }

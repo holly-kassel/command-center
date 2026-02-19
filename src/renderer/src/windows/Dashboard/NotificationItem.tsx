@@ -10,6 +10,7 @@ import { memo } from 'react'
 interface NotificationItemProps {
   notification: GitHubNotification
   onMarkAsRead: (id: string) => void
+  expanded?: boolean
 }
 
 const REASON_CONFIG: Record<
@@ -82,6 +83,7 @@ function timeAgo(isoDate: string): string {
 export const NotificationItem = memo(function NotificationItem({
   notification,
   onMarkAsRead,
+  expanded = false,
 }: NotificationItemProps): React.ReactElement {
   const config = REASON_CONFIG[notification.reason] || REASON_CONFIG.other
 
@@ -109,7 +111,7 @@ export const NotificationItem = memo(function NotificationItem({
       {/* Content */}
       <div className="min-w-0 flex-1 overflow-hidden">
         <div className="text-text-tertiary text-xs">{notification.repository}</div>
-        <div className="text-text-primary mt-0.5 truncate text-sm break-all">{notification.title}</div>
+        <div className={`text-text-primary mt-0.5 text-sm ${expanded ? 'break-words' : 'truncate break-all'}`}>{notification.title}</div>
         <div className="text-text-tertiary mt-0.5 text-xs">{timeAgo(notification.updatedAt)}</div>
       </div>
 

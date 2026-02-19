@@ -34,6 +34,9 @@ export function SettingsPanel({ onClose }: { onClose: () => void }): React.React
   const [ghPat, setGhPat] = useState('')
   const [ghTesting, setGhTesting] = useState(false)
 
+  // Meeting filter state
+  const [newFilterPattern, setNewFilterPattern] = useState('')
+
   // Load settings
   useEffect(() => {
     const load = async (): Promise<void> => {
@@ -74,6 +77,7 @@ export function SettingsPanel({ onClose }: { onClose: () => void }): React.React
         githubRefreshInterval: settings.githubRefreshInterval,
         theme: settings.theme,
         userName: settings.userName,
+        meetingFilterPatterns: settings.meetingFilterPatterns,
       })
       setSettings(saved)
       setDirty(false)
@@ -238,6 +242,63 @@ export function SettingsPanel({ onClose }: { onClose: () => void }): React.React
               </option>
             ))}
           </select>
+        </Label>
+        <Label text="Meeting Filters">
+          <p className="text-xs text-text-muted mb-2">
+            Events matching these patterns are hidden from the calendar.
+          </p>
+          <div className="flex flex-wrap gap-1.5 mb-2">
+            {(settings.meetingFilterPatterns || []).map((pattern) => (
+              <span
+                key={pattern}
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-surface-muted text-text-secondary text-xs border border-surface-border"
+              >
+                {pattern}
+                <button
+                  onClick={() => {
+                    update('meetingFilterPatterns', (settings.meetingFilterPatterns || []).filter((p) => p !== pattern))
+                  }}
+                  className="text-text-muted hover:text-urgent ml-0.5 transition-colors"
+                  title="Remove filter"
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={newFilterPattern}
+              onChange={(e) => setNewFilterPattern(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && newFilterPattern.trim()) {
+                  const patterns = settings.meetingFilterPatterns || []
+                  if (!patterns.includes(newFilterPattern.trim())) {
+                    update('meetingFilterPatterns', [...patterns, newFilterPattern.trim()])
+                  }
+                  setNewFilterPattern('')
+                }
+              }}
+              placeholder="e.g. Standup, 1:1..."
+              className="settings-input flex-1"
+            />
+            <button
+              onClick={() => {
+                if (newFilterPattern.trim()) {
+                  const patterns = settings.meetingFilterPatterns || []
+                  if (!patterns.includes(newFilterPattern.trim())) {
+                    update('meetingFilterPatterns', [...patterns, newFilterPattern.trim()])
+                  }
+                  setNewFilterPattern('')
+                }
+              }}
+              disabled={!newFilterPattern.trim()}
+              className="settings-btn-secondary"
+            >
+              Add
+            </button>
+          </div>
         </Label>
       </Section>
 

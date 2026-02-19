@@ -1,5 +1,8 @@
 // Shared types used across main + renderer via preload bridge
 
+export * from './ritual'
+export * from './goal'
+
 /** IPC channel names — keep in sync between main & preload */
 export const IPC_CHANNELS = {
   // Obsidian

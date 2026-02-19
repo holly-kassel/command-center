@@ -7,6 +7,7 @@
 import { ipcMain } from 'electron'
 import { getObsidianService } from '../services/obsidian/ObsidianService'
 import { getFileWatcher } from '../services/obsidian/FileWatcher'
+import { getSlashCommandRegistry } from '../services/commands/SlashCommandRegistry'
 import { join } from 'node:path'
 import log from 'electron-log'
 
@@ -99,6 +100,28 @@ export function registerObsidianIpc(): void {
       await obsidian.toggleCheckbox(lineOffset)
     } catch (error) {
       log.error('[IPC] obsidian:toggleCheckbox error:', error)
+      throw error
+    }
+  })
+
+  // ─── Slash Commands ────────────────────────────────────────────
+
+  ipcMain.handle('obsidian:executeSlashCommand', async (_event, text: string) => {
+    try {
+      const registry = getSlashCommandRegistry()
+      return await registry.execute(text)
+    } catch (error) {
+      log.error('[IPC] obsidian:executeSlashCommand error:', error)
+      throw error
+    }
+  })
+
+  ipcMain.handle('obsidian:getSlashCommands', async () => {
+    try {
+      const registry = getSlashCommandRegistry()
+      return registry.getCommands()
+    } catch (error) {
+      log.error('[IPC] obsidian:getSlashCommands error:', error)
       throw error
     }
   })

@@ -11,6 +11,8 @@ import { getCacheManager } from '../cache/CacheManager'
 import { getCalendarService } from '../calendar/CalendarService'
 import { getGitHubService } from '../github/GitHubService'
 import { getObsidianService } from '../obsidian/ObsidianService'
+import { getRitualService } from '../ritual/RitualService'
+import { getGoalService } from '../goal/GoalService'
 import { settings } from '../../config/settings'
 import type { CalendarEvent } from '../../../shared/types/calendar'
 import type { GitHubNotification } from '../../../shared/types/github'
@@ -45,6 +47,12 @@ export class SyncManager {
     // Obsidian is already handled by FileWatcher (chokidar) from Epic 2.
     // We just add a periodic re-sync as a safety net (every 60s).
     this.setInterval('obsidian', () => this.syncObsidian(), 60 * 1000)
+
+    // Ritual sync — every 60 seconds
+    this.setInterval('ritual', () => this.syncRitual(), 60 * 1000)
+
+    // Goal sync — every 2 minutes
+    this.setInterval('goal', () => this.syncGoal(), 2 * 60 * 1000)
   }
 
   /**
@@ -120,6 +128,30 @@ export class SyncManager {
       logger.debug('[SyncManager] Obsidian synced')
     } catch {
       // Silent — file watcher is the primary mechanism
+    }
+  }
+
+  private async syncRitual(): Promise<void> {
+    try {
+      const ritual = getRitualService()
+      const todayLog = ritual.getTodayLog()
+      const streaks = ritual.getAllStreaks()
+      this.sendToRenderer('sync:ritual', { todayLog, streaks })
+      logger.debug('[SyncManager] Ritual synced')
+    } catch {
+      // Silent — ritual data is non-critical
+    }
+  }
+
+  private async syncGoal(): Promise<void> {
+    try {
+      const goalService = getGoalService()
+      const goals = goalService.getActiveGoals()
+      const summary = goalService.getSummary()
+      this.sendToRenderer('sync:goal', { goals, summary: { totalActive: summary.totalActive, completedThisWeek: summary.completedThisWeek } })
+      logger.debug(`[SyncManager] Goals synced: ${goals.length} active`)
+    } catch {
+      // Silent — goal data is non-critical
     }
   }
 

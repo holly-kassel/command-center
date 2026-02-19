@@ -13,6 +13,7 @@ export interface AppSettings {
   userName: string
   windowBounds: { width: number; height: number; x?: number; y?: number }
   lastSyncTime: number
+  meetingFilterPatterns: string[]
 }
 
 export const DEFAULT_SETTINGS: Omit<AppSettings, 'windowBounds' | 'lastSyncTime'> = {
@@ -21,6 +22,7 @@ export const DEFAULT_SETTINGS: Omit<AppSettings, 'windowBounds' | 'lastSyncTime'
   githubRefreshInterval: 10,
   theme: 'dark',
   userName: 'Holly',
+  meetingFilterPatterns: ['Lunch', 'Focus Time', 'OOO', 'No Meetings'],
 }
 
 const store = new (ElectronStore.default || ElectronStore)({
@@ -49,6 +51,7 @@ export const settings = {
       userName: store.get('userName') as string,
       windowBounds: store.get('windowBounds') as AppSettings['windowBounds'],
       lastSyncTime: store.get('lastSyncTime') as number,
+      meetingFilterPatterns: (store.get('meetingFilterPatterns') as string[]) || ['Lunch', 'Focus Time', 'OOO', 'No Meetings'],
     }
   },
 

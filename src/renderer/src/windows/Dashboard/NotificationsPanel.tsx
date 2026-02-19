@@ -64,6 +64,7 @@ export function NotificationsPanel(): React.ReactElement {
   const [patInput, setPATInput] = useState('')
   const [showPATInput, setShowPATInput] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
+  const [expanded, setExpanded] = useState(false)
 
   // Init on mount
   useEffect(() => {
@@ -178,6 +179,13 @@ export function NotificationsPanel(): React.ReactElement {
         </div>
         <div className="flex items-center gap-2">
           <button
+            onClick={() => setExpanded(!expanded)}
+            className="text-text-tertiary hover:text-text-secondary text-xs transition-colors"
+            title={expanded ? 'Compact view' : 'Expand titles'}
+          >
+            {expanded ? '⊟' : '⊞'}
+          </button>
+          <button
             onClick={() => setShowSettings(!showSettings)}
             className="text-text-tertiary hover:text-text-secondary text-xs transition-colors"
             title="Change token"
@@ -244,6 +252,7 @@ export function NotificationsPanel(): React.ReactElement {
                       key={notification.id}
                       notification={notification}
                       onMarkAsRead={markAsRead}
+                      expanded={expanded}
                     />
                   ))}
                 </div>

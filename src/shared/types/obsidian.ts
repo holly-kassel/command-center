@@ -52,3 +52,18 @@ export interface VaultStatus {
   weeklyNotesDir: string
   hasCurrentWeekNote: boolean
 }
+
+/** Result from executing a slash command */
+export interface SlashCommandResult {
+  success: boolean
+  command: string
+  message: string
+}
+
+/** Metadata for a registered slash command */
+export interface SlashCommandInfo {
+  name: string
+  description: string
+  argHint: string
+  multiline?: boolean
+}

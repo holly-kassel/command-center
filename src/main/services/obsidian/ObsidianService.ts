@@ -265,6 +265,59 @@ export class ObsidianService {
   // ─── Quick Capture (append to today) ─────────────────────────────
 
   /**
+   * Append a todo checkbox to today's "Tasks & Notes" subsection.
+   * Inserts `- [ ] text` at the end of the subsection.
+   */
+  async appendTodoToToday(text: string): Promise<void> {
+    if (!this.vaultPath) {
+      throw new Error('Vault path not set')
+    }
+
+    const filePath = getWeekFilePath(this.vaultPath)
+    if (!existsSync(filePath)) {
+      throw new Error(`Weekly note not found: ${filePath}`)
+    }
+
+    const backupPath = `${filePath}.backup`
+    const now = new Date()
+    const dayOfWeek = getDayOfWeek(now)
+    const entry = `- [ ] ${text}`
+
+    try {
+      await copyFile(filePath, backupPath)
+      const content = await readFile(filePath, 'utf-8')
+      const lines = content.split('\n')
+
+      const { sectionStart, sectionEnd } = findDaySection(lines, dayOfWeek)
+      if (sectionStart === -1) {
+        throw new Error(`Could not find section for ${dayOfWeek} in ${filePath}`)
+      }
+
+      const insertLine = findTasksNotesInsertPoint(lines, sectionStart, sectionEnd)
+      if (insertLine === -1) {
+        throw new Error(`Could not find "### Tasks & Notes" subsection for ${dayOfWeek}`)
+      }
+
+      lines.splice(insertLine, 0, entry)
+      await writeFile(filePath, lines.join('\n'), 'utf-8')
+      await unlink(backupPath)
+
+      log.info(`[Obsidian] Added todo to ${dayOfWeek}: ${text}`)
+    } catch (error) {
+      if (existsSync(backupPath)) {
+        try {
+          await copyFile(backupPath, filePath)
+          await unlink(backupPath)
+          log.info('[Obsidian] Restored from backup after error')
+        } catch {
+          log.error('[Obsidian] Failed to restore backup')
+        }
+      }
+      throw error
+    }
+  }
+
+  /**
    * Append a timestamped entry to today's "Tasks & Notes" subsection.
    *
    * Strategy:
@@ -327,6 +380,64 @@ export class ObsidianService {
       log.info(`[Obsidian] Appended quick capture to ${dayOfWeek}: ${text}`)
     } catch (error) {
       // Attempt to restore from backup
+      if (existsSync(backupPath)) {
+        try {
+          await copyFile(backupPath, filePath)
+          await unlink(backupPath)
+          log.info('[Obsidian] Restored from backup after error')
+        } catch {
+          log.error('[Obsidian] Failed to restore backup')
+        }
+      }
+      throw error
+    }
+  }
+
+  /**
+   * Append a raw multi-line block to today's "Tasks & Notes" subsection.
+   * Unlike appendToToday, this does NOT wrap in a bullet or timestamp —
+   * it inserts the content as-is with a blank line before it.
+   * Used by slash commands that produce structured markdown (summaries, details blocks).
+   */
+  async appendBlockToToday(block: string): Promise<void> {
+    if (!this.vaultPath) {
+      throw new Error('Vault path not set')
+    }
+
+    const filePath = getWeekFilePath(this.vaultPath)
+    if (!existsSync(filePath)) {
+      throw new Error(`Weekly note not found: ${filePath}`)
+    }
+
+    const backupPath = `${filePath}.backup`
+    const now = new Date()
+    const dayOfWeek = getDayOfWeek(now)
+
+    try {
+      await copyFile(filePath, backupPath)
+
+      const content = await readFile(filePath, 'utf-8')
+      const lines = content.split('\n')
+
+      const { sectionStart, sectionEnd } = findDaySection(lines, dayOfWeek)
+      if (sectionStart === -1) {
+        throw new Error(`Could not find section for ${dayOfWeek} in ${filePath}`)
+      }
+
+      const insertLine = findTasksNotesInsertPoint(lines, sectionStart, sectionEnd)
+      if (insertLine === -1) {
+        throw new Error(`Could not find "### Tasks & Notes" subsection for ${dayOfWeek}`)
+      }
+
+      // Insert with blank line before for clean separation
+      const blockLines = ['', ...block.split('\n')]
+      lines.splice(insertLine, 0, ...blockLines)
+
+      await writeFile(filePath, lines.join('\n'), 'utf-8')
+      await unlink(backupPath)
+
+      log.info(`[Obsidian] Appended block to ${dayOfWeek} (${blockLines.length} lines)`)
+    } catch (error) {
       if (existsSync(backupPath)) {
         try {
           await copyFile(backupPath, filePath)

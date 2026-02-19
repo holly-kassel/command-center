@@ -8,19 +8,19 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import rehypeRaw from 'rehype-raw'
 import { useObsidianStore } from '../../store/obsidianStore'
+import { useGoalStore } from '../../store/goalStore'
 import { toast } from '../../utils/toast'
 
 export function TodayView(): React.JSX.Element {
   const { todaySection, currentFocus, isLoading, error, vaultStatus, updateTodayContent, toggleCheckbox } = useObsidianStore()
+  const updateTaskCompletion = useGoalStore((s) => s.updateTaskCompletion)
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
   const [saving, setSaving] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const checkboxIndexRef = useRef(0)
-
-  // Reset the checkbox counter before each render
-  checkboxIndexRef.current = 0
+  const contentRef = useRef<HTMLDivElement>(null)
 
   // When entering edit mode, seed the draft with current content
   const startEditing = useCallback(() => {
@@ -71,39 +71,50 @@ export function TodayView(): React.JSX.Element {
     }
   }
 
-  // Handle checkbox clicks — passes the Nth checkbox index directly
-  const handleCheckboxToggle = useCallback(
-    async (index: number): Promise<void> => {
+  // Handle checkbox clicks — determines the index from DOM position at
+  // click time, avoiding render-time side effects that break under StrictMode
+  const handleCheckboxChange = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>): Promise<void> => {
+      const container = contentRef.current
+      if (!container) return
+      const allCheckboxes = Array.from(container.querySelectorAll('input[type="checkbox"]'))
+      const idx = allCheckboxes.indexOf(e.target as HTMLInputElement)
+      if (idx === -1) return
       try {
-        await toggleCheckbox(index)
+        await toggleCheckbox(idx)
+
+        // Wire task-link: extract task text and notify goal system
+        const li = (e.target as HTMLElement).closest('li')
+        if (li) {
+          const taskText = (li.textContent ?? '').trim()
+          const isCompleted = (e.target as HTMLInputElement).checked
+          // Fire-and-forget — don't block the toggle
+          updateTaskCompletion(taskText, isCompleted).catch(() => {})
+        }
       } catch {
         toast.error('Failed to toggle checkbox')
       }
     },
-    [toggleCheckbox]
+    [toggleCheckbox, updateTaskCompletion]
   )
 
-  // Custom checkbox renderer — uses a render-time counter so each
-  // checkbox gets its sequential index (0, 1, 2, ...) which maps
-  // directly to the Nth checkbox in the file's day section
+  // Custom checkbox renderer — no render-time mutation, StrictMode safe
   const CheckboxInput = useCallback(
     (props: React.InputHTMLAttributes<HTMLInputElement>) => {
       if (props.type === 'checkbox') {
-        const idx = checkboxIndexRef.current++
-
         return (
           <input
             type="checkbox"
             checked={props.checked}
             disabled={false}
             className="cursor-pointer accent-primary w-4 h-4 mr-1.5 align-middle rounded"
-            onChange={() => handleCheckboxToggle(idx)}
+            onChange={handleCheckboxChange}
           />
         )
       }
       return <input {...props} />
     },
-    [handleCheckboxToggle]
+    [handleCheckboxChange]
   )
 
   if (isLoading) {
@@ -216,8 +227,8 @@ export function TodayView(): React.JSX.Element {
             </div>
           </div>
         ) : (
-          <div className="prose prose-sm max-w-none text-text-primary prose-headings:text-text-primary prose-a:text-primary break-words overflow-hidden [&_li]:marker:text-text-tertiary">
-            <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ input: CheckboxInput }}>
+          <div ref={contentRef} className="prose prose-sm max-w-none text-text-primary prose-headings:text-text-primary prose-a:text-primary break-words overflow-hidden [&_li]:marker:text-text-tertiary">
+            <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]} components={{ input: CheckboxInput }}>
               {todaySection.content}
             </ReactMarkdown>
           </div>

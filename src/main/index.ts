@@ -3,7 +3,7 @@ import { app, shell, BrowserWindow, ipcMain, nativeImage } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
-import { registerObsidianIpc, initObsidian, registerAuthIpc, registerCalendarIpc, registerGitHubIpc, registerSlackIpc, registerSettingsIpc } from './ipc'
+import { registerObsidianIpc, initObsidian, registerAuthIpc, registerCalendarIpc, registerGitHubIpc, registerSlackIpc, registerSettingsIpc, registerRitualIpc, registerGoalIpc } from './ipc'
 import { HotkeyManager } from './services/hotkey/HotkeyManager'
 import { getSyncManager } from './services/sync/SyncManager'
 import { buildAppMenu } from './menu'
@@ -79,6 +79,8 @@ app.whenReady().then(() => {
   registerGitHubIpc()
   registerSlackIpc()
   registerSettingsIpc()
+  registerRitualIpc()
+  registerGoalIpc()
   initObsidian()
 
   const mainWindow = createWindow()

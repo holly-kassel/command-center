@@ -11,4 +11,5 @@ export interface AppSettings {
   userName: string
   windowBounds: { width: number; height: number; x?: number; y?: number }
   lastSyncTime: number
+  meetingFilterPatterns: string[]
 }

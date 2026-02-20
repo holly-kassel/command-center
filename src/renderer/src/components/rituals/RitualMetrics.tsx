@@ -10,6 +10,7 @@ import type { StreakType } from '@shared/types/ritual'
 interface RitualMetricsProps {
   onStartMorning: () => void
   onStartEvening: () => void
+  onStartTouchGrass: () => void
 }
 
 const STREAK_LABELS: Record<StreakType, { label: string; icon: string }> = {
@@ -21,7 +22,7 @@ const STREAK_LABELS: Record<StreakType, { label: string; icon: string }> = {
 
 const DAY_LABELS = ['M', 'T', 'W', 'T', 'F']
 
-export function RitualMetrics({ onStartMorning, onStartEvening }: RitualMetricsProps): React.ReactElement {
+export function RitualMetrics({ onStartMorning, onStartEvening, onStartTouchGrass }: RitualMetricsProps): React.ReactElement {
   const todayLog = useRitualStore((s) => s.todayLog)
   const streaks = useRitualStore((s) => s.streaks)
   const weeklyMetrics = useRitualStore((s) => s.weeklyMetrics)
@@ -111,6 +112,19 @@ export function RitualMetrics({ onStartMorning, onStartEvening }: RitualMetricsP
           {todayLog.intention}
         </div>
       )}
+
+      {/* Touch Grass — always available */}
+      <button
+        onClick={onStartTouchGrass}
+        className="w-full flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-green-500/10 text-green-400 hover:bg-green-500/20 border border-green-500/20 transition-all"
+        title="Stop. Breathe. Drink water."
+      >
+        <span>🌿</span>
+        Touch Grass
+        {todayLog?.touchGrassCount ? (
+          <span className="text-[10px] text-green-400/60 ml-1">× {todayLog.touchGrassCount}</span>
+        ) : null}
+      </button>
 
       {/* Streaks */}
       {streaks && (

@@ -1,9 +1,10 @@
 import 'dotenv/config'
 import { app, shell, BrowserWindow, ipcMain, nativeImage } from 'electron'
 import { join } from 'path'
+import { readFile } from 'fs/promises'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
-import { registerObsidianIpc, initObsidian, registerAuthIpc, registerCalendarIpc, registerGitHubIpc, registerSlackIpc, registerSettingsIpc, registerRitualIpc, registerGoalIpc } from './ipc'
+import { registerObsidianIpc, initObsidian, registerAuthIpc, registerCalendarIpc, registerGitHubIpc, registerSlackIpc, registerSettingsIpc, registerRitualIpc, registerGoalIpc, registerTranscriptionIpc } from './ipc'
 import { HotkeyManager } from './services/hotkey/HotkeyManager'
 import { getSyncManager } from './services/sync/SyncManager'
 import { buildAppMenu } from './menu'
@@ -72,6 +73,19 @@ app.whenReady().then(() => {
   // IPC test
   ipcMain.on('ping', () => console.log('pong'))
 
+  // Serve sound files from resources/sounds/
+  ipcMain.handle('app:getSound', async (_event, filename: string) => {
+    // Sanitize filename to prevent directory traversal
+    const safe = filename.replace(/[^a-zA-Z0-9._-]/g, '')
+    const soundPath = join(__dirname, '../../resources/sounds', safe)
+    try {
+      const buffer = await readFile(soundPath)
+      return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength)
+    } catch {
+      return null
+    }
+  })
+
   // Register IPC handlers
   registerObsidianIpc()
   registerAuthIpc()
@@ -81,6 +95,7 @@ app.whenReady().then(() => {
   registerSettingsIpc()
   registerRitualIpc()
   registerGoalIpc()
+  registerTranscriptionIpc()
   initObsidian()
 
   const mainWindow = createWindow()

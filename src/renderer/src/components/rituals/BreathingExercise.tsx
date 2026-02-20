@@ -4,7 +4,7 @@
  * 4-7-8 breathing pattern: 4s inhale, 7s hold, 8s exhale.
  * Animated circle + phase text + countdown.
  */
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 interface BreathingExerciseProps {
   durationSeconds?: number
@@ -33,6 +33,8 @@ const PHASE_COLORS: Record<Phase, string> = {
   exhale: 'text-accent',
 }
 
+const PHASE_ORDER: Exclude<Phase, 'ready'>[] = ['inhale', 'hold', 'exhale']
+
 const CYCLE_DURATION = 4 + 7 + 8 // 19 seconds
 
 export function BreathingExercise({
@@ -45,58 +47,65 @@ export function BreathingExercise({
   const [cycleCount, setCycleCount] = useState(0)
   const [totalElapsed, setTotalElapsed] = useState(0)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const phaseIndexRef = useRef(0) // 0=inhale, 1=hold, 2=exhale
+  const phaseRemainingRef = useRef(0)
+  const cycleRef = useRef(0)
+  const elapsedRef = useRef(0)
+  const onCompleteRef = useRef(onComplete)
+  onCompleteRef.current = onComplete
 
   const totalCycles = Math.ceil(durationSeconds / CYCLE_DURATION)
-
-  const nextPhase = useCallback(
-    (current: Phase): Phase => {
-      if (current === 'inhale') return 'hold'
-      if (current === 'hold') return 'exhale'
-      // exhale → start new cycle or complete
-      return 'inhale'
-    },
-    []
-  )
 
   useEffect(() => {
     if (!started) return
 
-    // Start with inhale
+    // Initialize: start at inhale
+    phaseIndexRef.current = 0
+    phaseRemainingRef.current = PHASE_DURATIONS.inhale
+    cycleRef.current = 1
+    elapsedRef.current = 0
+
     setPhase('inhale')
     setPhaseTimeLeft(PHASE_DURATIONS.inhale)
     setCycleCount(1)
+    setTotalElapsed(0)
 
     intervalRef.current = setInterval(() => {
-      setTotalElapsed((prev) => {
-        const next = prev + 1
-        if (next >= durationSeconds) {
-          clearInterval(intervalRef.current!)
-          onComplete()
-        }
-        return next
-      })
+      elapsedRef.current += 1
+      phaseRemainingRef.current -= 1
 
-      setPhaseTimeLeft((prev) => {
-        if (prev <= 1) {
-          // Transition to next phase
-          setPhase((currentPhase) => {
-            const next = nextPhase(currentPhase)
-            if (next === 'inhale' && currentPhase === 'exhale') {
-              setCycleCount((c) => c + 1)
-            }
-            setPhaseTimeLeft(PHASE_DURATIONS[next])
-            return next
-          })
-          return 0
+      // Check if overall exercise is done
+      if (elapsedRef.current >= durationSeconds) {
+        clearInterval(intervalRef.current!)
+        onCompleteRef.current()
+        return
+      }
+
+      if (phaseRemainingRef.current <= 0) {
+        // Move to next phase
+        phaseIndexRef.current = (phaseIndexRef.current + 1) % 3
+
+        // If we wrapped back to inhale, that's a new cycle
+        if (phaseIndexRef.current === 0) {
+          cycleRef.current += 1
+          setCycleCount(cycleRef.current)
         }
-        return prev - 1
-      })
+
+        const nextPhaseName = PHASE_ORDER[phaseIndexRef.current]
+        phaseRemainingRef.current = PHASE_DURATIONS[nextPhaseName]
+        setPhase(nextPhaseName)
+        setPhaseTimeLeft(PHASE_DURATIONS[nextPhaseName])
+      } else {
+        setPhaseTimeLeft(phaseRemainingRef.current)
+      }
+
+      setTotalElapsed(elapsedRef.current)
     }, 1000)
 
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current)
     }
-  }, [started, durationSeconds, nextPhase, onComplete])
+  }, [started, durationSeconds])
 
   // Circle scale based on phase
   const getScale = (): number => {

@@ -23,6 +23,9 @@ import { SamoyedMascot } from '../../components/SamoyedMascot'
 import { RitualMetrics } from '../../components/rituals/RitualMetrics'
 import { MorningRitualFlow } from '../../components/rituals/MorningRitualFlow'
 import { EveningRitualFlow } from '../../components/rituals/EveningRitualFlow'
+import { TouchGrassFlow } from '../../components/rituals/TouchGrassFlow'
+import { VoiceRecorder } from '../../components/VoiceRecorder'
+import { ScreamIntoTheVoid } from '../../components/ScreamIntoTheVoid'
 import { GoalsPanel } from '../../components/goals/GoalsPanel'
 
 // ─── Helpers ──────────────────────────────────────────────────
@@ -48,6 +51,8 @@ function getFormattedDate(): string {
 export function Dashboard(): React.ReactElement {
   const [showSettings, setShowSettings] = useState(false)
   const [showFocusMode, setShowFocusMode] = useState(false)
+  const [showVoiceRecorder, setShowVoiceRecorder] = useState(false)
+  const [showScreamVoid, setShowScreamVoid] = useState(false)
   const obsidianInit = useObsidianStore((s) => s.initialize)
   const obsidianRefresh = useObsidianStore((s) => s.refreshAll)
   const calendarInit = useCalendarStore((s) => s.initialize)
@@ -123,6 +128,13 @@ export function Dashboard(): React.ReactElement {
             </div>
             <div className="flex items-center gap-2">
               <button
+                onClick={() => setShowScreamVoid(true)}
+                className="text-text-muted hover:text-red-400 text-sm transition-colors"
+                title="Scream Into The Void"
+              >
+                🗣️
+              </button>
+              <button
                 onClick={() => setShowFocusMode(true)}
                 className="text-text-muted hover:text-focus text-sm transition-colors"
                 title="Focus Mode (⌘⇧F)"
@@ -147,7 +159,7 @@ export function Dashboard(): React.ReactElement {
           </div>
 
           {/* Quick Capture — full width */}
-          <QuickCaptureBox />
+          <QuickCaptureBox onStartRecording={() => setShowVoiceRecorder(true)} />
 
           {/* Main grid: 2 columns on lg */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -161,6 +173,7 @@ export function Dashboard(): React.ReactElement {
               <RitualMetrics
                 onStartMorning={() => startRitual('morning')}
                 onStartEvening={() => startRitual('evening')}
+                onStartTouchGrass={() => startRitual('touch_grass')}
               />
               <CalendarSection />
               <FocusSection />
@@ -185,6 +198,25 @@ export function Dashboard(): React.ReactElement {
       )}
       {activeRitual === 'evening' && (
         <EveningRitualFlow onComplete={endRitual} onClose={endRitual} />
+      )}
+      {activeRitual === 'touch_grass' && (
+        <TouchGrassFlow onComplete={endRitual} onClose={endRitual} />
+      )}
+
+      {/* Voice Recorder overlay */}
+      {showVoiceRecorder && (
+        <VoiceRecorder
+          onComplete={() => {
+            setShowVoiceRecorder(false)
+            obsidianRefresh()
+          }}
+          onClose={() => setShowVoiceRecorder(false)}
+        />
+      )}
+
+      {/* Scream Into The Void */}
+      {showScreamVoid && (
+        <ScreamIntoTheVoid onClose={() => setShowScreamVoid(false)} />
       )}
 
       {/* Settings slide-over */}

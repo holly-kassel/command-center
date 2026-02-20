@@ -24,6 +24,7 @@ export interface DailyLog {
   intention: string | null
   eveningRitualCompleted: boolean
   eveningRitualTime: string | null // ISO timestamp
+  touchGrassCount: number // how many times today
   reflection: {
     wentWell: string
     couldImprove: string
@@ -104,6 +105,20 @@ export interface EveningRitualResult {
   gratitude: string
   energyLevel: number
 }
+
+export const TOUCH_GRASS_STEPS: RitualStep[] = [
+  {
+    id: 'breathe',
+    title: 'Breathe',
+    description: 'Stop. Close your eyes. 4-7-8.',
+    durationSeconds: 60,
+  },
+  {
+    id: 'water',
+    title: 'Hydrate',
+    description: 'Drink some water. Right now.',
+  },
+]
 
 // ─── Weekly Metrics ───────────────────────────────────────────
 

@@ -12,7 +12,7 @@ interface RitualState {
   todayLog: DailyLog | null
   streaks: Record<StreakType, Streak> | null
   weeklyMetrics: WeeklyRitualMetrics | null
-  activeRitual: 'morning' | 'evening' | null
+  activeRitual: 'morning' | 'evening' | 'touch_grass' | null
   isLoading: boolean
   error: string | null
 
@@ -29,7 +29,8 @@ interface RitualState {
     gratitude: string
     energyLevel: number
   }) => Promise<void>
-  startRitual: (type: 'morning' | 'evening') => void
+  saveTouchGrass: () => Promise<void>
+  startRitual: (type: 'morning' | 'evening' | 'touch_grass') => void
   endRitual: () => void
   refreshAll: () => Promise<void>
 }
@@ -124,6 +125,22 @@ export const useRitualStore = create<RitualState>((set, get) => ({
       set({ activeRitual: null })
     } catch (error) {
       set({ error: error instanceof Error ? error.message : 'Failed to save evening ritual' })
+      throw error
+    }
+  },
+
+  saveTouchGrass: async () => {
+    try {
+      const today = formatDate(new Date())
+      const currentLog = get().todayLog
+      const currentCount = currentLog?.touchGrassCount ?? 0
+      await window.api.ritual.saveDailyLog(today, {
+        touchGrassCount: currentCount + 1,
+      })
+      await get().loadToday()
+      set({ activeRitual: null })
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : 'Failed to save touch grass' })
       throw error
     }
   },

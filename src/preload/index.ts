@@ -16,6 +16,10 @@ import type {
   GoalCategory,
   GoalStatus,
 } from '../shared/types/goal'
+import type {
+  TranscriptionResult,
+  TranscriptionAndSummaryResult,
+} from '../shared/types/transcription'
 
 // Obsidian API exposed to renderer
 const obsidianApi = {
@@ -24,6 +28,8 @@ const obsidianApi = {
   getVaultStatus: (): Promise<VaultStatus> => ipcRenderer.invoke('obsidian:getVaultStatus'),
   getTodaySection: (): Promise<TodaySection | null> =>
     ipcRenderer.invoke('obsidian:getTodaySection'),
+  getDaySection: (dateStr: string): Promise<TodaySection | null> =>
+    ipcRenderer.invoke('obsidian:getDaySection', dateStr),
   getCurrentFocus: (): Promise<string | null> => ipcRenderer.invoke('obsidian:getCurrentFocus'),
   getWeeklyNote: (): Promise<WeeklyNote | null> => ipcRenderer.invoke('obsidian:getWeeklyNote'),
   appendToToday: (text: string): Promise<void> =>
@@ -182,6 +188,20 @@ const goalApi = {
   },
 }
 
+// Transcription API exposed to renderer
+const transcriptionApi = {
+  transcribe: (audioBuffer: ArrayBuffer, durationSeconds: number): Promise<TranscriptionResult> =>
+    ipcRenderer.invoke('transcription:transcribe', audioBuffer, durationSeconds),
+  transcribeAndSummarize: (audioBuffer: ArrayBuffer, durationSeconds: number): Promise<TranscriptionAndSummaryResult> =>
+    ipcRenderer.invoke('transcription:transcribeAndSummarize', audioBuffer, durationSeconds),
+}
+
+// App utilities
+const appApi = {
+  getSound: (filename: string): Promise<ArrayBuffer | null> =>
+    ipcRenderer.invoke('app:getSound', filename),
+}
+
 // Settings API exposed to renderer
 const settingsApi = {
   getAll: (): Promise<AppSettings> => ipcRenderer.invoke('settings:getAll'),
@@ -212,7 +232,9 @@ const api = {
   slack: slackApi,
   ritual: ritualApi,
   goal: goalApi,
+  transcription: transcriptionApi,
   settings: settingsApi,
+  app: appApi,
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to

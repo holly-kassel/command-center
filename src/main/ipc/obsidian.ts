@@ -57,6 +57,15 @@ export function registerObsidianIpc(): void {
     }
   })
 
+  ipcMain.handle('obsidian:getDaySection', async (_event, dateStr: string) => {
+    try {
+      return await obsidian.getDaySection(dateStr)
+    } catch (error) {
+      log.error('[IPC] obsidian:getDaySection error:', error)
+      throw error
+    }
+  })
+
   ipcMain.handle('obsidian:getCurrentFocus', async () => {
     try {
       return await obsidian.getCurrentFocus()

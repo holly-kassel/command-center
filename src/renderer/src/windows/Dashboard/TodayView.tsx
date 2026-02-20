@@ -4,6 +4,9 @@
  * Displays today's section from the weekly note with
  * rendered markdown content, interactive checkboxes,
  * and an inline markdown editor toggle.
+ *
+ * Supports day-by-day navigation with arrow buttons so you
+ * can reflect on previous weekdays' notes.
  */
 import { useState, useRef, useEffect, useCallback } from 'react'
 import ReactMarkdown from 'react-markdown'
@@ -12,6 +15,30 @@ import rehypeRaw from 'rehype-raw'
 import { useObsidianStore } from '../../store/obsidianStore'
 import { useGoalStore } from '../../store/goalStore'
 import { toast } from '../../utils/toast'
+import type { TodaySection } from '../../../../shared/types/obsidian'
+
+/** Format a Date as YYYY-MM-DD (local time) */
+function toDateStr(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+/** Shift a YYYY-MM-DD string by `delta` weekdays (skipping Sat/Sun) */
+function shiftWeekday(dateStr: string, delta: number): string {
+  const d = new Date(dateStr + 'T12:00:00')
+  let remaining = Math.abs(delta)
+  const dir = delta > 0 ? 1 : -1
+  while (remaining > 0) {
+    d.setDate(d.getDate() + dir)
+    const dow = d.getDay()
+    if (dow !== 0 && dow !== 6) remaining--
+  }
+  return toDateStr(d)
+}
+
+const todayStr = toDateStr(new Date())
 
 export function TodayView(): React.JSX.Element {
   const { todaySection, currentFocus, isLoading, error, vaultStatus, updateTodayContent, toggleCheckbox } = useObsidianStore()
@@ -22,13 +49,62 @@ export function TodayView(): React.JSX.Element {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const contentRef = useRef<HTMLDivElement>(null)
 
-  // When entering edit mode, seed the draft with current content
+  // Day navigation
+  const [selectedDate, setSelectedDate] = useState(todayStr)
+  const [historicalSection, setHistoricalSection] = useState<TodaySection | null>(null)
+  const [navLoading, setNavLoading] = useState(false)
+  const isToday = selectedDate === todayStr
+
+  // The section to render: live store data for today, fetched data otherwise
+  const activeSection = isToday ? todaySection : historicalSection
+
+  // Fetch historical day section when navigating away from today
+  useEffect(() => {
+    if (isToday) {
+      setHistoricalSection(null)
+      return
+    }
+    let cancelled = false
+    setNavLoading(true)
+    window.api.obsidian.getDaySection(selectedDate).then((section) => {
+      if (!cancelled) {
+        setHistoricalSection(section)
+        setNavLoading(false)
+      }
+    }).catch(() => {
+      if (!cancelled) {
+        setHistoricalSection(null)
+        setNavLoading(false)
+      }
+    })
+    return () => { cancelled = true }
+  }, [selectedDate, isToday])
+
+  const goBack = useCallback(() => {
+    setEditing(false)
+    setSelectedDate((prev) => shiftWeekday(prev, -1))
+  }, [])
+
+  const goForward = useCallback(() => {
+    setEditing(false)
+    setSelectedDate((prev) => {
+      const next = shiftWeekday(prev, 1)
+      return next > todayStr ? prev : next
+    })
+  }, [])
+
+  const goToday = useCallback(() => {
+    setEditing(false)
+    setSelectedDate(todayStr)
+  }, [])
+
+  // When entering edit mode, seed the draft with current content (today only)
   const startEditing = useCallback(() => {
-    if (todaySection) {
+    if (isToday && todaySection) {
       setDraft(todaySection.content)
       setEditing(true)
     }
-  }, [todaySection])
+  }, [todaySection, isToday])
 
   // Auto-focus and auto-resize textarea
   useEffect(() => {
@@ -149,33 +225,67 @@ export function TodayView(): React.JSX.Element {
     )
   }
 
-  if (!todaySection) {
+  if (!activeSection && !navLoading) {
     return (
-      <div className="card">
-        <h3 className="text-lg font-semibold text-text-primary mb-2">No notes for today</h3>
-        <p className="text-text-secondary text-sm">
-          No section found for today in the current weekly note. It might be the weekend, or the
-          weekly note hasn&apos;t been created yet.
-        </p>
+      <div className="space-y-4">
+        {/* Navigation arrows even when no notes */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <button onClick={goBack} className="p-1.5 rounded-md text-text-muted hover:text-text-primary hover:bg-surface-muted transition-colors" title="Previous day">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+            </button>
+            <h2 className="text-xl font-bold text-text-primary">{selectedDate}</h2>
+            <button onClick={goForward} disabled={isToday} className="p-1.5 rounded-md text-text-muted hover:text-text-primary hover:bg-surface-muted transition-colors disabled:opacity-30 disabled:cursor-not-allowed" title="Next day">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+            </button>
+            {!isToday && (
+              <button onClick={goToday} className="ml-2 px-2 py-1 text-xs text-primary hover:bg-primary/10 rounded-md transition-colors">Today</button>
+            )}
+          </div>
+        </div>
+        <div className="card">
+          <h3 className="text-lg font-semibold text-text-primary mb-2">
+            {isToday ? 'No notes for today' : 'No notes for this day'}
+          </h3>
+          <p className="text-text-secondary text-sm">
+            No section found in the weekly note.{' '}
+            {isToday ? 'It might be the weekend, or the weekly note hasn\u2019t been created yet.' : 'This day may not have been logged.'}
+          </p>
+        </div>
       </div>
     )
   }
 
   return (
     <div className="space-y-4">
-      {/* Header with day name, focus, and edit toggle */}
+      {/* Header with navigation arrows, day name, focus, and edit toggle */}
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold text-text-primary">
-          {todaySection.dayOfWeek}
-          <span className="text-text-muted font-normal text-sm ml-2">{todaySection.date}</span>
-        </h2>
         <div className="flex items-center gap-2">
-          {currentFocus && (
+          <button onClick={goBack} className="p-1.5 rounded-md text-text-muted hover:text-text-primary hover:bg-surface-muted transition-colors" title="Previous day">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+          </button>
+          {navLoading ? (
+            <h2 className="text-xl font-bold text-text-primary animate-pulse">Loading…</h2>
+          ) : (
+            <h2 className="text-xl font-bold text-text-primary">
+              {activeSection?.dayOfWeek}
+              <span className="text-text-muted font-normal text-sm ml-2">{activeSection?.date}</span>
+            </h2>
+          )}
+          <button onClick={goForward} disabled={isToday} className="p-1.5 rounded-md text-text-muted hover:text-text-primary hover:bg-surface-muted transition-colors disabled:opacity-30 disabled:cursor-not-allowed" title="Next day">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+          </button>
+          {!isToday && (
+            <button onClick={goToday} className="ml-2 px-2 py-1 text-xs text-primary hover:bg-primary/10 rounded-md transition-colors">Today</button>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          {isToday && currentFocus && (
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-warning-light text-warning text-xs font-medium">
               🔔 {currentFocus}
             </span>
           )}
-          {!editing && (
+          {isToday && !editing && (
             <button
               onClick={startEditing}
               className="p-1.5 rounded-md text-text-muted hover:text-text-primary hover:bg-surface-muted transition-colors"
@@ -190,9 +300,9 @@ export function TodayView(): React.JSX.Element {
         </div>
       </div>
 
-      {/* Content: edit mode or rendered view */}
+      {/* Content: edit mode (today only) or rendered view */}
       <div className="card">
-        {editing ? (
+        {editing && isToday ? (
           <div className="space-y-3">
             <textarea
               ref={textareaRef}
@@ -229,7 +339,7 @@ export function TodayView(): React.JSX.Element {
         ) : (
           <div ref={contentRef} className="prose prose-sm max-w-none text-text-primary prose-headings:text-text-primary prose-a:text-primary break-words overflow-hidden [&_li]:marker:text-text-tertiary">
             <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]} components={{ input: CheckboxInput }}>
-              {todaySection.content}
+              {activeSection?.content ?? ''}
             </ReactMarkdown>
           </div>
         )}

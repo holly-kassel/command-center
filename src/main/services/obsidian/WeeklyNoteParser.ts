@@ -202,15 +202,25 @@ export function extractSubsections(dayContent: string): Record<string, string> {
  * Returns the parsed day content, or null if not found.
  */
 export async function getTodaySection(vaultPath: string): Promise<TodaySection | null> {
-  const now = new Date()
-  const dayOfWeek = getDayOfWeek(now)
+  return getDaySection(vaultPath, new Date())
+}
+
+/**
+ * Get a specific day's section from the appropriate weekly note.
+ * Works for any date — current week, past weeks, etc.
+ */
+export async function getDaySection(
+  vaultPath: string,
+  date: Date
+): Promise<TodaySection | null> {
+  const dayOfWeek = getDayOfWeek(date)
 
   // Only weekdays have sections
   if (!WEEKDAY_NAMES.includes(dayOfWeek)) {
     return null
   }
 
-  const filePath = getWeekFilePath(vaultPath, now)
+  const filePath = getWeekFilePath(vaultPath, date)
   if (!existsSync(filePath)) {
     return null
   }
@@ -227,7 +237,7 @@ export async function getTodaySection(vaultPath: string): Promise<TodaySection |
     content: day.rawContent,
     dayOfWeek,
     filePath,
-    date: day.date ?? formatDate(now),
+    date: day.date ?? formatDate(date),
   }
 }
 

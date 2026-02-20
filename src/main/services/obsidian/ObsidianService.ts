@@ -13,6 +13,7 @@ import { settings } from '../../config/settings'
 import {
   getWeekFilePath,
   getTodaySection,
+  getDaySection,
   parseWeeklyNote,
   extractCurrentFocus,
   getDayOfWeek,
@@ -115,6 +116,15 @@ export class ObsidianService {
       throw new Error('Vault path not set. Call findVault() or setVaultPath() first.')
     }
     return getTodaySection(this.vaultPath)
+  }
+
+  /** Get a specific day's section by date string (YYYY-MM-DD) */
+  async getDaySection(dateStr: string): Promise<TodaySection | null> {
+    if (!this.vaultPath) {
+      throw new Error('Vault path not set. Call findVault() or setVaultPath() first.')
+    }
+    const date = new Date(dateStr + 'T12:00:00') // noon to avoid timezone issues
+    return getDaySection(this.vaultPath, date)
   }
 
   /** Get the current focus/priority from today's section */

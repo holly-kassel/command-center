@@ -15,12 +15,14 @@ import type {
   GoalCategory,
   GoalStatus,
 } from '../shared/types/goal'
+import type { TranscriptionResult, TranscriptionAndSummaryResult } from '../shared/types/transcription'
 
 interface ObsidianApi {
   findVault(): Promise<string>
   setVaultPath(path: string): Promise<void>
   getVaultStatus(): Promise<VaultStatus>
   getTodaySection(): Promise<TodaySection | null>
+  getDaySection(dateStr: string): Promise<TodaySection | null>
   getCurrentFocus(): Promise<string | null>
   getWeeklyNote(): Promise<WeeklyNote | null>
   appendToToday(text: string): Promise<void>
@@ -106,6 +108,15 @@ interface GoalApi {
   onSyncUpdate(callback: (data: { goals: Goal[]; summary: { totalActive: number; completedThisWeek: number } }) => void): () => void
 }
 
+interface TranscriptionApi {
+  transcribe(audioBuffer: ArrayBuffer, durationSeconds: number): Promise<TranscriptionResult>
+  transcribeAndSummarize(audioBuffer: ArrayBuffer, durationSeconds: number): Promise<TranscriptionAndSummaryResult>
+}
+
+interface AppApi {
+  getSound(filename: string): Promise<ArrayBuffer | null>
+}
+
 interface Api {
   obsidian: ObsidianApi
   auth: AuthApi
@@ -114,7 +125,9 @@ interface Api {
   slack: SlackApi
   ritual: RitualApi
   goal: GoalApi
+  transcription: TranscriptionApi
   settings: SettingsApi
+  app: AppApi
 }
 
 declare global {

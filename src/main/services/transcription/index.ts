@@ -1,1 +1,1 @@
-export { transcribeAudio, isWhisperReady } from './TranscriptionService'
+export { transcribeAudio, transcribeChunkWithOpenAI, summarizeMeeting } from './TranscriptionService'

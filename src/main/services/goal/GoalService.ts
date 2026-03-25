@@ -151,11 +151,6 @@ export class GoalService {
     return this.getAllGoals().filter((g) => g.parentId === parentId)
   }
 
-  /** Returns top-level goals (no parent) */
-  getRootGoals(): Goal[] {
-    return this.getAllGoals().filter((g) => g.parentId === null)
-  }
-
   /** Build a full tree starting from root goals */
   getGoalTree(): GoalWithChildren[] {
     const all = this.getAllGoals()
@@ -214,17 +209,17 @@ export class GoalService {
   }
 
   getTaskLinksForGoal(goalId: string): GoalTaskLink[] {
-    const links = this.store.get('taskLinks', {})
+    const links: Record<string, GoalTaskLink> = this.store.get('taskLinks', {})
     return Object.values(links).filter((l) => l.goalId === goalId)
   }
 
   getAllTaskLinks(): GoalTaskLink[] {
-    const links = this.store.get('taskLinks', {})
+    const links: Record<string, GoalTaskLink> = this.store.get('taskLinks', {})
     return Object.values(links)
   }
 
   updateTaskCompletion(taskText: string, completed: boolean): GoalTaskLink[] {
-    const links = this.store.get('taskLinks', {})
+    const links: Record<string, GoalTaskLink> = this.store.get('taskLinks', {})
     const updated: GoalTaskLink[] = []
 
     for (const link of Object.values(links)) {

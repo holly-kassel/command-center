@@ -79,9 +79,4 @@ export const credentialManager = {
       return null
     }
   },
-
-  deleteGitHubPAT(): void {
-    store.set('githubPAT', '')
-    log.info('[CredentialManager] GitHub PAT deleted')
-  },
 }

@@ -21,20 +21,17 @@ export class HotkeyManager {
   registerHotkeys(mainWindow: BrowserWindow): void {
     this.mainWindow = mainWindow
 
-    const captureOk = globalShortcut.register('CommandOrControl+Option+Space', () => {
+    globalShortcut.register('CommandOrControl+Option+Space', () => {
       this.toggleQuickCapture()
     })
-    console.log('[HotkeyManager] Cmd+Option+Space (quick capture) registered:', captureOk)
 
-    const nextOk = globalShortcut.register('CommandOrControl+Shift+N', () => {
+    globalShortcut.register('CommandOrControl+Shift+N', () => {
       this.showWhatsNext()
     })
-    console.log('[HotkeyManager] Cmd+Shift+N (whats next) registered:', nextOk)
 
-    const focusOk = globalShortcut.register('CommandOrControl+Shift+F', () => {
+    globalShortcut.register('CommandOrControl+Shift+F', () => {
       this.toggleFocusMode()
     })
-    console.log('[HotkeyManager] Cmd+Shift+F (focus mode) registered:', focusOk)
 
     // Listen for overlay close requests from renderer
     ipcMain.on('overlay:close', (_event) => {

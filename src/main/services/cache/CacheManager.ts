@@ -57,20 +57,6 @@ export class CacheManager {
     return entry?.data ?? null
   }
 
-  /**
-   * Remove a cache entry.
-   */
-  remove(key: string): void {
-    cacheStore.delete(key)
-  }
-
-  /**
-   * Clear the entire cache.
-   */
-  clear(): void {
-    cacheStore.clear()
-    logger.info('[Cache] Cleared')
-  }
 }
 
 // Singleton

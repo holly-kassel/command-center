@@ -267,18 +267,4 @@ export function extractCurrentFocus(dayContent: string): string | null {
   return lastFocus
 }
 
-/**
- * Get all current focus items from today's content.
- * Returns an array of focus strings found.
- */
-export function extractAllFocusItems(dayContent: string): string[] {
-  const items: string[] = []
-  const lines = dayContent.split('\n')
-  for (const line of lines) {
-    const match = line.match(/\*\*(?:🔔\s*)?(?:Triage|Priority|Focus):\s*(.*?)\*\*/)
-    if (match) {
-      items.push(match[1].trim())
-    }
-  }
-  return items
-}
+

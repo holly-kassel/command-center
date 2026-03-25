@@ -4,9 +4,23 @@ import { join } from 'path'
 import { readFile } from 'fs/promises'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
-import { registerObsidianIpc, initObsidian, registerAuthIpc, registerCalendarIpc, registerGitHubIpc, registerSlackIpc, registerSettingsIpc, registerRitualIpc, registerGoalIpc, registerTranscriptionIpc } from './ipc'
+import {
+  registerObsidianIpc,
+  initObsidian,
+  registerAuthIpc,
+  registerCalendarIpc,
+  registerGitHubIpc,
+  registerSlackIpc,
+  registerSettingsIpc,
+  registerRitualIpc,
+  registerGoalIpc,
+  registerKanbanIpc,
+  registerTranscriptionIpc,
+  registerChatIpc,
+} from './ipc'
 import { HotkeyManager } from './services/hotkey/HotkeyManager'
 import { getSyncManager } from './services/sync/SyncManager'
+import { getChatService } from './services/chat'
 import { buildAppMenu } from './menu'
 
 const hotkeyManager = new HotkeyManager()
@@ -70,9 +84,6 @@ app.whenReady().then(() => {
     optimizer.watchWindowShortcuts(window)
   })
 
-  // IPC test
-  ipcMain.on('ping', () => console.log('pong'))
-
   // Serve sound files from resources/sounds/
   ipcMain.handle('app:getSound', async (_event, filename: string) => {
     // Sanitize filename to prevent directory traversal
@@ -95,10 +106,14 @@ app.whenReady().then(() => {
   registerSettingsIpc()
   registerRitualIpc()
   registerGoalIpc()
+  registerKanbanIpc()
   registerTranscriptionIpc()
   initObsidian()
 
   const mainWindow = createWindow()
+
+  // Register chat IPC (needs mainWindow for streaming events)
+  registerChatIpc(mainWindow)
 
   // Build native app menu
   buildAppMenu()
@@ -108,6 +123,10 @@ app.whenReady().then(() => {
 
   // Start auto-sync (calendar, github, obsidian)
   syncManager.startAutoSync(mainWindow)
+
+  // Start Katya's proactive nudge scheduler
+  const chatService = getChatService()
+  chatService.scheduleNudges(mainWindow)
 
   app.on('activate', function () {
     // On macOS it's common to re-create a window in the app when the
@@ -128,6 +147,7 @@ app.on('window-all-closed', () => {
 app.on('will-quit', () => {
   hotkeyManager.unregisterAll()
   syncManager.stopAutoSync()
+  getChatService().stopNudges()
 })
 
 // In this file you can include the rest of your app's specific main process

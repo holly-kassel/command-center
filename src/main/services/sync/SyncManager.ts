@@ -68,13 +68,6 @@ export class SyncManager {
     logger.info('[SyncManager] Auto-sync stopped')
   }
 
-  /**
-   * Get cached data for offline fallback.
-   */
-  getCachedData<T>(key: string): T | null {
-    return this.cache.getStale<T>(key)
-  }
-
   // ── Sync routines ──────────────────────────────────────────────
 
   private async syncCalendar(): Promise<void> {

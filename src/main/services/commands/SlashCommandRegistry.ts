@@ -5,11 +5,10 @@
  * Extensible — register new commands via .register().
  */
 import log from 'electron-log'
-import { readFile } from 'node:fs/promises'
-import { existsSync } from 'node:fs'
-import { join } from 'node:path'
 import { getObsidianService } from '../obsidian/ObsidianService'
+import { getKanbanService } from '../kanban/KanbanService'
 import { chatCompletion } from '../llm'
+import { loadLLMContext } from '../llm/contextLoader'
 import { SlackParser } from '../slack/SlackParser'
 
 export interface SlashCommandResult {
@@ -28,7 +27,7 @@ interface SlashCommandDefinition {
   execute: (args: string) => Promise<SlashCommandResult>
 }
 
-const TRANSCRIPT_SYSTEM_PROMPT = `You are a concise meeting note summarizer for a product manager's weekly notes.
+const TRANSCRIPT_SYSTEM_PROMPT = `You are a thorough meeting note summarizer for a product manager's weekly notes.
 
 Given a raw meeting transcript, produce a structured summary in this exact markdown format:
 
@@ -41,20 +40,27 @@ Given a raw meeting transcript, produce a structured summary in this exact markd
 - [etc.]
 
 **Action Items:**
-- [ ] [action item with owner if clear]
-- [ ] [action item]
+- [ ] [owner] [action item]
+- [ ] [owner] [action item]
 
 **Decisions Made:**
 - [decision 1]
 - [decision 2]
 
+**Open Questions:**
+- [question 1]
+
 Rules:
-- Be concise — strip filler words, repetition, and small talk
-- Focus on decisions, action items, and key info
+- Strip filler words, repetition, and small talk, but do NOT sacrifice completeness
 - Use the participants' first names
 - If something is unclear from the transcript, note it as "[unclear]"
-- Keep the total summary under 300 words
-- Action items should be specific and actionable`
+
+Action item rules (CRITICAL — err on the side of capturing MORE, not fewer):
+- Capture EVERY commitment, next step, or follow-up mentioned — explicit ("I'll do X") or implicit ("we should do X", "let's try X", "can you do X")
+- Include the owner's name for each item when identifiable
+- Include items that were agreed to even casually (e.g. "yeah I can get that done tomorrow")
+- Include items someone volunteered for ("I'll share that out", "let me pull that in")
+- If someone said they'd share, review, send, schedule, create, update, or follow up on anything, that's an action item`
 
 /**
  * Context files from LLM-context/ to load for transcript summarization.
@@ -64,9 +70,9 @@ Rules:
  */
 const TRANSCRIPT_CONTEXT_FILES = ['business-profile.md', 'billing-domain.md']
 
-const SLACK_SYSTEM_PROMPT = `You are a concise Slack thread summarizer for a product manager's weekly notes.
+const SLACK_SYSTEM_PROMPT = `You are a Slack thread summarizer for a product manager's weekly notes.
 
-Given a parsed Slack thread, produce a brief summary and action items in this exact markdown format:
+Given a parsed Slack thread, produce a summary and action items in this exact markdown format:
 
 **💬 Slack Thread Summary:** [one-line description of what was discussed]
 **Participants:** [names]
@@ -76,50 +82,18 @@ Given a parsed Slack thread, produce a brief summary and action items in this ex
 - [point 2]
 
 **Action Items:**
-- [ ] [action item with owner if clear]
+- [ ] [owner] [action item]
 
 Rules:
-- Be very concise — 3-5 bullet points max for key points
-- Only include action items if there are actual next steps discussed
+- Be concise for key points, but THOROUGH for action items
 - Use first names only
-- Skip the action items section entirely if there are none
-- Keep the total summary under 150 words`
 
-/**
- * Load LLM context files from the Obsidian vault.
- * Returns the combined content, or empty string if vault/files not found.
- */
-async function loadLLMContext(fileNames: string[]): Promise<string> {
-  const vaultPath = getObsidianService().getVaultPath()
-  if (!vaultPath) return ''
-
-  const contextDir = join(vaultPath, 'LLM-context')
-  if (!existsSync(contextDir)) return ''
-
-  const sections: string[] = []
-
-  for (const fileName of fileNames) {
-    const filePath = join(contextDir, fileName)
-    if (!existsSync(filePath)) {
-      log.warn(`[SlashCommands] Context file not found: ${filePath}`)
-      continue
-    }
-
-    try {
-      const content = await readFile(filePath, 'utf-8')
-      sections.push(`--- ${fileName} ---\n${content}`)
-    } catch (err) {
-      log.warn(`[SlashCommands] Failed to read context file: ${fileName}`, err)
-    }
-  }
-
-  if (sections.length === 0) return ''
-
-  return (
-    '\n\n## Personal Context (use this to understand the user, their team, and domain terminology)\n\n' +
-    sections.join('\n\n')
-  )
-}
+Action item rules (CRITICAL — err on the side of capturing MORE, not fewer):
+- Capture EVERY commitment, next step, or follow-up — explicit ("I'll do X") or implicit ("we should do X", "can you look into X")
+- Include the owner's name when identifiable
+- Include casual commitments ("yeah I can do that", "will take a look")
+- If someone said they'd share, review, send, check, update, or follow up on anything, that's an action item
+- Only skip the action items section if there are truly ZERO next steps of any kind`
 
 class SlashCommandRegistry {
   private commands = new Map<string, SlashCommandDefinition>()
@@ -141,6 +115,9 @@ class SlashCommandRegistry {
 
         const obsidian = getObsidianService()
         await obsidian.appendTodoToToday(text)
+
+        const kanban = getKanbanService()
+        kanban.addTask(text, 'slash_command')
 
         return {
           success: true,
@@ -177,7 +154,7 @@ class SlashCommandRegistry {
             { role: 'system', content: systemPrompt },
             { role: 'user', content: transcript }
           ],
-          { temperature: 0.2, maxTokens: 1024 }
+          { temperature: 0.2, maxTokens: 4096 }
         )
 
         // Append the summary as a raw block (no bullet/timestamp wrapping)

@@ -1,8 +1,8 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
-import type { TodaySection, VaultStatus, WeeklyNote, SlashCommandResult, SlashCommandInfo } from '../shared/types/obsidian'
+import type { TodaySection, VaultStatus, WeeklyNote, SlashCommandResult, SlashCommandInfo, WeeklyNoteSummary, WeeklySectionResult } from '../shared/types/obsidian'
 import type { CalendarEvent } from '../shared/types/calendar'
-import type { GitHubNotification, GitHubPullRequest } from '../shared/types/github'
+import type { GitHubNotification, GitHubPullRequest, NotificationTriageData, TriageStatus, TriagePriority } from '../shared/types/github'
 import type { ParsedSlackThread } from '../shared/types/slack'
 import type { AppSettings } from '../shared/types/settings'
 import type { DailyLog, Streak, StreakType, WeeklyRitualMetrics } from '../shared/types/ritual'
@@ -15,11 +15,17 @@ import type {
   GoalLevel,
   GoalCategory,
   GoalStatus,
+  KanbanTask,
+  KanbanStatus,
 } from '../shared/types/goal'
 import type {
   TranscriptionResult,
   TranscriptionAndSummaryResult,
+  MeetingSegment,
+  MeetingNotes,
+  SavedMeeting,
 } from '../shared/types/transcription'
+import type { ChatConversation, ChatMessage, ChatStreamChunk, NudgeConfig } from '../shared/types/chat'
 
 // Obsidian API exposed to renderer
 const obsidianApi = {
@@ -34,6 +40,8 @@ const obsidianApi = {
   getWeeklyNote: (): Promise<WeeklyNote | null> => ipcRenderer.invoke('obsidian:getWeeklyNote'),
   appendToToday: (text: string): Promise<void> =>
     ipcRenderer.invoke('obsidian:appendToToday', text),
+  appendBlockToToday: (block: string): Promise<void> =>
+    ipcRenderer.invoke('obsidian:appendBlockToToday', block),
   updateTodayContent: (content: string): Promise<void> =>
     ipcRenderer.invoke('obsidian:updateTodayContent', content),
   toggleCheckbox: (lineOffset: number): Promise<void> =>
@@ -54,6 +62,14 @@ const obsidianApi = {
     ipcRenderer.on('sync:obsidian', handler)
     return () => ipcRenderer.removeListener('sync:obsidian', handler)
   },
+  listWeeklyNotes: (): Promise<WeeklyNoteSummary[]> =>
+    ipcRenderer.invoke('obsidian:listWeeklyNotes'),
+  updateDayContent: (dateStr: string, content: string): Promise<void> =>
+    ipcRenderer.invoke('obsidian:updateDayContent', dateStr, content),
+  getWeeklySection: (dateStr: string, section: string): Promise<WeeklySectionResult | null> =>
+    ipcRenderer.invoke('obsidian:getWeeklySection', dateStr, section),
+  updateWeeklySection: (dateStr: string, section: string, content: string): Promise<void> =>
+    ipcRenderer.invoke('obsidian:updateWeeklySection', dateStr, section, content),
 }
 
 // Auth API exposed to renderer
@@ -104,6 +120,18 @@ const githubApi = {
     ipcRenderer.on('sync:github', handler)
     return () => ipcRenderer.removeListener('sync:github', handler)
   },
+  getAllTriageData: (): Promise<Record<string, NotificationTriageData>> =>
+    ipcRenderer.invoke('github:getAllTriageData'),
+  setTriageStatus: (notificationId: string, status: TriageStatus): Promise<NotificationTriageData> =>
+    ipcRenderer.invoke('github:setTriageStatus', notificationId, status),
+  setTriagePriority: (notificationId: string, priority: TriagePriority): Promise<NotificationTriageData> =>
+    ipcRenderer.invoke('github:setTriagePriority', notificationId, priority),
+  setTriageNotes: (notificationId: string, notes: string): Promise<NotificationTriageData> =>
+    ipcRenderer.invoke('github:setTriageNotes', notificationId, notes),
+  getTriageSortOrder: (): Promise<string[]> =>
+    ipcRenderer.invoke('github:getTriageSortOrder'),
+  setTriageSortOrder: (order: string[]): Promise<void> =>
+    ipcRenderer.invoke('github:setTriageSortOrder', order),
 }
 
 // Slack API exposed to renderer
@@ -188,12 +216,48 @@ const goalApi = {
   },
 }
 
+const kanbanApi = {
+  getAllTasks: (): Promise<KanbanTask[]> => ipcRenderer.invoke('kanban:getAllTasks'),
+  addTask: (
+    text: string,
+    source?: string,
+    sourceNotificationId?: string,
+    sourceUrl?: string,
+  ): Promise<KanbanTask> =>
+    ipcRenderer.invoke('kanban:addTask', text, source, sourceNotificationId, sourceUrl),
+  moveTask: (
+    taskId: string,
+    newStatus: KanbanStatus,
+    newPosition: number,
+  ): Promise<KanbanTask | null> =>
+    ipcRenderer.invoke('kanban:moveTask', taskId, newStatus, newPosition),
+  reorderTask: (taskId: string, newPosition: number): Promise<KanbanTask | null> =>
+    ipcRenderer.invoke('kanban:reorderTask', taskId, newPosition),
+  updateTaskText: (taskId: string, text: string): Promise<KanbanTask | null> =>
+    ipcRenderer.invoke('kanban:updateTaskText', taskId, text),
+  deleteTask: (taskId: string): Promise<boolean> => ipcRenderer.invoke('kanban:deleteTask', taskId),
+  findByNotificationId: (notificationId: string): Promise<KanbanTask | null> =>
+    ipcRenderer.invoke('kanban:findByNotificationId', notificationId),
+}
+
 // Transcription API exposed to renderer
 const transcriptionApi = {
   transcribe: (audioBuffer: ArrayBuffer, durationSeconds: number): Promise<TranscriptionResult> =>
     ipcRenderer.invoke('transcription:transcribe', audioBuffer, durationSeconds),
   transcribeAndSummarize: (audioBuffer: ArrayBuffer, durationSeconds: number): Promise<TranscriptionAndSummaryResult> =>
     ipcRenderer.invoke('transcription:transcribeAndSummarize', audioBuffer, durationSeconds),
+  transcribeChunk: (audioBuffer: ArrayBuffer, options: { language?: string; speakerDiarization?: boolean }): Promise<MeetingSegment[]> =>
+    ipcRenderer.invoke('transcription:transcribeChunk', audioBuffer, options),
+  summarizeMeeting: (transcript: string, participants?: string[]): Promise<MeetingNotes> =>
+    ipcRenderer.invoke('transcription:summarizeMeeting', transcript, participants),
+  saveMeeting: (meeting: SavedMeeting): Promise<SavedMeeting> =>
+    ipcRenderer.invoke('transcription:saveMeeting', meeting),
+  getMeetings: (): Promise<SavedMeeting[]> =>
+    ipcRenderer.invoke('transcription:getMeetings'),
+  deleteMeeting: (meetingId: string): Promise<boolean> =>
+    ipcRenderer.invoke('transcription:deleteMeeting', meetingId),
+  saveTranscriptToVault: (meeting: SavedMeeting): Promise<{ filename: string; path: string }> =>
+    ipcRenderer.invoke('transcription:saveTranscriptToVault', meeting),
 }
 
 // App utilities
@@ -223,6 +287,35 @@ const settingsApi = {
   },
 }
 
+// Chat API exposed to renderer
+const chatApi = {
+  sendMessage: (text: string): Promise<ChatMessage> =>
+    ipcRenderer.invoke('chat:send-message', text),
+  getConversation: (date?: string): Promise<ChatConversation> =>
+    ipcRenderer.invoke('chat:get-conversation', date),
+  clearConversation: (): Promise<{ success: boolean }> =>
+    ipcRenderer.invoke('chat:clear-conversation'),
+  getNudgeConfig: (): Promise<NudgeConfig> =>
+    ipcRenderer.invoke('chat:get-nudge-config'),
+  setNudgeConfig: (config: Partial<NudgeConfig>): Promise<NudgeConfig> =>
+    ipcRenderer.invoke('chat:set-nudge-config', config),
+  onStreamChunk: (callback: (data: ChatStreamChunk) => void): (() => void) => {
+    const handler = (_e: Electron.IpcRendererEvent, data: ChatStreamChunk): void => callback(data)
+    ipcRenderer.on('chat:stream-chunk', handler)
+    return () => ipcRenderer.removeListener('chat:stream-chunk', handler)
+  },
+  onStreamDone: (callback: (data: { messageId: string }) => void): (() => void) => {
+    const handler = (_e: Electron.IpcRendererEvent, data: { messageId: string }): void => callback(data)
+    ipcRenderer.on('chat:stream-done', handler)
+    return () => ipcRenderer.removeListener('chat:stream-done', handler)
+  },
+  onNudge: (callback: (message: ChatMessage) => void): (() => void) => {
+    const handler = (_e: Electron.IpcRendererEvent, message: ChatMessage): void => callback(message)
+    ipcRenderer.on('chat:nudge', handler)
+    return () => ipcRenderer.removeListener('chat:nudge', handler)
+  },
+}
+
 // Custom APIs for renderer
 const api = {
   obsidian: obsidianApi,
@@ -232,7 +325,9 @@ const api = {
   slack: slackApi,
   ritual: ritualApi,
   goal: goalApi,
+  kanban: kanbanApi,
   transcription: transcriptionApi,
+  chat: chatApi,
   settings: settingsApi,
   app: appApi,
 }

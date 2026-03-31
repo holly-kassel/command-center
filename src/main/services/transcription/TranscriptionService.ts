@@ -274,110 +274,14 @@ function buildParticipantHint(participants: string[]): string {
 }
 
 /**
- * Dedicated action-item extraction pass.
- * Runs a focused LLM call specifically to find action items the initial summary may have missed.
- */
-async function extractActionItems(
-  transcript: string,
-  apiKey: string,
-  existingItems: string[],
-  participants: string[]
-): Promise<string[]> {
-  const participantHint = buildParticipantHint(participants)
-
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'gpt-4o',
-      messages: [
-        {
-          role: 'system',
-          content: `You are an expert at extracting action items from meeting transcripts. Your ONLY job is to find every single commitment, follow-up, request, or next step.${participantHint}
-
-You must catch ALL of these patterns — they are commonly missed:
-- End-of-meeting wrap-up tasks ("will you write the summary for X?", "can you send me X?")
-- Casual verbal commitments ("yeah I can get that done", "I'll look into it", "let me pull that up")
-- Requests for information ("please give me X when you have it", "send me the format")
-- Requirements stated as needs ("we need to make sure X", "this has to be Y before Z date")
-- Advocacy/escalation requests ("please reconsider X", "can you push back on Y")
-- Sharing/access tasks ("I'll give you access", "I'll share the repo", "let me send you the link")
-- Scheduling/coordination ("let's set up a meeting with X", "we should align with X")
-- Information gathering ("I'll get those answers", "I need to find out about X")
-
-Pay EXTRA attention to:
-- The first and last 20% of the transcript (wrap-up items and post-meeting asks live here)
-- Any statement where someone says "I'll", "I can", "let me", "I need to", "we should", "can you", "will you"
-- Commitments made on behalf of others ("Holly will follow up", "the team needs to")
-
-Return a JSON array of strings. Each item should be: "[Owner] action description" (use first names).
-Include items even if they seem minor. Return ONLY valid JSON array, no markdown.`
-        },
-        {
-          role: 'user',
-          content: `Here are action items already captured (avoid exact duplicates but DO include items that are similar but distinct):\n${existingItems.map(i => `- ${i}`).join('\n')}\n\nNow find ALL additional action items from this transcript:\n\n${transcript}`
-        }
-      ],
-      temperature: 0.2,
-    }),
-  })
-
-  if (!response.ok) {
-    log.warn('[Transcription] Action item extraction pass failed, using first-pass items only')
-    return existingItems
-  }
-
-  const data = await response.json() as { choices: Array<{ message: { content: string } }> }
-  const content = data.choices?.[0]?.message?.content || '[]'
-
-  try {
-    const additional = JSON.parse(content) as string[]
-    if (!Array.isArray(additional)) return existingItems
-
-    // Merge: keep all existing items, add new ones that aren't near-duplicates
-    const allItems = [...existingItems]
-    const existingLower = existingItems.map(i => i.toLowerCase())
-    for (const item of additional) {
-      if (typeof item !== 'string' || !item.trim()) continue
-      const itemLower = item.toLowerCase().trim()
-      const isDuplicate = existingLower.some(e =>
-        e.includes(itemLower) || itemLower.includes(e) ||
-        levenshteinSimilarity(e, itemLower) > 0.7
-      )
-      if (!isDuplicate) {
-        allItems.push(item.trim())
-      }
-    }
-    return allItems
-  } catch {
-    log.warn('[Transcription] Failed to parse action item extraction JSON')
-    return existingItems
-  }
-}
-
-/** Simple similarity check based on shared words */
-function levenshteinSimilarity(a: string, b: string): number {
-  const wordsA = new Set(a.split(/\s+/).filter(w => w.length > 3))
-  const wordsB = new Set(b.split(/\s+/).filter(w => w.length > 3))
-  if (wordsA.size === 0 || wordsB.size === 0) return 0
-  let shared = 0
-  for (const w of wordsA) {
-    if (wordsB.has(w)) shared++
-  }
-  return shared / Math.max(wordsA.size, wordsB.size)
-}
-
-/**
  * Generate AI meeting notes from transcript using OpenAI Chat Completions.
- * Runs two passes: general summarization + dedicated action-item extraction.
+ * Single-pass summarization with comprehensive action-item extraction built into the prompt.
  */
 export async function summarizeMeeting(
   transcript: string,
   apiKey: string,
-  participants: string[] = []
+  participants: string[] = [],
+  model: string = 'gpt-4o-mini'
 ): Promise<MeetingNotes> {
   log.info('[Transcription] Generating meeting summary...')
 
@@ -391,7 +295,7 @@ export async function summarizeMeeting(
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'gpt-4o',
+      model,
       messages: [
         {
           role: 'system',
@@ -408,7 +312,12 @@ export async function summarizeMeeting(
   * Requests for information: "please give me X when you have it"
   * Advocacy requests: "please reconsider removing X", "push back on Y"
   * Sharing/access: "I'll give you access to the repo", "I'll send the link"
+  * Scheduling/coordination: "let's set up a meeting with X", "we should align with X"
+  * Information gathering: "I'll get those answers", "I need to find out about X"
   * Pay special attention to the BEGINNING and END of the meeting — wrap-up items and post-meeting asks are commonly missed.
+  * Look for "I'll", "I can", "let me", "I need to", "we should", "can you", "will you" patterns.
+  * Include commitments made on behalf of others ("Holly will follow up", "the team needs to").
+  * Format each item as: "[Owner] action description" (use first names).
 
 - "decisions" (array of strings): Any decisions made or conclusions reached during the meeting.
 - "openQuestions" (array of strings): Unresolved questions or topics that need follow-up.
@@ -430,12 +339,13 @@ Return ONLY valid JSON, no markdown.${participantHint}${context}`
   }
 
   const data = await response.json() as { choices: Array<{ message: { content: string } }> }
-  const content = data.choices?.[0]?.message?.content || '{}'
+  const rawContent = data.choices?.[0]?.message?.content || '{}'
+  // Strip markdown code fences if the LLM wrapped the JSON
+  const content = rawContent.replace(/^```(?:json)?\s*\n?/i, '').replace(/\n?```\s*$/i, '').trim()
 
-  let notes: MeetingNotes
   try {
     const parsed = JSON.parse(content) as MeetingNotes
-    notes = {
+    return {
       summary: parsed.summary || '',
       keyTopics: parsed.keyTopics || [],
       keyPoints: parsed.keyPoints || [],
@@ -454,14 +364,4 @@ Return ONLY valid JSON, no markdown.${participantHint}${context}`
       openQuestions: [],
     }
   }
-
-  // Second pass: dedicated action-item extraction
-  try {
-    notes.actionItems = await extractActionItems(transcript, apiKey, notes.actionItems, participants)
-    log.info(`[Transcription] Action items after second pass: ${notes.actionItems.length}`)
-  } catch (err) {
-    log.warn('[Transcription] Second-pass action item extraction failed:', err)
-  }
-
-  return notes
 }

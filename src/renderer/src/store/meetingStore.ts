@@ -4,6 +4,8 @@ import type {
   MeetingNotes,
   SavedMeeting,
   MeetingTranscriptionSettings,
+  EvaluatedDecision,
+  SpeakerMap
 } from '@shared/types/transcription'
 
 interface MeetingState {
@@ -18,6 +20,13 @@ interface MeetingState {
   audioLevel: number
   activeView: 'transcript' | 'notes'
   error: string | null
+
+  // Decision evaluation
+  evaluatedDecisions: EvaluatedDecision[]
+  isEvaluatingDecisions: boolean
+
+  // Speaker mapping
+  speakerMap: SpeakerMap
 
   // Settings
   settings: MeetingTranscriptionSettings
@@ -41,6 +50,7 @@ interface MeetingState {
   setSearchQuery: (query: string) => void
   setError: (error: string | null) => void
   updateSettings: (settings: Partial<MeetingTranscriptionSettings>) => void
+  renameSpeaker: (originalLabel: string, displayName: string) => void
 
   // Async actions
   transcribeChunk: (audioBuffer: ArrayBuffer) => Promise<void>
@@ -57,8 +67,8 @@ const DEFAULT_SETTINGS: MeetingTranscriptionSettings = {
   language: 'en',
   autoTranslate: false,
   speakerDiarization: true,
-  chunkInterval: 30000,
-  participants: [],
+  chunkInterval: 60000,
+  participants: []
 }
 
 export const useMeetingStore = create<MeetingState>((set, get) => ({
@@ -72,6 +82,9 @@ export const useMeetingStore = create<MeetingState>((set, get) => ({
   audioLevel: 0,
   activeView: 'transcript',
   error: null,
+  evaluatedDecisions: [],
+  isEvaluatingDecisions: false,
+  speakerMap: {},
   settings: DEFAULT_SETTINGS,
   savedMeetings: [],
   speakerFilter: null,
@@ -80,18 +93,22 @@ export const useMeetingStore = create<MeetingState>((set, get) => ({
   addSegments: (newSegments) =>
     set((state) => {
       const merged = [...state.segments]
+      const map = state.speakerMap
 
       for (const seg of newSegments) {
+        const mappedSpeaker = map[seg.speaker] || seg.speaker
+        const mappedSeg = mappedSpeaker !== seg.speaker ? { ...seg, speaker: mappedSpeaker } : seg
+
         const last = merged[merged.length - 1]
-        if (last && last.speaker === seg.speaker) {
+        if (last && last.speaker === mappedSeg.speaker) {
           // Merge consecutive same-speaker segments
           merged[merged.length - 1] = {
             ...last,
-            text: last.text + ' ' + seg.text,
-            end: seg.end,
+            text: last.text + ' ' + mappedSeg.text,
+            end: mappedSeg.end
           }
         } else {
-          merged.push(seg)
+          merged.push(mappedSeg)
         }
       }
 
@@ -109,15 +126,27 @@ export const useMeetingStore = create<MeetingState>((set, get) => ({
   setError: (error) => set({ error }),
   updateSettings: (partial) =>
     set((state) => ({
-      settings: { ...state.settings, ...partial },
+      settings: { ...state.settings, ...partial }
     })),
+
+  renameSpeaker: (originalLabel, displayName) =>
+    set((state) => {
+      const newMap = { ...state.speakerMap, [originalLabel]: displayName }
+
+      // Apply the rename to all existing segments with this original label
+      const updatedSegments = state.segments.map((seg) =>
+        seg.speaker === originalLabel ? { ...seg, speaker: displayName } : seg
+      )
+
+      return { speakerMap: newMap, segments: updatedSegments }
+    }),
 
   transcribeChunk: async (audioBuffer) => {
     try {
       const { settings } = get()
       const segments = await window.api.transcription.transcribeChunk(audioBuffer, {
         language: settings.language,
-        speakerDiarization: settings.speakerDiarization,
+        speakerDiarization: settings.speakerDiarization
       })
       if (segments.length > 0) {
         get().addSegments(segments)
@@ -134,15 +163,28 @@ export const useMeetingStore = create<MeetingState>((set, get) => ({
 
     set({ isGeneratingNotes: true, error: null })
     try {
-      // Format transcript with timestamps and clear speaker turns
+      // Build transcript using the already-mapped speaker names from segments
       const fullTranscript = segments
         .map((s) => `[${s.timestamp}] ${s.speaker}: ${s.text}`)
         .join('\n')
-      const notes = await window.api.transcription.summarizeMeeting(
-        fullTranscript,
-        settings.participants
-      )
+
+      // Include mapped speaker names as participants for better attribution
+      const mappedNames = Object.values(get().speakerMap)
+      const allParticipants = [...new Set([...settings.participants, ...mappedNames])]
+
+      const notes = await window.api.transcription.summarizeMeeting(fullTranscript, allParticipants)
       set({ notes, isGeneratingNotes: false })
+
+      // Automatically evaluate decisions in the background
+      if (notes.decisions && notes.decisions.length > 0) {
+        set({ isEvaluatingDecisions: true })
+        try {
+          const evaluated = await window.api.decisionEval.evaluate(notes.decisions)
+          set({ evaluatedDecisions: evaluated, isEvaluatingDecisions: false })
+        } catch {
+          set({ isEvaluatingDecisions: false })
+        }
+      }
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error)
       set({ error: msg, isGeneratingNotes: false })
@@ -169,7 +211,7 @@ export const useMeetingStore = create<MeetingState>((set, get) => ({
       speakers,
       manualNotes,
       language: settings.language,
-      createdAt: new Date().toISOString(),
+      createdAt: new Date().toISOString()
     }
 
     try {
@@ -212,7 +254,10 @@ export const useMeetingStore = create<MeetingState>((set, get) => ({
       audioLevel: 0,
       activeView: 'transcript',
       error: null,
+      evaluatedDecisions: [],
+      isEvaluatingDecisions: false,
+      speakerMap: {},
       speakerFilter: null,
-      searchQuery: '',
-    }),
+      searchQuery: ''
+    })
 }))

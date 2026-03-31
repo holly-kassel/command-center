@@ -114,7 +114,8 @@ export function registerTranscriptionIpc(): void {
       try {
         const apiKey = settings.get('openaiApiKey')
         if (!apiKey) throw new Error('OpenAI API key not configured. Add it in Settings.')
-        return await summarizeMeeting(transcript, apiKey, participants || [])
+        const model = settings.get('meetingSummaryModel') || 'gpt-4o-mini'
+        return await summarizeMeeting(transcript, apiKey, participants || [], model)
       } catch (error) {
         log.error('[IPC] transcription:summarizeMeeting error:', error)
         throw error

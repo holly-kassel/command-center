@@ -1,3 +1,8 @@
+import { DEFAULT_NUDGE_CONFIG } from '../../shared/types/chat'
+import type { NudgeConfig } from '../../shared/types/chat'
+import { DEFAULT_DASHBOARD_LAYOUT } from '../../shared/types/settings'
+import type { DashboardLayout } from '../../shared/types/settings'
+
 /**
  * Persistent settings store using electron-store
  * Wraps electron-store with typed accessors for app configuration
@@ -14,6 +19,11 @@ export interface AppSettings {
   windowBounds: { width: number; height: number; x?: number; y?: number }
   lastSyncTime: number
   meetingFilterPatterns: string[]
+  katyaNudgeConfig: NudgeConfig
+  dashboardLayout: DashboardLayout
+  openaiApiKey: string
+  meetingSummaryModel: string
+  decisionEvalModel: string
 }
 
 export const DEFAULT_SETTINGS: Omit<AppSettings, 'windowBounds' | 'lastSyncTime'> = {
@@ -23,14 +33,19 @@ export const DEFAULT_SETTINGS: Omit<AppSettings, 'windowBounds' | 'lastSyncTime'
   theme: 'dark',
   userName: 'Holly',
   meetingFilterPatterns: ['Lunch', 'Focus Time', 'OOO', 'No Meetings'],
+  katyaNudgeConfig: DEFAULT_NUDGE_CONFIG,
+  dashboardLayout: DEFAULT_DASHBOARD_LAYOUT,
+  openaiApiKey: '',
+  meetingSummaryModel: 'gpt-4o-mini',
+  decisionEvalModel: 'gpt-4o-mini'
 }
 
 const store = new (ElectronStore.default || ElectronStore)({
   defaults: {
     ...DEFAULT_SETTINGS,
     windowBounds: { width: 1400, height: 900 },
-    lastSyncTime: 0,
-  },
+    lastSyncTime: 0
+  }
 })
 
 export const settings = {
@@ -51,7 +66,17 @@ export const settings = {
       userName: store.get('userName') as string,
       windowBounds: store.get('windowBounds') as AppSettings['windowBounds'],
       lastSyncTime: store.get('lastSyncTime') as number,
-      meetingFilterPatterns: (store.get('meetingFilterPatterns') as string[]) || ['Lunch', 'Focus Time', 'OOO', 'No Meetings'],
+      meetingFilterPatterns: (store.get('meetingFilterPatterns') as string[]) || [
+        'Lunch',
+        'Focus Time',
+        'OOO',
+        'No Meetings'
+      ],
+      katyaNudgeConfig: (store.get('katyaNudgeConfig') as NudgeConfig) || DEFAULT_NUDGE_CONFIG,
+      dashboardLayout: (store.get('dashboardLayout') as DashboardLayout) || DEFAULT_DASHBOARD_LAYOUT,
+      openaiApiKey: (store.get('openaiApiKey') as string) || '',
+      meetingSummaryModel: (store.get('meetingSummaryModel') as string) || 'gpt-4o-mini',
+      decisionEvalModel: (store.get('decisionEvalModel') as string) || 'gpt-4o-mini'
     }
   },
 
@@ -68,5 +93,5 @@ export const settings = {
 
   setObsidianVaultPath(path: string): void {
     store.set('obsidianVaultPath', path)
-  },
+  }
 }

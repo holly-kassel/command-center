@@ -11,7 +11,7 @@
  * - Days separated by "---"
  * - Non-day sections: "## Weekly Priorities" (top), "## Weekly Reflection" (bottom)
  */
-import { readFile } from 'node:fs/promises'
+import { readFile, writeFile, mkdir } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import type { TodaySection, WeeklyNote } from '../../../shared/types/obsidian'
@@ -77,7 +77,7 @@ export function parseWeeklyNote(markdown: string): WeeklyNote {
     weekEnd: '',
     days: {},
     weeklyPriorities: '',
-    weeklyReflection: '',
+    weeklyReflection: ''
   }
 
   // Track current section
@@ -97,7 +97,7 @@ export function parseWeeklyNote(markdown: string): WeeklyNote {
         dayOfWeek: currentDay,
         date: currentDayDate,
         rawContent: content,
-        subsections: extractSubsections(content),
+        subsections: extractSubsections(content)
       }
     }
     sectionLines.length = 0
@@ -209,10 +209,7 @@ export async function getTodaySection(vaultPath: string): Promise<TodaySection |
  * Get a specific day's section from the appropriate weekly note.
  * Works for any date — current week, past weeks, etc.
  */
-export async function getDaySection(
-  vaultPath: string,
-  date: Date
-): Promise<TodaySection | null> {
+export async function getDaySection(vaultPath: string, date: Date): Promise<TodaySection | null> {
   const dayOfWeek = getDayOfWeek(date)
 
   // Only weekdays have sections
@@ -237,7 +234,7 @@ export async function getDaySection(
     content: day.rawContent,
     dayOfWeek,
     filePath,
-    date: day.date ?? formatDate(date),
+    date: day.date ?? formatDate(date)
   }
 }
 
@@ -267,4 +264,75 @@ export function extractCurrentFocus(dayContent: string): string | null {
   return lastFocus
 }
 
+// ─── Scaffolding ─────────────────────────────────────────────────
 
+/**
+ * Generate the markdown content for a new weekly note.
+ * Matches the format used in the vault: H1 title, Weekly Priorities,
+ * day sections (Mon–Fri) with Schedule / Tasks & Notes subsections,
+ * and a Weekly Reflection section at the bottom.
+ */
+export function generateWeeklyNoteContent(monday: Date): string {
+  const friday = new Date(monday)
+  friday.setDate(friday.getDate() + 4)
+  const mondayStr = formatDate(monday)
+  const fridayStr = formatDate(friday)
+
+  const lines: string[] = [
+    `# Week of ${mondayStr} - ${fridayStr}`,
+    '',
+    '## Weekly Priorities',
+    '',
+    '- [ ] Priority 1',
+    '- [ ] Priority 2',
+    '- [ ] Priority 3'
+  ]
+
+  for (let i = 0; i < 5; i++) {
+    const dayDate = new Date(monday)
+    dayDate.setDate(dayDate.getDate() + i)
+    const dayName = WEEKDAY_NAMES[i]
+    const dateStr = formatDate(dayDate)
+
+    lines.push(
+      '',
+      '---',
+      '',
+      `## ${dayName} ${dateStr}`,
+      '### Schedule',
+      '- ',
+      '',
+      '### Tasks & Notes',
+      '- '
+    )
+  }
+
+  lines.push('', '---', '', '## Weekly Reflection', '', '')
+
+  return lines.join('\n')
+}
+
+/**
+ * Create a new weekly note file if it doesn't already exist.
+ * Returns the file path (whether newly created or already existing).
+ */
+export async function ensureWeeklyNote(
+  vaultPath: string,
+  date: Date = new Date()
+): Promise<string> {
+  const weeklyNotesDir = join(vaultPath, 'weekly-notes')
+  if (!existsSync(weeklyNotesDir)) {
+    await mkdir(weeklyNotesDir, { recursive: true })
+  }
+
+  const filePath = getWeekFilePath(vaultPath, date)
+  if (existsSync(filePath)) {
+    return filePath
+  }
+
+  const monday = getMonday(date)
+  const content = generateWeeklyNoteContent(monday)
+  await writeFile(filePath, content, 'utf-8')
+
+  return filePath
+}

@@ -4,24 +4,32 @@
  * Handles vault discovery, quick capture, and coordinates with the
  * WeeklyNoteParser for reading weekly notes.
  */
-import { readFile, writeFile, copyFile, unlink } from 'node:fs/promises'
+import { readFile, writeFile, copyFile, unlink, readdir } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { homedir } from 'node:os'
 import log from 'electron-log'
 import { settings } from '../../config/settings'
 import {
+  formatDate,
   getWeekFilePath,
   getTodaySection,
   getDaySection,
   parseWeeklyNote,
   extractCurrentFocus,
   getDayOfWeek,
+  ensureWeeklyNote,
 } from './WeeklyNoteParser'
-import type { TodaySection, VaultStatus } from '../../../shared/types/obsidian'
+import type {
+  TodaySection,
+  VaultStatus,
+  WeeklyNoteSummary,
+  WeeklySectionResult
+} from '../../../shared/types/obsidian'
 
 const COMMON_VAULT_PATHS = [
   'Documents/obsidian-notes',
+  'Documents/code/obsidian-notes',
   'Documents/Obsidian',
   'Documents/ObsidianVault',
   'obsidian-notes',
@@ -108,6 +116,22 @@ export class ObsidianService {
     }
   }
 
+  // ─── Weekly Note Lifecycle ────────────────────────────────────────
+
+  /**
+   * Ensure the current week's note file exists, creating it from the
+   * scaffold template if needed. Called on startup and before any
+   * operation that expects the file to be present.
+   */
+  async ensureCurrentWeekNote(): Promise<string> {
+    if (!this.vaultPath) {
+      throw new Error('Vault path not set. Call findVault() or setVaultPath() first.')
+    }
+    const filePath = await ensureWeeklyNote(this.vaultPath)
+    log.info(`[Obsidian] Ensured current week note: ${filePath}`)
+    return filePath
+  }
+
   // ─── Reading ─────────────────────────────────────────────────────
 
   /** Get today's section from the current week's note */
@@ -143,6 +167,80 @@ export class ObsidianService {
     const parsed = parseWeeklyNote(markdown)
     parsed.filePath = filePath
     return parsed
+  }
+
+  /** Get a weekly-level section from the weekly note containing the given date */
+  async getWeeklySection(
+    dateStr: string,
+    section: 'priorities' | 'reflection'
+  ): Promise<WeeklySectionResult | null> {
+    if (!this.vaultPath) {
+      throw new Error('Vault path not set. Call findVault() or setVaultPath() first.')
+    }
+
+    const date = new Date(`${dateStr}T12:00:00`)
+    const filePath = getWeekFilePath(this.vaultPath, date)
+    if (!existsSync(filePath)) return null
+
+    const markdown = await readFile(filePath, 'utf-8')
+    const parsed = parseWeeklyNote(markdown)
+
+    return {
+      content: section === 'priorities' ? parsed.weeklyPriorities : parsed.weeklyReflection,
+      filePath,
+      weekStart: parsed.weekStart,
+      section
+    }
+  }
+
+  async listWeeklyNotes(): Promise<WeeklyNoteSummary[]> {
+    if (!this.vaultPath) return []
+    const weeklyNotesDir = join(this.vaultPath, 'weekly-notes')
+    if (!existsSync(weeklyNotesDir)) return []
+
+    const files = await readdir(weeklyNotesDir)
+    const weeklyFiles = files.filter((f) => /^\d{4}-\d{2}-\d{2}-week\.md$/.test(f))
+
+    const summaries: WeeklyNoteSummary[] = []
+    for (const filename of weeklyFiles) {
+      const filePath = join(weeklyNotesDir, filename)
+      const mondayStr = filename.slice(0, 10)
+      const monday = new Date(`${mondayStr}T12:00:00`)
+      const friday = new Date(monday)
+      friday.setDate(friday.getDate() + 4)
+
+      const janFirst = new Date(monday.getFullYear(), 0, 1)
+      const dayOfYear = Math.floor((monday.getTime() - janFirst.getTime()) / 86400000) + 1
+      const weekNumber = Math.ceil((dayOfYear + janFirst.getDay()) / 7)
+
+      const markdown = await readFile(filePath, 'utf-8')
+      const parsed = parseWeeklyNote(markdown)
+
+      const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
+      const days = WEEKDAYS.map((dayName, i) => {
+        const dayDate = new Date(monday)
+        dayDate.setDate(dayDate.getDate() + i)
+        const dayData = parsed.days[dayName]
+        return {
+          date: formatDate(dayDate),
+          dayOfWeek: dayName,
+          hasContent: !!dayData && !!dayData.rawContent.trim(),
+        }
+      })
+
+      summaries.push({
+        filename,
+        filePath,
+        year: monday.getFullYear(),
+        weekNumber,
+        startDate: mondayStr,
+        endDate: formatDate(friday),
+        days,
+      })
+    }
+
+    summaries.sort((a, b) => b.startDate.localeCompare(a.startDate))
+    return summaries
   }
 
   // ─── Update today's content ──────────────────────────────────────
@@ -190,6 +288,103 @@ export class ObsidianService {
       await unlink(backupPath)
 
       log.info(`[Obsidian] Updated ${dayOfWeek} section content`)
+    } catch (error) {
+      if (existsSync(backupPath)) {
+        try {
+          await copyFile(backupPath, filePath)
+          await unlink(backupPath)
+          log.info('[Obsidian] Restored from backup after error')
+        } catch {
+          log.error('[Obsidian] Failed to restore backup')
+        }
+      }
+      throw error
+    }
+  }
+
+  async updateDayContent(dateStr: string, newContent: string): Promise<void> {
+    if (!this.vaultPath) {
+      throw new Error('Vault path not set')
+    }
+
+    const date = new Date(`${dateStr}T12:00:00`)
+    const filePath = getWeekFilePath(this.vaultPath, date)
+    if (!existsSync(filePath)) {
+      throw new Error(`Weekly note not found: ${filePath}`)
+    }
+
+    const backupPath = `${filePath}.backup`
+    const dayOfWeek = getDayOfWeek(date)
+
+    try {
+      await copyFile(filePath, backupPath)
+
+      const content = await readFile(filePath, 'utf-8')
+      const lines = content.split('\n')
+
+      const { sectionStart, sectionEnd } = findDaySection(lines, dayOfWeek)
+      if (sectionStart === -1) {
+        throw new Error(`Could not find section for ${dayOfWeek} in ${filePath}`)
+      }
+
+      const newLines = newContent.split('\n')
+      lines.splice(sectionStart, sectionEnd - sectionStart, ...newLines)
+
+      await writeFile(filePath, lines.join('\n'), 'utf-8')
+      await unlink(backupPath)
+
+      log.info(`[Obsidian] Updated ${dayOfWeek} (${dateStr}) section content`)
+    } catch (error) {
+      if (existsSync(backupPath)) {
+        try {
+          await copyFile(backupPath, filePath)
+          await unlink(backupPath)
+          log.info('[Obsidian] Restored from backup after error')
+        } catch {
+          log.error('[Obsidian] Failed to restore backup')
+        }
+      }
+      throw error
+    }
+  }
+
+  async updateWeeklySection(
+    dateStr: string,
+    section: 'priorities' | 'reflection',
+    newContent: string
+  ): Promise<void> {
+    if (!this.vaultPath) {
+      throw new Error('Vault path not set')
+    }
+
+    const date = new Date(`${dateStr}T12:00:00`)
+    const filePath = getWeekFilePath(this.vaultPath, date)
+    if (!existsSync(filePath)) {
+      throw new Error(`Weekly note not found: ${filePath}`)
+    }
+
+    const backupPath = `${filePath}.backup`
+
+    try {
+      await copyFile(filePath, backupPath)
+
+      const content = await readFile(filePath, 'utf-8')
+      const lines = content.split('\n')
+
+      const { sectionStart, sectionEnd } = findWeeklySection(lines, section)
+      if (sectionStart === -1) {
+        const sectionHeader =
+          section === 'priorities' ? '## Weekly Priorities' : '## Weekly Reflection'
+        throw new Error(`Could not find ${sectionHeader} in ${filePath}`)
+      }
+
+      const newLines = newContent.split('\n')
+      lines.splice(sectionStart, sectionEnd - sectionStart, ...newLines)
+
+      await writeFile(filePath, lines.join('\n'), 'utf-8')
+      await unlink(backupPath)
+
+      log.info(`[Obsidian] Updated weekly ${section} section for ${dateStr}`)
     } catch (error) {
       if (existsSync(backupPath)) {
         try {
@@ -494,6 +689,29 @@ function findDaySection(
         sectionEnd = i
         break
       }
+    }
+  }
+
+  return { sectionStart, sectionEnd }
+}
+
+function findWeeklySection(
+  lines: string[],
+  section: 'priorities' | 'reflection'
+): { sectionStart: number; sectionEnd: number } {
+  const sectionHeader = section === 'priorities' ? '## Weekly Priorities' : '## Weekly Reflection'
+  let sectionStart = -1
+  let sectionEnd = lines.length
+
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].trim() === sectionHeader) {
+      sectionStart = i + 1
+      continue
+    }
+
+    if (sectionStart !== -1 && i >= sectionStart && lines[i].startsWith('## ')) {
+      sectionEnd = i
+      break
     }
   }
 

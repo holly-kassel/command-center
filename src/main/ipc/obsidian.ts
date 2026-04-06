@@ -84,6 +84,18 @@ export function registerObsidianIpc(): void {
     }
   })
 
+  ipcMain.handle(
+    'obsidian:getWeeklySection',
+    async (_event, dateStr: string, section: 'priorities' | 'reflection') => {
+      try {
+        return await obsidian.getWeeklySection(dateStr, section)
+      } catch (error) {
+        log.error('[IPC] obsidian:getWeeklySection error:', error)
+        throw error
+      }
+    }
+  )
+
   // ─── Writing ───────────────────────────────────────────────────
 
   ipcMain.handle('obsidian:appendToToday', async (_event, text: string) => {
@@ -91,6 +103,15 @@ export function registerObsidianIpc(): void {
       await obsidian.appendToToday(text)
     } catch (error) {
       log.error('[IPC] obsidian:appendToToday error:', error)
+      throw error
+    }
+  })
+
+  ipcMain.handle('obsidian:appendBlockToToday', async (_event, block: string) => {
+    try {
+      await obsidian.appendBlockToToday(block)
+    } catch (error) {
+      log.error('[IPC] obsidian:appendBlockToToday error:', error)
       throw error
     }
   })
@@ -112,6 +133,36 @@ export function registerObsidianIpc(): void {
       throw error
     }
   })
+
+  ipcMain.handle('obsidian:listWeeklyNotes', async () => {
+    try {
+      return await obsidian.listWeeklyNotes()
+    } catch (error) {
+      log.error('[IPC] obsidian:listWeeklyNotes error:', error)
+      throw error
+    }
+  })
+
+  ipcMain.handle('obsidian:updateDayContent', async (_event, dateStr: string, content: string) => {
+    try {
+      await obsidian.updateDayContent(dateStr, content)
+    } catch (error) {
+      log.error('[IPC] obsidian:updateDayContent error:', error)
+      throw error
+    }
+  })
+
+  ipcMain.handle(
+    'obsidian:updateWeeklySection',
+    async (_event, dateStr: string, section: 'priorities' | 'reflection', content: string) => {
+      try {
+        await obsidian.updateWeeklySection(dateStr, section, content)
+      } catch (error) {
+        log.error('[IPC] obsidian:updateWeeklySection error:', error)
+        throw error
+      }
+    }
+  )
 
   // ─── Slash Commands ────────────────────────────────────────────
 
@@ -146,6 +197,9 @@ export async function initObsidian(): Promise<void> {
   const path = await obsidian.findVault()
 
   if (path) {
+    // Ensure the current week's note exists before watching
+    await obsidian.ensureCurrentWeekNote()
+
     const watcher = getFileWatcher()
     watcher.start(join(path, 'weekly-notes'))
     log.info(`[Obsidian] Initialized with vault: ${path}`)

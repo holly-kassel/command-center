@@ -24,6 +24,7 @@ import type {
   MeetingSegment,
   MeetingNotes,
   SavedMeeting,
+  EvaluatedDecision,
 } from '../shared/types/transcription'
 import type { ChatConversation, ChatMessage, ChatStreamChunk, NudgeConfig } from '../shared/types/chat'
 
@@ -64,6 +65,8 @@ const obsidianApi = {
   },
   listWeeklyNotes: (): Promise<WeeklyNoteSummary[]> =>
     ipcRenderer.invoke('obsidian:listWeeklyNotes'),
+  ensureCurrentWeekNote: (): Promise<string> =>
+    ipcRenderer.invoke('obsidian:ensureCurrentWeekNote'),
   updateDayContent: (dateStr: string, content: string): Promise<void> =>
     ipcRenderer.invoke('obsidian:updateDayContent', dateStr, content),
   getWeeklySection: (dateStr: string, section: string): Promise<WeeklySectionResult | null> =>
@@ -260,6 +263,14 @@ const transcriptionApi = {
     ipcRenderer.invoke('transcription:saveTranscriptToVault', meeting),
 }
 
+// Decision Evaluation API exposed to renderer
+const decisionEvalApi = {
+  evaluate: (decisions: string[]): Promise<EvaluatedDecision[]> =>
+    ipcRenderer.invoke('decisionEval:evaluate', decisions),
+  invalidateCache: (): Promise<void> =>
+    ipcRenderer.invoke('decisionEval:invalidateCache'),
+}
+
 // App utilities
 const appApi = {
   getSound: (filename: string): Promise<ArrayBuffer | null> =>
@@ -327,6 +338,7 @@ const api = {
   goal: goalApi,
   kanban: kanbanApi,
   transcription: transcriptionApi,
+  decisionEval: decisionEvalApi,
   chat: chatApi,
   settings: settingsApi,
   app: appApi,

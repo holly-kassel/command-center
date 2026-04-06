@@ -143,6 +143,15 @@ export function registerObsidianIpc(): void {
     }
   })
 
+  ipcMain.handle('obsidian:ensureCurrentWeekNote', async () => {
+    try {
+      return await obsidian.ensureCurrentWeekNote()
+    } catch (error) {
+      log.error('[IPC] obsidian:ensureCurrentWeekNote error:', error)
+      throw error
+    }
+  })
+
   ipcMain.handle('obsidian:updateDayContent', async (_event, dateStr: string, content: string) => {
     try {
       await obsidian.updateDayContent(dateStr, content)

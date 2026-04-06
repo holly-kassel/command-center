@@ -17,7 +17,7 @@ import type {
   KanbanTask,
   KanbanStatus,
 } from '../shared/types/goal'
-import type { TranscriptionResult, TranscriptionAndSummaryResult, MeetingSegment, MeetingNotes, SavedMeeting } from '../shared/types/transcription'
+import type { TranscriptionResult, TranscriptionAndSummaryResult, MeetingSegment, MeetingNotes, SavedMeeting, EvaluatedDecision } from '../shared/types/transcription'
 import type { ChatConversation, ChatMessage, ChatStreamChunk, NudgeConfig } from '../shared/types/chat'
 
 interface ObsidianApi {
@@ -33,6 +33,7 @@ interface ObsidianApi {
   updateTodayContent(content: string): Promise<void>
   toggleCheckbox(lineOffset: number): Promise<void>
   listWeeklyNotes(): Promise<WeeklyNoteSummary[]>
+  ensureCurrentWeekNote(): Promise<string>
   updateDayContent(dateStr: string, content: string): Promise<void>
   getWeeklySection(dateStr: string, section: string): Promise<WeeklySectionResult | null>
   updateWeeklySection(dateStr: string, section: string, content: string): Promise<void>
@@ -152,6 +153,11 @@ interface AppApi {
   getSound(filename: string): Promise<ArrayBuffer | null>
 }
 
+interface DecisionEvalApi {
+  evaluate(decisions: string[]): Promise<EvaluatedDecision[]>
+  invalidateCache(): Promise<void>
+}
+
 interface ChatApi {
   sendMessage(text: string): Promise<ChatMessage>
   getConversation(date?: string): Promise<ChatConversation>
@@ -173,6 +179,7 @@ interface Api {
   goal: GoalApi
   kanban: KanbanApi
   transcription: TranscriptionApi
+  decisionEval: DecisionEvalApi
   chat: ChatApi
   settings: SettingsApi
   app: AppApi

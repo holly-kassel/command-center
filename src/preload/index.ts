@@ -20,6 +20,7 @@ import type {
   TranscriptionResult,
   TranscriptionAndSummaryResult,
 } from '../shared/types/transcription'
+import { isMicrosoftAuthConfigurationError } from '../shared/constants/auth'
 
 // Obsidian API exposed to renderer
 const obsidianApi = {
@@ -67,12 +68,36 @@ const authApi = {
 
 // Calendar API exposed to renderer
 const calendarApi = {
-  getTodayEvents: (): Promise<CalendarEvent[]> =>
-    ipcRenderer.invoke('calendar:getTodayEvents'),
-  getNextMeeting: (): Promise<CalendarEvent | null> =>
-    ipcRenderer.invoke('calendar:getNextMeeting'),
-  getEvents: (startISO: string, endISO: string): Promise<CalendarEvent[]> =>
-    ipcRenderer.invoke('calendar:getEvents', startISO, endISO),
+  getTodayEvents: async (): Promise<CalendarEvent[]> => {
+    try {
+      return await ipcRenderer.invoke('calendar:getTodayEvents')
+    } catch (error) {
+      if (isMicrosoftAuthConfigurationError(error)) {
+        return []
+      }
+      throw error
+    }
+  },
+  getNextMeeting: async (): Promise<CalendarEvent | null> => {
+    try {
+      return await ipcRenderer.invoke('calendar:getNextMeeting')
+    } catch (error) {
+      if (isMicrosoftAuthConfigurationError(error)) {
+        return null
+      }
+      throw error
+    }
+  },
+  getEvents: async (startISO: string, endISO: string): Promise<CalendarEvent[]> => {
+    try {
+      return await ipcRenderer.invoke('calendar:getEvents', startISO, endISO)
+    } catch (error) {
+      if (isMicrosoftAuthConfigurationError(error)) {
+        return []
+      }
+      throw error
+    }
+  },
   refresh: (): Promise<{ success: boolean }> =>
     ipcRenderer.invoke('calendar:refresh'),
   onSyncUpdate: (callback: (events: CalendarEvent[]) => void): (() => void) => {

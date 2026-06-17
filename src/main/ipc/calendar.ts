@@ -7,6 +7,7 @@
 import { ipcMain } from 'electron'
 import { getCalendarService } from '../services/calendar/CalendarService'
 import log from 'electron-log'
+import { isMicrosoftAuthConfigurationError } from '../../shared/constants/auth'
 
 export function registerCalendarIpc(): void {
   const calendar = getCalendarService()
@@ -15,6 +16,10 @@ export function registerCalendarIpc(): void {
     try {
       return await calendar.getTodayEvents()
     } catch (error) {
+      if (isMicrosoftAuthConfigurationError(error)) {
+        log.warn('[IPC] calendar:getTodayEvents not configured; returning empty events')
+        return []
+      }
       log.error('[IPC] calendar:getTodayEvents error:', error)
       throw error
     }
@@ -24,6 +29,10 @@ export function registerCalendarIpc(): void {
     try {
       return await calendar.getNextMeeting()
     } catch (error) {
+      if (isMicrosoftAuthConfigurationError(error)) {
+        log.warn('[IPC] calendar:getNextMeeting not configured; returning null meeting')
+        return null
+      }
       log.error('[IPC] calendar:getNextMeeting error:', error)
       throw error
     }
@@ -35,6 +44,10 @@ export function registerCalendarIpc(): void {
       try {
         return await calendar.getEvents(new Date(startISO), new Date(endISO))
       } catch (error) {
+        if (isMicrosoftAuthConfigurationError(error)) {
+          log.warn('[IPC] calendar:getEvents not configured; returning empty events')
+          return []
+        }
         log.error('[IPC] calendar:getEvents error:', error)
         throw error
       }

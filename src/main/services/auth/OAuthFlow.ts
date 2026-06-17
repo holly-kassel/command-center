@@ -15,6 +15,7 @@ import { createServer, type Server } from 'node:http'
 import log from 'electron-log'
 import { credentialManager } from './CredentialManager'
 import type { MicrosoftTokenData } from '../../../shared/types/calendar'
+import { MICROSOFT_CLIENT_ID_MISSING_ERROR } from '../../../shared/constants/auth'
 import { settings } from '../../config/settings'
 
 const SCOPES = ['Calendars.Read', 'User.Read', 'offline_access']
@@ -25,25 +26,43 @@ export class GraphAuthService {
   private pca: PublicClientApplication | null = null
   private pcaConfigKey: string | null = null
 
+  private normalizeConfigValue(value: unknown): string {
+    if (typeof value !== 'string') {
+      return ''
+    }
+
+    const normalized = value.trim()
+    if (!normalized) {
+      return ''
+    }
+
+    const lower = normalized.toLowerCase()
+    if (lower === 'undefined' || lower === 'null') {
+      return ''
+    }
+
+    return normalized
+  }
+
   private getClientId(): string {
-    const envClientId = process.env.MICROSOFT_CLIENT_ID?.trim()
+    const envClientId = this.normalizeConfigValue(process.env.MICROSOFT_CLIENT_ID)
     if (envClientId) return envClientId
 
-    return settings.get('microsoftClientId').trim()
+    return this.normalizeConfigValue(settings.get('microsoftClientId'))
   }
 
   private getTenantId(): string {
-    const envTenantId = process.env.MICROSOFT_TENANT_ID?.trim()
+    const envTenantId = this.normalizeConfigValue(process.env.MICROSOFT_TENANT_ID)
     if (envTenantId) return envTenantId
 
-    const tenantFromSettings = settings.get('microsoftTenantId').trim()
+    const tenantFromSettings = this.normalizeConfigValue(settings.get('microsoftTenantId'))
     return tenantFromSettings || 'common'
   }
 
   private async getPca(): Promise<PublicClientApplication> {
     const clientId = this.getClientId()
     if (!clientId) {
-      throw new Error('MICROSOFT_CLIENT_ID not set. Add it to .env or Settings.')
+      throw new Error(MICROSOFT_CLIENT_ID_MISSING_ERROR)
     }
 
     const tenantId = this.getTenantId()

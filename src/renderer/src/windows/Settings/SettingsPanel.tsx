@@ -73,6 +73,8 @@ export function SettingsPanel({ onClose }: { onClose: () => void }): React.React
     try {
       const saved = await window.api.settings.update({
         obsidianVaultPath: settings.obsidianVaultPath,
+        microsoftClientId: settings.microsoftClientId,
+        microsoftTenantId: settings.microsoftTenantId,
         calendarRefreshInterval: settings.calendarRefreshInterval,
         githubRefreshInterval: settings.githubRefreshInterval,
         theme: settings.theme,
@@ -229,6 +231,27 @@ export function SettingsPanel({ onClose }: { onClose: () => void }): React.React
               {msftAuthed ? 'Sign Out' : 'Sign In'}
             </button>
           </div>
+          <p className="text-xs text-text-muted mt-1">
+            If <code className="text-accent">.env</code> is not set, configure your Azure app values below and save.
+          </p>
+        </Label>
+        <Label text="Microsoft Client ID">
+          <input
+            type="text"
+            value={settings.microsoftClientId}
+            onChange={(e) => update('microsoftClientId', e.target.value)}
+            placeholder="Application (client) ID"
+            className="settings-input"
+          />
+        </Label>
+        <Label text="Microsoft Tenant ID">
+          <input
+            type="text"
+            value={settings.microsoftTenantId}
+            onChange={(e) => update('microsoftTenantId', e.target.value)}
+            placeholder="common"
+            className="settings-input"
+          />
         </Label>
         <Label text="Refresh Interval">
           <select

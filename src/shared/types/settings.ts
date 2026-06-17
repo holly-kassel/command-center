@@ -5,6 +5,8 @@
  */
 export interface AppSettings {
   obsidianVaultPath: string
+  microsoftClientId: string
+  microsoftTenantId: string
   calendarRefreshInterval: number
   githubRefreshInterval: number
   theme: 'light' | 'dark' | 'system'

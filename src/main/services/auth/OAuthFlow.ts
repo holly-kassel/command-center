@@ -15,6 +15,7 @@ import { createServer, type Server } from 'node:http'
 import log from 'electron-log'
 import { credentialManager } from './CredentialManager'
 import type { MicrosoftTokenData } from '../../../shared/types/calendar'
+import { settings } from '../../config/settings'
 
 const SCOPES = ['Calendars.Read', 'User.Read', 'offline_access']
 const REDIRECT_PORT = 3845
@@ -22,31 +23,45 @@ const REDIRECT_URI = `http://localhost:${REDIRECT_PORT}/auth/callback`
 
 export class GraphAuthService {
   private pca: PublicClientApplication | null = null
+  private pcaConfigKey: string | null = null
 
   private getClientId(): string {
-    return process.env.MICROSOFT_CLIENT_ID || ''
+    const envClientId = process.env.MICROSOFT_CLIENT_ID?.trim()
+    if (envClientId) return envClientId
+
+    return settings.get('microsoftClientId').trim()
   }
 
   private getTenantId(): string {
-    return process.env.MICROSOFT_TENANT_ID || 'common'
+    const envTenantId = process.env.MICROSOFT_TENANT_ID?.trim()
+    if (envTenantId) return envTenantId
+
+    const tenantFromSettings = settings.get('microsoftTenantId').trim()
+    return tenantFromSettings || 'common'
   }
 
   private async getPca(): Promise<PublicClientApplication> {
-    if (!this.pca) {
-      const clientId = this.getClientId()
-      if (!clientId) {
-        throw new Error(
-          'MICROSOFT_CLIENT_ID not set. Add it to .env or Settings.'
-        )
-      }
+    const clientId = this.getClientId()
+    if (!clientId) {
+      throw new Error(
+        'MICROSOFT_CLIENT_ID not set. Add it to .env or Settings.'
+      )
+    }
+
+    const tenantId = this.getTenantId()
+    const configKey = `${clientId}::${tenantId}`
+
+    if (!this.pca || this.pcaConfigKey !== configKey) {
       const config: Configuration = {
         auth: {
           clientId,
-          authority: `https://login.microsoftonline.com/${this.getTenantId()}`,
+          authority: `https://login.microsoftonline.com/${tenantId}`,
         },
       }
       this.pca = new PublicClientApplication(config)
+      this.pcaConfigKey = configKey
     }
+
     return this.pca
   }
 

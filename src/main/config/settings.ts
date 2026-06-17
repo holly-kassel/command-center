@@ -7,6 +7,8 @@ const ElectronStore = require('electron-store')
 
 export interface AppSettings {
   obsidianVaultPath: string
+  microsoftClientId: string
+  microsoftTenantId: string
   calendarRefreshInterval: number
   githubRefreshInterval: number
   theme: 'light' | 'dark' | 'system'
@@ -18,6 +20,8 @@ export interface AppSettings {
 
 export const DEFAULT_SETTINGS: Omit<AppSettings, 'windowBounds' | 'lastSyncTime'> = {
   obsidianVaultPath: '',
+  microsoftClientId: '',
+  microsoftTenantId: 'common',
   calendarRefreshInterval: 5,
   githubRefreshInterval: 10,
   theme: 'dark',
@@ -45,6 +49,8 @@ export const settings = {
   getAll(): AppSettings {
     return {
       obsidianVaultPath: store.get('obsidianVaultPath') as string,
+      microsoftClientId: (store.get('microsoftClientId') as string) || '',
+      microsoftTenantId: (store.get('microsoftTenantId') as string) || 'common',
       calendarRefreshInterval: store.get('calendarRefreshInterval') as number,
       githubRefreshInterval: store.get('githubRefreshInterval') as number,
       theme: store.get('theme') as AppSettings['theme'],

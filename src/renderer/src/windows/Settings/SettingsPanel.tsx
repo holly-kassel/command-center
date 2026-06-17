@@ -13,12 +13,12 @@ const REFRESH_OPTIONS = [
   { label: '5 minutes', value: 5 },
   { label: '10 minutes', value: 10 },
   { label: '15 minutes', value: 15 },
-  { label: '30 minutes', value: 30 },
+  { label: '30 minutes', value: 30 }
 ]
 
 const HOTKEYS = [
   { label: 'Quick Capture', shortcut: '⌘ + ⌥ + Space' },
-  { label: "What's Next", shortcut: '⌘ + ⇧ + N' },
+  { label: "What's Next", shortcut: '⌘ + ⇧ + N' }
 ]
 
 export function SettingsPanel({ onClose }: { onClose: () => void }): React.ReactElement {
@@ -44,7 +44,7 @@ export function SettingsPanel({ onClose }: { onClose: () => void }): React.React
         const [s, authed, configured] = await Promise.all([
           window.api.settings.getAll(),
           window.api.auth.isAuthenticated(),
-          window.api.github.isConfigured(),
+          window.api.github.isConfigured()
         ])
         setSettings(s)
         setMsftAuthed(authed)
@@ -73,13 +73,13 @@ export function SettingsPanel({ onClose }: { onClose: () => void }): React.React
     try {
       const saved = await window.api.settings.update({
         obsidianVaultPath: settings.obsidianVaultPath,
-        microsoftClientId: settings.microsoftClientId,
-        microsoftTenantId: settings.microsoftTenantId,
+        microsoftClientId: settings.microsoftClientId.trim(),
+        microsoftTenantId: settings.microsoftTenantId.trim(),
         calendarRefreshInterval: settings.calendarRefreshInterval,
         githubRefreshInterval: settings.githubRefreshInterval,
         theme: settings.theme,
         userName: settings.userName,
-        meetingFilterPatterns: settings.meetingFilterPatterns,
+        meetingFilterPatterns: settings.meetingFilterPatterns
       })
       setSettings(saved)
       setDirty(false)
@@ -90,6 +90,14 @@ export function SettingsPanel({ onClose }: { onClose: () => void }): React.React
     } finally {
       setSaving(false)
     }
+  }
+
+  const saveMicrosoftAuthSettings = async (): Promise<void> => {
+    if (!settings) return
+    await window.api.settings.update({
+      microsoftClientId: settings.microsoftClientId.trim(),
+      microsoftTenantId: settings.microsoftTenantId.trim()
+    })
   }
 
   // Browse vault
@@ -130,6 +138,13 @@ export function SettingsPanel({ onClose }: { onClose: () => void }): React.React
         setMsftAuthed(false)
         toast.success('Signed out')
       } else {
+        if (!settings.microsoftClientId.trim()) {
+          toast.error('Set Microsoft Client ID, then sign in')
+          return
+        }
+
+        await saveMicrosoftAuthSettings()
+
         const result = await window.api.auth.loginMicrosoft()
         if (result.success) {
           setMsftAuthed(true)
@@ -232,7 +247,8 @@ export function SettingsPanel({ onClose }: { onClose: () => void }): React.React
             </button>
           </div>
           <p className="text-xs text-text-muted mt-1">
-            If <code className="text-accent">.env</code> is not set, configure your Azure app values below and save.
+            If <code className="text-accent">.env</code> is not set, configure your Azure app values
+            below and save.
           </p>
         </Label>
         <Label text="Microsoft Client ID">
@@ -279,7 +295,10 @@ export function SettingsPanel({ onClose }: { onClose: () => void }): React.React
                 {pattern}
                 <button
                   onClick={() => {
-                    update('meetingFilterPatterns', (settings.meetingFilterPatterns || []).filter((p) => p !== pattern))
+                    update(
+                      'meetingFilterPatterns',
+                      (settings.meetingFilterPatterns || []).filter((p) => p !== pattern)
+                    )
                   }}
                   className="text-text-muted hover:text-urgent ml-0.5 transition-colors"
                   title="Remove filter"
@@ -353,11 +372,7 @@ export function SettingsPanel({ onClose }: { onClose: () => void }): React.React
               placeholder={ghConfigured ? '••••••••' : 'ghp_...'}
               className="settings-input flex-1"
             />
-            <button
-              onClick={saveGhPat}
-              disabled={!ghPat.trim()}
-              className="settings-btn-secondary"
-            >
+            <button onClick={saveGhPat} disabled={!ghPat.trim()} className="settings-btn-secondary">
               Save
             </button>
           </div>
@@ -392,9 +407,7 @@ export function SettingsPanel({ onClose }: { onClose: () => void }): React.React
             </div>
           ))}
         </div>
-        <p className="text-xs text-text-muted mt-2 italic">
-          Customizable hotkeys coming soon
-        </p>
+        <p className="text-xs text-text-muted mt-2 italic">Customizable hotkeys coming soon</p>
       </Section>
 
       {/* ── Appearance ──────────────────────── */}
@@ -431,11 +444,7 @@ export function SettingsPanel({ onClose }: { onClose: () => void }): React.React
       {dirty && (
         <div className="flex items-center justify-end gap-3 pt-2 border-t border-surface-border/40">
           <span className="text-xs text-warning">Unsaved changes</span>
-          <button
-            onClick={save}
-            disabled={saving}
-            className="settings-btn-primary"
-          >
+          <button onClick={save} disabled={saving} className="settings-btn-primary">
             {saving ? 'Saving...' : 'Save Changes'}
           </button>
         </div>
@@ -449,7 +458,7 @@ export function SettingsPanel({ onClose }: { onClose: () => void }): React.React
 function Section({
   title,
   icon,
-  children,
+  children
 }: {
   title: string
   icon: string
@@ -468,7 +477,7 @@ function Section({
 
 function Label({
   text,
-  children,
+  children
 }: {
   text: string
   children: React.ReactNode
@@ -486,9 +495,7 @@ function Label({
 function StatusDot({ connected }: { connected: boolean }): React.ReactElement {
   return (
     <span
-      className={`inline-block w-2 h-2 rounded-full ${
-        connected ? 'bg-focus' : 'bg-text-muted'
-      }`}
+      className={`inline-block w-2 h-2 rounded-full ${connected ? 'bg-focus' : 'bg-text-muted'}`}
     />
   )
 }

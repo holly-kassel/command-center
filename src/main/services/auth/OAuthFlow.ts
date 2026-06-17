@@ -9,7 +9,7 @@ import { BrowserWindow } from 'electron'
 import {
   PublicClientApplication,
   type Configuration,
-  type AuthenticationResult,
+  type AuthenticationResult
 } from '@azure/msal-node'
 import { createServer, type Server } from 'node:http'
 import log from 'electron-log'
@@ -43,9 +43,7 @@ export class GraphAuthService {
   private async getPca(): Promise<PublicClientApplication> {
     const clientId = this.getClientId()
     if (!clientId) {
-      throw new Error(
-        'MICROSOFT_CLIENT_ID not set. Add it to .env or Settings.'
-      )
+      throw new Error('MICROSOFT_CLIENT_ID not set. Add it to .env or Settings.')
     }
 
     const tenantId = this.getTenantId()
@@ -55,14 +53,21 @@ export class GraphAuthService {
       const config: Configuration = {
         auth: {
           clientId,
-          authority: `https://login.microsoftonline.com/${tenantId}`,
-        },
+          authority: `https://login.microsoftonline.com/${tenantId}`
+        }
       }
       this.pca = new PublicClientApplication(config)
       this.pcaConfigKey = configKey
     }
 
     return this.pca
+  }
+
+  /**
+   * Check whether Microsoft auth is configured with a usable client ID.
+   */
+  isConfigured(): boolean {
+    return this.getClientId().length > 0
   }
 
   /**
@@ -93,6 +98,10 @@ export class GraphAuthService {
    * Check if we have valid (or refreshable) credentials.
    */
   isAuthenticated(): boolean {
+    if (!this.isConfigured()) {
+      return false
+    }
+
     const stored = credentialManager.getMicrosoftToken()
     return stored !== null
   }
@@ -106,7 +115,7 @@ export class GraphAuthService {
     // Generate auth code URL
     const authCodeUrl = await pca.getAuthCodeUrl({
       scopes: SCOPES,
-      redirectUri: REDIRECT_URI,
+      redirectUri: REDIRECT_URI
     })
 
     // Start temporary local server to capture the callback
@@ -116,7 +125,7 @@ export class GraphAuthService {
     const result: AuthenticationResult = await pca.acquireTokenByCode({
       code: authCode,
       scopes: SCOPES,
-      redirectUri: REDIRECT_URI,
+      redirectUri: REDIRECT_URI
     })
 
     if (!result.accessToken) {
@@ -128,7 +137,7 @@ export class GraphAuthService {
       accessToken: result.accessToken,
       refreshToken: '', // MSAL manages refresh internally via cache
       expiresAt: result.expiresOn ? result.expiresOn.getTime() : Date.now() + 3600_000,
-      account: result.account?.homeAccountId,
+      account: result.account?.homeAccountId
     }
     credentialManager.storeMicrosoftToken(tokenData)
 
@@ -151,7 +160,7 @@ export class GraphAuthService {
     try {
       const result = await pca.acquireTokenSilent({
         scopes: SCOPES,
-        account,
+        account
       })
 
       if (result.accessToken) {
@@ -159,7 +168,7 @@ export class GraphAuthService {
           accessToken: result.accessToken,
           refreshToken: '',
           expiresAt: result.expiresOn ? result.expiresOn.getTime() : Date.now() + 3600_000,
-          account: result.account?.homeAccountId,
+          account: result.account?.homeAccountId
         }
         credentialManager.storeMicrosoftToken(tokenData)
         log.info('[GraphAuth] Token refreshed silently')
@@ -218,11 +227,15 @@ export class GraphAuthService {
 
           res.writeHead(200, { 'Content-Type': 'text/html' })
           if (code) {
-            res.end('<html><body><h2>✓ Authentication successful!</h2><p>You can close this window.</p></body></html>')
+            res.end(
+              '<html><body><h2>✓ Authentication successful!</h2><p>You can close this window.</p></body></html>'
+            )
             cleanup()
             resolve(code)
           } else {
-            res.end(`<html><body><h2>✗ Authentication failed</h2><p>${error || 'Unknown error'}</p></body></html>`)
+            res.end(
+              `<html><body><h2>✗ Authentication failed</h2><p>${error || 'Unknown error'}</p></body></html>`
+            )
             cleanup()
             reject(new Error(`Auth failed: ${error}`))
           }
@@ -245,8 +258,8 @@ export class GraphAuthService {
         title: 'Sign in to Microsoft',
         webPreferences: {
           nodeIntegration: false,
-          contextIsolation: true,
-        },
+          contextIsolation: true
+        }
       })
 
       authWindow.loadURL(authCodeUrl)

@@ -28,6 +28,11 @@ export class CalendarService {
   async getEvents(start: Date, end: Date): Promise<CalendarEvent[]> {
     const rangeStart = start.toISOString()
     const rangeEnd = end.toISOString()
+    const auth = getGraphAuthService()
+
+    if (!auth.isConfigured()) {
+      return []
+    }
 
     // Return cached if still fresh and covers same range
     if (
@@ -39,7 +44,6 @@ export class CalendarService {
       return this.cache.events
     }
 
-    const auth = getGraphAuthService()
     const accessToken = await auth.getAccessToken()
 
     const url = `${GRAPH_BASE}/me/calendarView?startDateTime=${rangeStart}&endDateTime=${rangeEnd}&$orderby=start/dateTime&$top=50&$select=id,subject,start,end,location,attendees,isOnlineMeeting,onlineMeeting,isAllDay`
@@ -48,8 +52,8 @@ export class CalendarService {
       headers: {
         Authorization: `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
-        Prefer: 'outlook.timezone="UTC"',
-      },
+        Prefer: 'outlook.timezone="UTC"'
+      }
     })
 
     if (!response.ok) {
@@ -84,10 +88,7 @@ export class CalendarService {
     const events = await this.getTodayEvents()
     const now = Date.now()
 
-    return (
-      events.find((e) => !e.isAllDay && new Date(e.start).getTime() > now) ??
-      null
-    )
+    return events.find((e) => !e.isAllDay && new Date(e.start).getTime() > now) ?? null
   }
 
   /**
@@ -114,28 +115,31 @@ export class CalendarService {
     })
   }
 
-  private parseGraphEvents(
-    items: Record<string, unknown>[]
-  ): CalendarEvent[] {
+  private parseGraphEvents(items: Record<string, unknown>[]): CalendarEvent[] {
     return items.map((item) => {
       const start = item.start as { dateTime: string; timeZone: string } | undefined
       const end = item.end as { dateTime: string; timeZone: string } | undefined
       const location = item.location as { displayName?: string } | undefined
-      const attendees = item.attendees as Array<{
-        emailAddress?: { name?: string; address?: string }
-      }> | undefined
+      const attendees = item.attendees as
+        | Array<{
+            emailAddress?: { name?: string; address?: string }
+          }>
+        | undefined
       const onlineMeeting = item.onlineMeeting as { joinUrl?: string } | undefined
 
       return {
         id: String(item.id ?? ''),
         title: String(item.subject ?? 'No title'),
-        start: start?.dateTime ? new Date(start.dateTime + 'Z').toISOString() : new Date().toISOString(),
+        start: start?.dateTime
+          ? new Date(start.dateTime + 'Z').toISOString()
+          : new Date().toISOString(),
         end: end?.dateTime ? new Date(end.dateTime + 'Z').toISOString() : new Date().toISOString(),
         location: location?.displayName || undefined,
-        attendees: attendees?.map((a) => a.emailAddress?.name || a.emailAddress?.address || 'Unknown') || [],
+        attendees:
+          attendees?.map((a) => a.emailAddress?.name || a.emailAddress?.address || 'Unknown') || [],
         isOnlineMeeting: Boolean(item.isOnlineMeeting),
         onlineMeetingUrl: onlineMeeting?.joinUrl || undefined,
-        isAllDay: Boolean(item.isAllDay),
+        isAllDay: Boolean(item.isAllDay)
       }
     })
   }

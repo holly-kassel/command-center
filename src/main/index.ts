@@ -7,6 +7,7 @@ import icon from '../../resources/icon.png?asset'
 import { registerObsidianIpc, initObsidian, registerAuthIpc, registerCalendarIpc, registerGitHubIpc, registerSlackIpc, registerSettingsIpc, registerRitualIpc, registerGoalIpc, registerTranscriptionIpc } from './ipc'
 import { HotkeyManager } from './services/hotkey/HotkeyManager'
 import { getSyncManager } from './services/sync/SyncManager'
+import { getCalendarService } from './services/calendar/CalendarService'
 import { buildAppMenu } from './menu'
 
 const hotkeyManager = new HotkeyManager()
@@ -128,6 +129,10 @@ app.on('window-all-closed', () => {
 app.on('will-quit', () => {
   hotkeyManager.unregisterAll()
   syncManager.stopAutoSync()
+  // Kill the WorkIQ MCP subprocess if it's running (fire-and-forget).
+  getCalendarService()
+    .shutdown()
+    .catch(() => {})
 })
 
 // In this file you can include the rest of your app's specific main process

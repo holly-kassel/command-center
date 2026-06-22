@@ -94,7 +94,7 @@ export function FocusModeOverlay({ onExit }: { onExit: () => void }): React.Reac
   // ── Next meeting info ────────────────────────────────────────
 
   const meetingInfo = nextMeeting
-    ? `Next: ${nextMeeting.subject} at ${new Date(nextMeeting.start).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`
+    ? `Next: ${nextMeeting.title} at ${new Date(nextMeeting.start).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`
     : null
 
   return (

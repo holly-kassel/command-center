@@ -1,15 +1,15 @@
 /**
  * Calendar Service
  *
- * Fetches calendar events from Microsoft Graph API.
- * Caches results for 5 minutes to avoid excessive API calls.
+ * Fetches calendar events from Microsoft 365 via the WorkIQ MCP server
+ * (see WorkIqClient). Caches results for 5 minutes to avoid re-running the
+ * comparatively slow natural-language query on every render.
  */
 import log from 'electron-log'
-import { getGraphAuthService } from '../auth/OAuthFlow'
+import { getWorkIqClient, friendlyWorkIqError } from './WorkIqClient'
 import { settings } from '../../config/settings'
 import type { CalendarEvent } from '../../../shared/types/calendar'
 
-const GRAPH_BASE = 'https://graph.microsoft.com/v1.0'
 const CACHE_TTL = 5 * 60 * 1000 // 5 minutes
 
 interface CachedEvents {
@@ -39,30 +39,24 @@ export class CalendarService {
       return this.cache.events
     }
 
-    const auth = getGraphAuthService()
-    const accessToken = await auth.getAccessToken()
+    const workiq = getWorkIqClient()
 
-    const url = `${GRAPH_BASE}/me/calendarView?startDateTime=${rangeStart}&endDateTime=${rangeEnd}&$orderby=start/dateTime&$top=50&$select=id,subject,start,end,location,attendees,isOnlineMeeting,onlineMeeting,isAllDay`
-
-    const response = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-        Prefer: 'outlook.timezone="UTC"',
-      },
-    })
-
-    if (!response.ok) {
-      const errorText = await response.text()
-      log.error(`[Calendar] Graph API error ${response.status}: ${errorText}`)
-      throw new Error(`Calendar API error: ${response.status}`)
+    // Don't spawn WorkIQ until the user has connected it at least once.
+    if (!workiq.isConnected()) {
+      return []
     }
 
-    const data = await response.json()
-    const events = this.parseGraphEvents(data.value || [])
+    let events: CalendarEvent[]
+    try {
+      const items = await workiq.getCalendarView(rangeStart, rangeEnd)
+      events = this.parseWorkIqEvents(items)
+    } catch (error) {
+      log.error('[Calendar] WorkIQ fetch error:', error)
+      throw new Error(friendlyWorkIqError(error))
+    }
 
     this.cache = { events, fetchedAt: Date.now(), rangeStart, rangeEnd }
-    log.info(`[Calendar] Fetched ${events.length} events`)
+    log.info(`[Calendar] Fetched ${events.length} events via WorkIQ`)
     return events
   }
 
@@ -84,10 +78,7 @@ export class CalendarService {
     const events = await this.getTodayEvents()
     const now = Date.now()
 
-    return (
-      events.find((e) => !e.isAllDay && new Date(e.start).getTime() > now) ??
-      null
-    )
+    return events.find((e) => !e.isAllDay && new Date(e.start).getTime() > now) ?? null
   }
 
   /**
@@ -95,6 +86,37 @@ export class CalendarService {
    */
   invalidateCache(): void {
     this.cache = null
+  }
+
+  // ─── WorkIQ connection (used by auth IPC) ─────────────────────
+
+  /**
+   * Connect WorkIQ and verify calendar access. Throws a friendly error on
+   * failure. On success, future fetches are enabled.
+   */
+  async connect(): Promise<void> {
+    this.invalidateCache()
+    try {
+      await getWorkIqClient().connect()
+    } catch (error) {
+      log.error('[Calendar] WorkIQ connect error:', error)
+      throw new Error(friendlyWorkIqError(error))
+    }
+  }
+
+  isConnected(): boolean {
+    return getWorkIqClient().isConnected()
+  }
+
+  /** Sign out of WorkIQ and clear cached events. */
+  async disconnect(): Promise<void> {
+    this.invalidateCache()
+    await getWorkIqClient().disconnect()
+  }
+
+  /** Kill the WorkIQ subprocess on app quit (keeps the connected flag). */
+  async shutdown(): Promise<void> {
+    await getWorkIqClient().shutdown()
   }
 
   // ─── Internal ─────────────────────────────────────────────────
@@ -114,30 +136,82 @@ export class CalendarService {
     })
   }
 
-  private parseGraphEvents(
-    items: Record<string, unknown>[]
-  ): CalendarEvent[] {
+  /**
+   * Map WorkIQ's flat event records onto the {@link CalendarEvent} shape.
+   *
+   * WorkIQ returns each event as:
+   *   { subject, start, end, location, isOnlineMeeting, onlineMeetingUrl,
+   *     isAllDay, attendees: string[] }
+   * where `start`/`end` are ISO 8601 strings that ALREADY include the UTC
+   * offset (e.g. "2026-06-22T10:00:00-05:00"). We therefore pass them straight
+   * through `new Date(...)` — we must NOT append "Z", which would corrupt the
+   * absolute instant. WorkIQ supplies no event id, so we synthesise a stable
+   * one from the subject + start (used as the React key and for next-meeting
+   * identity).
+   */
+  private parseWorkIqEvents(items: Record<string, unknown>[]): CalendarEvent[] {
     return items.map((item) => {
-      const start = item.start as { dateTime: string; timeZone: string } | undefined
-      const end = item.end as { dateTime: string; timeZone: string } | undefined
-      const location = item.location as { displayName?: string } | undefined
-      const attendees = item.attendees as Array<{
-        emailAddress?: { name?: string; address?: string }
-      }> | undefined
-      const onlineMeeting = item.onlineMeeting as { joinUrl?: string } | undefined
+      const title = String(item.subject ?? 'No title')
+      const startISO = this.toIso(item.start)
+      const endISO = this.toIso(item.end)
+
+      const rawLocation = this.toLocation(item.location)
+      const rawJoinUrl =
+        typeof item.onlineMeetingUrl === 'string' ? item.onlineMeetingUrl.trim() : ''
+      const attendees = Array.isArray(item.attendees)
+        ? item.attendees.map((a) => String(a)).filter((a) => a.length > 0)
+        : []
 
       return {
-        id: String(item.id ?? ''),
-        title: String(item.subject ?? 'No title'),
-        start: start?.dateTime ? new Date(start.dateTime + 'Z').toISOString() : new Date().toISOString(),
-        end: end?.dateTime ? new Date(end.dateTime + 'Z').toISOString() : new Date().toISOString(),
-        location: location?.displayName || undefined,
-        attendees: attendees?.map((a) => a.emailAddress?.name || a.emailAddress?.address || 'Unknown') || [],
+        id: this.makeId(title, startISO),
+        title,
+        start: startISO,
+        end: endISO,
+        location: rawLocation || undefined,
+        attendees,
         isOnlineMeeting: Boolean(item.isOnlineMeeting),
-        onlineMeetingUrl: onlineMeeting?.joinUrl || undefined,
-        isAllDay: Boolean(item.isAllDay),
+        onlineMeetingUrl: rawJoinUrl || undefined,
+        isAllDay: Boolean(item.isAllDay)
       }
     })
+  }
+
+  /**
+   * Normalise a WorkIQ datetime to an ISO string. Accepts either a plain ISO
+   * string (the expected case, offset already included) or a Graph-style
+   * `{ dateTime }` object as a defensive fallback. Never appends "Z".
+   */
+  private toIso(value: unknown): string {
+    let raw: string | undefined
+    if (typeof value === 'string') {
+      raw = value
+    } else if (value && typeof value === 'object') {
+      const dt = (value as { dateTime?: unknown }).dateTime
+      if (typeof dt === 'string') raw = dt
+    }
+    if (!raw) return new Date().toISOString()
+    const d = new Date(raw)
+    return Number.isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString()
+  }
+
+  /** Accept a string location or a Graph-style `{ displayName }` object. */
+  private toLocation(value: unknown): string {
+    if (typeof value === 'string') return value.trim()
+    if (value && typeof value === 'object') {
+      const name = (value as { displayName?: unknown }).displayName
+      if (typeof name === 'string') return name.trim()
+    }
+    return ''
+  }
+
+  /** Deterministic id from subject + start, so the React key is stable. */
+  private makeId(title: string, startISO: string): string {
+    const seed = `${title}|${startISO}`
+    let hash = 0
+    for (let i = 0; i < seed.length; i++) {
+      hash = (hash * 31 + seed.charCodeAt(i)) | 0
+    }
+    return `wi_${(hash >>> 0).toString(36)}`
   }
 }
 

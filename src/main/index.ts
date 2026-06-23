@@ -22,6 +22,7 @@ import {
 import { HotkeyManager } from './services/hotkey/HotkeyManager'
 import { getSyncManager } from './services/sync/SyncManager'
 import { getChatService } from './services/chat'
+import { getCalendarService } from './services/calendar/CalendarService'
 import { buildAppMenu } from './menu'
 
 const hotkeyManager = new HotkeyManager()
@@ -150,6 +151,10 @@ app.on('will-quit', () => {
   hotkeyManager.unregisterAll()
   syncManager.stopAutoSync()
   getChatService().stopNudges()
+  // Kill the WorkIQ MCP subprocess if it's running (fire-and-forget).
+  getCalendarService()
+    .shutdown()
+    .catch(() => {})
 })
 
 // In this file you can include the rest of your app's specific main process

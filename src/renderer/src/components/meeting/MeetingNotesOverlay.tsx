@@ -54,6 +54,8 @@ export function MeetingNotesOverlay({ onClose }: MeetingNotesOverlayProps): Reac
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [showDoneOptions, setShowDoneOptions] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  const [meetingTitle, setMeetingTitle] = useState('Meeting Notes')
+  const [isEditingTitle, setIsEditingTitle] = useState(false)
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
@@ -275,7 +277,7 @@ export function MeetingNotesOverlay({ onClose }: MeetingNotesOverlayProps): Reac
       const speakers = [...new Set(segments.map((s) => s.speaker))]
       const meeting = {
         id: Date.now().toString(),
-        title: 'Meeting Notes',
+        title: meetingTitle,
         duration: currentElapsed,
         segments,
         transcript: segments.map((s) => `${s.speaker}: ${s.text}`).join('\n'),
@@ -293,7 +295,7 @@ export function MeetingNotesOverlay({ onClose }: MeetingNotesOverlayProps): Reac
       const m = Math.floor(currentElapsed / 60)
       const s = currentElapsed % 60
       const durationStr = m > 0 ? `${m}m${s > 0 ? ` ${s}s` : ''}` : `${s}s`
-      const noteLink = `[[transcripts/${filename}|Meeting Notes]]`
+      const noteLink = `[[transcripts/${filename}|${meetingTitle}]]`
 
       const lines: string[] = []
       lines.push(`#### 📝 ${noteLink} (${durationStr})`)
@@ -307,8 +309,13 @@ export function MeetingNotesOverlay({ onClose }: MeetingNotesOverlayProps): Reac
         for (const topic of meetingNotes.keyTopics) lines.push(`- ${topic}`)
         lines.push('')
       }
+      if (meetingNotes?.myActionItems && meetingNotes.myActionItems.length > 0) {
+        lines.push('**My Action Items:**')
+        for (const item of meetingNotes.myActionItems) lines.push(`- [ ] ${item}`)
+        lines.push('')
+      }
       if (meetingNotes?.actionItems && meetingNotes.actionItems.length > 0) {
-        lines.push('**Action Items:**')
+        lines.push(meetingNotes?.myActionItems && meetingNotes.myActionItems.length > 0 ? '**All Action Items:**' : '**Action Items:**')
         for (const item of meetingNotes.actionItems) lines.push(`- [ ] ${item}`)
         lines.push('')
       }
@@ -318,7 +325,7 @@ export function MeetingNotesOverlay({ onClose }: MeetingNotesOverlayProps): Reac
       // Weekly note append is best-effort; meeting is already saved
     }
     onClose()
-  }, [saveMeeting, settings.language, onClose])
+  }, [saveMeeting, settings.language, onClose, meetingTitle])
 
   // Start recording on mount
   useEffect(() => {
@@ -356,9 +363,30 @@ export function MeetingNotesOverlay({ onClose }: MeetingNotesOverlayProps): Reac
       >
         {/* Header */}
         <div className="flex items-center justify-between px-4 pt-4 pb-2">
-          <h2 className="text-sm font-bold text-text-primary flex items-center gap-2">
-            <span>🎙️</span> Meeting Notes
-          </h2>
+          <div className="flex items-center gap-2 min-w-0 flex-1 mr-2">
+            <span className="text-sm flex-shrink-0">🎙️</span>
+            {isEditingTitle ? (
+              <input
+                autoFocus
+                value={meetingTitle}
+                onChange={(e) => setMeetingTitle(e.target.value)}
+                onBlur={() => setIsEditingTitle(false)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') setIsEditingTitle(false)
+                  if (e.key === 'Escape') setIsEditingTitle(false)
+                }}
+                className="text-sm font-bold text-text-primary bg-transparent border-b border-focus outline-none min-w-0 flex-1"
+              />
+            ) : (
+              <h2
+                onClick={() => setIsEditingTitle(true)}
+                className="text-sm font-bold text-text-primary truncate cursor-text hover:text-focus transition-colors"
+                title="Click to rename"
+              >
+                {meetingTitle}
+              </h2>
+            )}
+          </div>
           <div className="flex items-center gap-2">
             {/* Settings gear */}
             <div className="relative">

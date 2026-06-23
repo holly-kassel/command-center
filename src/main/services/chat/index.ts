@@ -1,0 +1,1 @@
+export { getChatService } from './ChatService'

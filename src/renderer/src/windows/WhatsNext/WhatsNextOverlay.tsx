@@ -90,7 +90,7 @@ export function WhatsNextOverlay(): React.JSX.Element {
               {data.nextMeeting ? (
                 <div>
                   <p className="text-text-primary font-medium text-sm leading-snug">
-                    {data.nextMeeting.subject}
+                    {data.nextMeeting.title}
                   </p>
                   <p className="text-text-tertiary text-xs mt-1">
                     {formatTime(data.nextMeeting.start)} · {formatTimeUntil(data.nextMeeting.start)}

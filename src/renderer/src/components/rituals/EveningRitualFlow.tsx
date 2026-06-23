@@ -237,7 +237,10 @@ export function EveningRitualFlow({ onComplete, onClose }: EveningRitualFlowProp
     true
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/95 backdrop-blur-sm">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-background/95 backdrop-blur-sm"
+      style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+    >
       <div className="w-full max-w-lg mx-auto p-6">
         {/* Close button */}
         <button

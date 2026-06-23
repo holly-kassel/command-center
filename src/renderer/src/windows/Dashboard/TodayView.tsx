@@ -15,6 +15,7 @@ import rehypeRaw from 'rehype-raw'
 import { useObsidianStore } from '../../store/obsidianStore'
 import { useGoalStore } from '../../store/goalStore'
 import { toast } from '../../utils/toast'
+import { useTodayStr } from '../../hooks/useTodayStr'
 import type { TodaySection } from '../../../../shared/types/obsidian'
 
 /** Format a Date as YYYY-MM-DD (local time) */
@@ -38,9 +39,8 @@ function shiftWeekday(dateStr: string, delta: number): string {
   return toDateStr(d)
 }
 
-const todayStr = toDateStr(new Date())
-
 export function TodayView(): React.JSX.Element {
+  const todayStr = useTodayStr()
   const { todaySection, currentFocus, isLoading, error, vaultStatus, updateTodayContent, toggleCheckbox } = useObsidianStore()
   const updateTaskCompletion = useGoalStore((s) => s.updateTaskCompletion)
   const [editing, setEditing] = useState(false)
@@ -115,8 +115,13 @@ export function TodayView(): React.JSX.Element {
   }, [editing])
 
   const autoResize = (el: HTMLTextAreaElement): void => {
+    // Preserve scroll position of the scrollable parent so collapsing
+    // height to 'auto' doesn't yank the page to the bottom.
+    const scrollParent = el.closest('.overflow-y-auto') as HTMLElement | null
+    const prevScroll = scrollParent?.scrollTop ?? 0
     el.style.height = 'auto'
     el.style.height = `${el.scrollHeight}px`
+    if (scrollParent) scrollParent.scrollTop = prevScroll
   }
 
   const handleSave = async (): Promise<void> => {

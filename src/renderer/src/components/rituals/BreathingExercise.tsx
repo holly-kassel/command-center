@@ -2,7 +2,8 @@
  * BreathingExercise Component
  *
  * 4-7-8 breathing pattern: 4s inhale, 7s hold, 8s exhale.
- * Animated circle + phase text + countdown.
+ * Smooth CSS-transition-driven concentric rings with ambient glow.
+ * Always completes full cycles — never cuts off mid-breath.
  */
 import { useState, useEffect, useRef } from 'react'
 
@@ -11,31 +12,28 @@ interface BreathingExerciseProps {
   onComplete: () => void
 }
 
-type Phase = 'ready' | 'inhale' | 'hold' | 'exhale'
+type Phase = 'ready' | 'inhale' | 'hold' | 'exhale' | 'complete'
 
-const PHASE_DURATIONS: Record<Exclude<Phase, 'ready'>, number> = {
-  inhale: 4,
-  hold: 7,
-  exhale: 8,
-}
+const INHALE = 4
+const HOLD = 7
+const EXHALE = 8
+const CYCLE_DURATION = INHALE + HOLD + EXHALE
 
 const PHASE_LABELS: Record<Phase, string> = {
-  ready: 'Ready?',
-  inhale: 'Breathe in',
-  hold: 'Hold',
-  exhale: 'Breathe out',
+  ready: '',
+  inhale: 'Breathe in slowly\u2026',
+  hold: 'Gently hold\u2026',
+  exhale: 'Slowly let go\u2026',
+  complete: 'You\u2019re centered',
 }
 
-const PHASE_COLORS: Record<Phase, string> = {
-  ready: 'text-text-muted',
-  inhale: 'text-focus',
-  hold: 'text-warning',
-  exhale: 'text-accent',
+type ActivePhase = 'inhale' | 'hold' | 'exhale'
+const PHASE_ORDER: ActivePhase[] = ['inhale', 'hold', 'exhale']
+const PHASE_SECONDS: Record<ActivePhase, number> = {
+  inhale: INHALE,
+  hold: HOLD,
+  exhale: EXHALE,
 }
-
-const PHASE_ORDER: Exclude<Phase, 'ready'>[] = ['inhale', 'hold', 'exhale']
-
-const CYCLE_DURATION = 4 + 7 + 8 // 19 seconds
 
 export function BreathingExercise({
   durationSeconds = 60,
@@ -43,96 +41,116 @@ export function BreathingExercise({
 }: BreathingExerciseProps): React.ReactElement {
   const [started, setStarted] = useState(false)
   const [phase, setPhase] = useState<Phase>('ready')
-  const [phaseTimeLeft, setPhaseTimeLeft] = useState(0)
-  const [cycleCount, setCycleCount] = useState(0)
-  const [totalElapsed, setTotalElapsed] = useState(0)
+  const [cyclesCompleted, setCyclesCompleted] = useState(0)
+
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const phaseIndexRef = useRef(0) // 0=inhale, 1=hold, 2=exhale
-  const phaseRemainingRef = useRef(0)
+  const phaseIdxRef = useRef(0)
+  const remainingRef = useRef(0)
   const cycleRef = useRef(0)
-  const elapsedRef = useRef(0)
   const onCompleteRef = useRef(onComplete)
   onCompleteRef.current = onComplete
 
-  const totalCycles = Math.ceil(durationSeconds / CYCLE_DURATION)
+  const totalCycles = Math.max(1, Math.round(durationSeconds / CYCLE_DURATION))
 
+  // Completion wind-down → auto-advance after 3s
+  useEffect(() => {
+    if (phase !== 'complete') return
+    const t = setTimeout(() => onCompleteRef.current(), 3000)
+    return () => clearTimeout(t)
+  }, [phase])
+
+  // Core breathing loop — cycle-count based, never truncates mid-breath
   useEffect(() => {
     if (!started) return
 
-    // Initialize: start at inhale
-    phaseIndexRef.current = 0
-    phaseRemainingRef.current = PHASE_DURATIONS.inhale
-    cycleRef.current = 1
-    elapsedRef.current = 0
+    phaseIdxRef.current = 0
+    remainingRef.current = INHALE
+    cycleRef.current = 0
 
     setPhase('inhale')
-    setPhaseTimeLeft(PHASE_DURATIONS.inhale)
-    setCycleCount(1)
-    setTotalElapsed(0)
+    setCyclesCompleted(0)
 
     intervalRef.current = setInterval(() => {
-      elapsedRef.current += 1
-      phaseRemainingRef.current -= 1
+      remainingRef.current -= 1
 
-      // Check if overall exercise is done
-      if (elapsedRef.current >= durationSeconds) {
-        clearInterval(intervalRef.current!)
-        onCompleteRef.current()
-        return
-      }
+      if (remainingRef.current <= 0) {
+        const prevIdx = phaseIdxRef.current
 
-      if (phaseRemainingRef.current <= 0) {
-        // Move to next phase
-        phaseIndexRef.current = (phaseIndexRef.current + 1) % 3
-
-        // If we wrapped back to inhale, that's a new cycle
-        if (phaseIndexRef.current === 0) {
+        // Exhale just ended → cycle complete
+        if (prevIdx === 2) {
           cycleRef.current += 1
-          setCycleCount(cycleRef.current)
+          setCyclesCompleted(cycleRef.current)
+
+          if (cycleRef.current >= totalCycles) {
+            clearInterval(intervalRef.current!)
+            setPhase('complete')
+            return
+          }
         }
 
-        const nextPhaseName = PHASE_ORDER[phaseIndexRef.current]
-        phaseRemainingRef.current = PHASE_DURATIONS[nextPhaseName]
-        setPhase(nextPhaseName)
-        setPhaseTimeLeft(PHASE_DURATIONS[nextPhaseName])
-      } else {
-        setPhaseTimeLeft(phaseRemainingRef.current)
+        // Advance to next phase
+        phaseIdxRef.current = (prevIdx + 1) % 3
+        const next = PHASE_ORDER[phaseIdxRef.current]
+        remainingRef.current = PHASE_SECONDS[next]
+        setPhase(next)
       }
-
-      setTotalElapsed(elapsedRef.current)
     }, 1000)
 
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current)
     }
-  }, [started, durationSeconds])
+  }, [started, totalCycles])
 
-  // Circle scale based on phase
-  const getScale = (): number => {
-    if (!started || phase === 'ready') return 0.6
-    if (phase === 'inhale') {
-      const progress = 1 - phaseTimeLeft / PHASE_DURATIONS.inhale
-      return 0.6 + 0.4 * progress
+  // ─── Transition-driven scale (synced to phase duration) ───
+  const isExpanded = phase === 'inhale' || phase === 'hold'
+  const targetScale = isExpanded ? 1 : 0.55
+
+  const transDuration =
+    phase === 'inhale'
+      ? `${INHALE}s`
+      : phase === 'exhale'
+        ? `${EXHALE}s`
+        : '0.5s'
+
+  const transEasing =
+    phase === 'inhale'
+      ? 'cubic-bezier(0.25, 0.46, 0.45, 0.94)'
+      : phase === 'exhale'
+        ? 'cubic-bezier(0.55, 0.06, 0.68, 0.19)'
+        : 'ease'
+
+  const ringStyle = (delayMs: number = 0): React.CSSProperties => {
+    const delay = delayMs > 0 ? ` ${delayMs / 1000}s` : ''
+    return {
+      transform: `scale(${targetScale})`,
+      transition: [
+        `transform ${transDuration} ${transEasing}${delay}`,
+        'border-color 1.2s ease',
+        'background-color 1.2s ease',
+        'box-shadow 1.2s ease',
+      ].join(', '),
     }
-    if (phase === 'hold') return 1.0
-    // exhale
-    const progress = 1 - phaseTimeLeft / PHASE_DURATIONS.exhale
-    return 1.0 - 0.4 * progress
   }
 
-  const progressPercent = (totalElapsed / durationSeconds) * 100
+  const colorClass =
+    phase === 'inhale'
+      ? 'breathing-phase-inhale'
+      : phase === 'hold'
+        ? 'breathing-phase-hold'
+        : phase === 'exhale'
+          ? 'breathing-phase-exhale'
+          : 'breathing-phase-rest'
 
+  // ─── Ready state ──────────────────────────────────────
   if (!started) {
     return (
       <div className="flex flex-col items-center justify-center gap-6 py-8">
-        <div className="w-32 h-32 rounded-full bg-surface-muted/30 border-2 border-surface-border/40 flex items-center justify-center">
-          <span className="text-4xl">🫁</span>
+        <div className="breathing-ready-orb">
+          <span className="text-3xl">🫁</span>
         </div>
-        <div className="text-center space-y-2">
-          <p className="text-text-secondary text-sm">4-7-8 Breathing Pattern</p>
-          <p className="text-text-muted text-xs">
-            {totalCycles} cycles · ~{durationSeconds}s
-          </p>
+        <div className="text-center space-y-1.5">
+          <p className="text-text-secondary text-sm font-medium">4-7-8 Breathing</p>
+          <p className="text-text-muted text-xs">{totalCycles} gentle cycles</p>
         </div>
         <div className="flex gap-3">
           <button
@@ -152,45 +170,67 @@ export function BreathingExercise({
     )
   }
 
+  // ─── Active breathing + completion ────────────────────
   return (
     <div className="flex flex-col items-center justify-center gap-6 py-8">
-      {/* Animated breathing circle */}
-      <div className="relative w-40 h-40 flex items-center justify-center">
-        <div
-          className={`absolute inset-0 rounded-full border-2 transition-all duration-1000 ease-in-out ${
-            phase === 'inhale'
-              ? 'border-focus/60 bg-focus/10'
-              : phase === 'hold'
-                ? 'border-warning/60 bg-warning/10'
-                : 'border-accent/60 bg-accent/10'
-          }`}
-          style={{
-            transform: `scale(${getScale()})`,
-            transition: 'transform 1s ease-in-out, border-color 0.5s, background-color 0.5s',
-          }}
-        />
-        <div className="relative z-10 text-center">
-          <span className={`text-lg font-semibold ${PHASE_COLORS[phase]}`}>
+      {/* Ring container */}
+      <div className="relative w-48 h-48 flex items-center justify-center">
+        {phase !== 'complete' ? (
+          <>
+            <div
+              className={`breathing-ring breathing-outer ${colorClass}`}
+              style={ringStyle(300)}
+            />
+            <div
+              className={`breathing-ring breathing-middle ${colorClass}`}
+              style={ringStyle(150)}
+            />
+            <div
+              className={`breathing-ring breathing-inner ${colorClass}`}
+              style={ringStyle(0)}
+            />
+          </>
+        ) : (
+          <div className="breathing-done-orb">
+            <span className="text-2xl text-focus/80">✓</span>
+          </div>
+        )}
+
+        {/* Phase label — crossfades on change via key remount */}
+        <div className="relative z-10 text-center px-6" role="status" aria-live="polite">
+          <span
+            key={phase}
+            className="block text-sm font-medium text-text-secondary breathing-text-in"
+          >
             {PHASE_LABELS[phase]}
           </span>
-          <div className="text-2xl font-mono text-text-secondary mt-1">
-            {phaseTimeLeft}
-          </div>
         </div>
       </div>
 
-      {/* Cycle count */}
-      <p className="text-text-muted text-xs">
-        Cycle {cycleCount} of {totalCycles}
-      </p>
-
-      {/* Progress bar */}
-      <div className="w-48 h-1.5 bg-surface-muted/40 rounded-full overflow-hidden">
-        <div
-          className="h-full bg-focus/60 rounded-full transition-all duration-1000"
-          style={{ width: `${Math.min(progressPercent, 100)}%` }}
-        />
-      </div>
+      {/* Progress: cycle dots during breathing, summary at completion */}
+      {phase !== 'complete' ? (
+        <div className="flex gap-2 items-center">
+          {Array.from({ length: totalCycles }).map((_, i) => (
+            <div
+              key={i}
+              className={`rounded-full transition-all duration-700 ${
+                i < cyclesCompleted
+                  ? 'w-1.5 h-1.5 bg-focus/60'
+                  : i === cyclesCompleted
+                    ? 'w-2 h-2 bg-focus/30'
+                    : 'w-1.5 h-1.5 bg-surface-muted/40'
+              }`}
+            />
+          ))}
+        </div>
+      ) : (
+        <p
+          className="text-text-muted text-xs breathing-text-in"
+          style={{ animationDelay: '0.5s', opacity: 0, animationFillMode: 'forwards' }}
+        >
+          {totalCycles} breaths complete
+        </p>
+      )}
     </div>
   )
 }

@@ -38,6 +38,8 @@ export interface MeetingNotes {
   keyTopics: string[]
   keyPoints: string[]
   actionItems: string[]
+  /** Action items specifically assigned to the current user */
+  myActionItems: string[]
   decisions: string[]
   openQuestions: string[]
 }
@@ -65,3 +67,25 @@ export interface MeetingTranscriptionSettings {
   /** Known participant names for speaker attribution in summaries */
   participants: string[]
 }
+
+/** Confidence level for an evaluated decision */
+export type DecisionConfidence =
+  | 'confirmed'
+  | 'potentially-outdated'
+  | 'contradicted'
+  | 'unverifiable'
+
+/** A decision that has been cross-referenced against ground-truth sources */
+export interface EvaluatedDecision {
+  /** Original decision text from the meeting summary */
+  text: string
+  /** How confident we are that this decision is still accurate */
+  confidence: DecisionConfidence
+  /** Brief explanation of the evaluation reasoning */
+  annotation: string
+  /** Source references that informed the evaluation */
+  sources: string[]
+}
+
+/** Maps diarized speaker labels (e.g. "Speaker 0") to real names */
+export type SpeakerMap = Record<string, string>

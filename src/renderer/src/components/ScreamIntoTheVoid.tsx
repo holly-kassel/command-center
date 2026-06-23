@@ -8,6 +8,7 @@
  * Pure catharsis. Zero consequences.
  */
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { motion } from 'framer-motion'
 
 // ─── Howie Scream Synth ───────────────────────────────────────
 // The Howie / TIE Fighter scream: try loading the real audio file,
@@ -192,7 +193,13 @@ export function ScreamIntoTheVoid({ onClose }: ScreamIntoTheVoidProps): React.JS
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <motion.div
+      initial={{ opacity: 0, scale: 0.98 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.98 }}
+      transition={{ duration: 0.25 }}
+      className="fixed inset-0 z-50 flex items-center justify-center"
+    >
       {/* Backdrop — deep void black */}
       <div
         className="absolute inset-0 bg-black/80 backdrop-blur-md"
@@ -223,9 +230,7 @@ export function ScreamIntoTheVoid({ onClose }: ScreamIntoTheVoidProps): React.JS
             {/* Header */}
             <div className="text-center">
               <h2 className="text-lg font-bold text-white/90">Scream Into The Void</h2>
-              <p className="text-white/40 text-xs mt-1">
-                Nothing here is saved. Ever. Let it out.
-              </p>
+              <p className="text-white/40 text-xs mt-1">Nothing here is saved. Ever. Let it out.</p>
             </div>
 
             {/* Textarea */}
@@ -262,9 +267,7 @@ export function ScreamIntoTheVoid({ onClose }: ScreamIntoTheVoidProps): React.JS
                     AAAAA
                   </span>
                 ) : (
-                  <span className="inline-flex items-center gap-1.5">
-                    🗣️ Scream
-                  </span>
+                  <span className="inline-flex items-center gap-1.5">🗣️ Scream</span>
                 )}
               </button>
             </div>
@@ -276,6 +279,6 @@ export function ScreamIntoTheVoid({ onClose }: ScreamIntoTheVoidProps): React.JS
           </div>
         )}
       </div>
-    </div>
+    </motion.div>
   )
 }

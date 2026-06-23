@@ -11,7 +11,7 @@ const baseStyle = {
   background: 'var(--color-surface)',
   color: 'var(--color-text-primary)',
   backdropFilter: 'blur(12px)',
-  fontSize: '13px',
+  fontSize: '13px'
 }
 
 export const toast = {
@@ -19,25 +19,29 @@ export const toast = {
     hotToast.success(message, {
       style: {
         ...baseStyle,
-        border: '1px solid var(--color-focus)',
+        border: '1px solid var(--color-focus)'
       },
       iconTheme: {
         primary: 'var(--color-focus)',
-        secondary: 'var(--color-background)',
-      },
+        secondary: 'var(--color-background)'
+      }
     })
+  },
+
+  saved: (message: string): void => {
+    toast.success(message)
   },
 
   error: (message: string): void => {
     hotToast.error(message, {
       style: {
         ...baseStyle,
-        border: '1px solid var(--color-urgent)',
+        border: '1px solid var(--color-urgent)'
       },
       iconTheme: {
         primary: 'var(--color-urgent)',
-        secondary: 'var(--color-background)',
-      },
+        secondary: 'var(--color-background)'
+      }
     })
   },
 
@@ -46,12 +50,12 @@ export const toast = {
       icon: 'ℹ️',
       style: {
         ...baseStyle,
-        border: '1px solid var(--color-primary)',
-      },
+        border: '1px solid var(--color-primary)'
+      }
     })
   },
 
   dismiss: (): void => {
     hotToast.dismiss()
-  },
+  }
 }

@@ -2,6 +2,7 @@
 
 export * from './ritual'
 export * from './goal'
+export * from './chat'
 
 /** IPC channel names — keep in sync between main & preload */
 export const IPC_CHANNELS = {
@@ -16,6 +17,16 @@ export const IPC_CHANNELS = {
   // GitHub
   GITHUB_GET_NOTIFICATIONS: 'github:get-notifications',
   GITHUB_GET_PRS: 'github:get-prs',
+
+  // Chat (Katya)
+  CHAT_SEND_MESSAGE: 'chat:send-message',
+  CHAT_GET_CONVERSATION: 'chat:get-conversation',
+  CHAT_CLEAR_CONVERSATION: 'chat:clear-conversation',
+  CHAT_STREAM_CHUNK: 'chat:stream-chunk',
+  CHAT_STREAM_DONE: 'chat:stream-done',
+  CHAT_NUDGE: 'chat:nudge',
+  CHAT_GET_NUDGE_CONFIG: 'chat:get-nudge-config',
+  CHAT_SET_NUDGE_CONFIG: 'chat:set-nudge-config',
 
   // App
   APP_GET_CONFIG: 'app:get-config',

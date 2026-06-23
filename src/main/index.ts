@@ -17,6 +17,7 @@ import {
   registerKanbanIpc,
   registerTranscriptionIpc,
   registerChatIpc,
+  registerDecisionEvalIpc,
 } from './ipc'
 import { HotkeyManager } from './services/hotkey/HotkeyManager'
 import { getSyncManager } from './services/sync/SyncManager'
@@ -108,6 +109,7 @@ app.whenReady().then(() => {
   registerGoalIpc()
   registerKanbanIpc()
   registerTranscriptionIpc()
+  registerDecisionEvalIpc()
   initObsidian()
 
   const mainWindow = createWindow()

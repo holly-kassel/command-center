@@ -121,3 +121,34 @@ export const GOAL_STATUS_LABELS: Record<GoalStatus, { label: string; color: stri
   paused: { label: 'Paused', color: 'text-warning' },
   abandoned: { label: 'Abandoned', color: 'text-text-muted' },
 }
+
+/** Status of a kanban task */
+export type KanbanStatus = 'todo' | 'in_progress' | 'done'
+
+/** Where the task originated from */
+export type KanbanTaskSource = 'manual' | 'slash_command' | 'triage'
+
+/** A task on the kanban board */
+export interface KanbanTask {
+  id: string
+  text: string
+  status: KanbanStatus
+  createdAt: string
+  completedAt: string | null
+  /** Which date (YYYY-MM-DD) the task was completed on — for daily logging */
+  completedDate: string | null
+  /** Where this task came from */
+  source: KanbanTaskSource
+  /** If from triage, the notification ID for linking */
+  sourceNotificationId: string | null
+  /** If from triage, the GitHub URL */
+  sourceUrl: string | null
+  /** Position within its column (lower = higher on board) */
+  position: number
+}
+
+export const KANBAN_STATUS_LABELS: Record<KanbanStatus, string> = {
+  todo: 'To Do',
+  in_progress: 'In Progress',
+  done: 'Done',
+}

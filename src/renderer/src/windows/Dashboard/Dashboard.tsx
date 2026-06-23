@@ -5,18 +5,24 @@
  * Time-based greeting, auto-refresh, responsive layout.
  */
 import { useCallback, useEffect, useState } from 'react'
+import { DndContext, closestCenter, type DragEndEvent } from '@dnd-kit/core'
+import { SortableContext, arrayMove, verticalListSortingStrategy } from '@dnd-kit/sortable'
+import { DEFAULT_DASHBOARD_LAYOUT, type DashboardPanelId } from '@shared/types/settings'
+import { AnimatePresence } from 'framer-motion'
 import { useObsidianStore } from '../../store/obsidianStore'
 import { useCalendarStore } from '../../store/calendarStore'
 import { useGitHubStore } from '../../store/githubStore'
 import { useRitualStore } from '../../store/ritualStore'
-import { useGoalStore } from '../../store/goalStore'
 import { useAutoRefresh } from '../../hooks/useAutoRefresh'
+import { SortablePanel } from '../../components/ui/SortablePanel'
+import { AnimatedOverlay } from '../../components/ui/motion'
 import { QuickCaptureBox } from './QuickCaptureBox'
 import { CalendarSection } from './CalendarSection'
 import { NotificationsPanel } from './NotificationsPanel'
 import { PullRequestsPanel } from './PullRequestsPanel'
+import { TranscriptsPanel } from './TranscriptsPanel'
 import { FocusSection } from './FocusSection'
-import { TodayView } from './TodayView'
+import { NotesView } from '../../components/Notes/NotesView'
 import { SettingsPanel } from '../Settings/SettingsPanel'
 import { FocusModeOverlay } from '../FocusMode/FocusModeOverlay'
 import { SamoyedMascot } from '../../components/SamoyedMascot'
@@ -24,9 +30,12 @@ import { RitualMetrics } from '../../components/rituals/RitualMetrics'
 import { MorningRitualFlow } from '../../components/rituals/MorningRitualFlow'
 import { EveningRitualFlow } from '../../components/rituals/EveningRitualFlow'
 import { TouchGrassFlow } from '../../components/rituals/TouchGrassFlow'
-import { VoiceRecorder } from '../../components/VoiceRecorder'
 import { ScreamIntoTheVoid } from '../../components/ScreamIntoTheVoid'
-import { GoalsPanel } from '../../components/goals/GoalsPanel'
+import { MeetingNotesOverlay } from '../../components/meeting'
+import { KanbanBoard } from '../../components/kanban/KanbanBoard'
+import { KatyaDrawer, KatyaToggleButton } from '../../components/chat'
+import { useChatStore } from '../../store/chatStore'
+import { useKanbanStore } from '../../store/kanbanStore'
 
 // ─── Helpers ──────────────────────────────────────────────────
 
@@ -42,8 +51,35 @@ function getFormattedDate(): string {
     weekday: 'long',
     year: 'numeric',
     month: 'long',
-    day: 'numeric',
+    day: 'numeric'
   })
+}
+
+type RightColumnPanelId = Exclude<DashboardPanelId, 'notes' | 'goals'>
+
+const RIGHT_COLUMN_PANEL_IDS = [...DEFAULT_DASHBOARD_LAYOUT.rightColumn] as RightColumnPanelId[]
+
+function isRightColumnPanelId(panelId: DashboardPanelId): panelId is RightColumnPanelId {
+  return RIGHT_COLUMN_PANEL_IDS.includes(panelId as RightColumnPanelId)
+}
+
+function reconcileRightColumnOrder(savedOrder?: DashboardPanelId[]): RightColumnPanelId[] {
+  const nextOrder: RightColumnPanelId[] = []
+  const seen = new Set<RightColumnPanelId>()
+
+  for (const panelId of savedOrder ?? []) {
+    if (!isRightColumnPanelId(panelId) || seen.has(panelId)) continue
+    seen.add(panelId)
+    nextOrder.push(panelId)
+  }
+
+  for (const panelId of RIGHT_COLUMN_PANEL_IDS) {
+    if (!seen.has(panelId)) {
+      nextOrder.push(panelId)
+    }
+  }
+
+  return nextOrder
 }
 
 // ─── Component ────────────────────────────────────────────────
@@ -51,8 +87,11 @@ function getFormattedDate(): string {
 export function Dashboard(): React.ReactElement {
   const [showSettings, setShowSettings] = useState(false)
   const [showFocusMode, setShowFocusMode] = useState(false)
-  const [showVoiceRecorder, setShowVoiceRecorder] = useState(false)
   const [showScreamVoid, setShowScreamVoid] = useState(false)
+  const [showMeetingNotes, setShowMeetingNotes] = useState(false)
+  const [rightColumnOrder, setRightColumnOrder] = useState<RightColumnPanelId[]>(() =>
+    reconcileRightColumnOrder(DEFAULT_DASHBOARD_LAYOUT.rightColumn)
+  )
   const obsidianInit = useObsidianStore((s) => s.initialize)
   const obsidianRefresh = useObsidianStore((s) => s.refreshAll)
   const calendarInit = useCalendarStore((s) => s.initialize)
@@ -64,8 +103,23 @@ export function Dashboard(): React.ReactElement {
   const activeRitual = useRitualStore((s) => s.activeRitual)
   const startRitual = useRitualStore((s) => s.startRitual)
   const endRitual = useRitualStore((s) => s.endRitual)
-  const goalInit = useGoalStore((s) => s.initialize)
-  const goalRefresh = useGoalStore((s) => s.refreshAll)
+  const panelComponents: Record<RightColumnPanelId, React.ReactNode> = {
+    rituals: (
+      <RitualMetrics
+        onStartMorning={() => startRitual('morning')}
+        onStartEvening={() => startRitual('evening')}
+        onStartTouchGrass={() => startRitual('touch_grass')}
+      />
+    ),
+    calendar: <CalendarSection />,
+    focus: <FocusSection />,
+    triage: <NotificationsPanel />,
+    pullRequests: <PullRequestsPanel />,
+    transcripts: <TranscriptsPanel />,
+  }
+  const kanbanInit = useKanbanStore((s) => s.initialize)
+  const kanbanRefresh = useKanbanStore((s) => s.refreshTasks)
+  const chatInit = useChatStore((s) => s.initialize)
 
   // Initialize all services once on mount
   const initAll = useCallback(() => {
@@ -73,8 +127,9 @@ export function Dashboard(): React.ReactElement {
     calendarInit()
     githubInit()
     ritualInit()
-    goalInit()
-  }, [obsidianInit, calendarInit, githubInit, ritualInit, goalInit])
+    kanbanInit()
+    chatInit()
+  }, [obsidianInit, calendarInit, githubInit, ritualInit, kanbanInit, chatInit])
 
   // Refresh data sources every 5 minutes
   const refreshAll = useCallback(() => {
@@ -82,8 +137,8 @@ export function Dashboard(): React.ReactElement {
     calendarRefresh()
     githubRefresh()
     ritualRefresh()
-    goalRefresh()
-  }, [obsidianRefresh, calendarRefresh, githubRefresh, ritualRefresh, goalRefresh])
+    kanbanRefresh()
+  }, [obsidianRefresh, calendarRefresh, githubRefresh, ritualRefresh, kanbanRefresh])
 
   // Auto-refresh sets up the interval (5 min)
   useAutoRefresh(initAll, 5 * 60 * 1000)
@@ -102,6 +157,58 @@ export function Dashboard(): React.ReactElement {
     return () => cleanup?.()
   }, [])
 
+  const persistRightColumnOrder = useCallback((nextOrder: RightColumnPanelId[]): void => {
+    void window.api.settings.update({ dashboardLayout: { rightColumn: nextOrder } }).catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    let isMounted = true
+
+    void window.api.settings
+      .get('dashboardLayout')
+      .then((layout) => {
+        if (!isMounted) return
+
+        const nextOrder = reconcileRightColumnOrder(layout?.rightColumn)
+        setRightColumnOrder(nextOrder)
+
+        const savedOrder = layout?.rightColumn
+        const hasChanged =
+          !savedOrder ||
+          savedOrder.length !== nextOrder.length ||
+          nextOrder.some((panelId, index) => panelId !== savedOrder[index])
+
+        if (hasChanged) {
+          persistRightColumnOrder(nextOrder)
+        }
+      })
+      .catch(() => {})
+
+    return () => {
+      isMounted = false
+    }
+  }, [persistRightColumnOrder])
+
+  const handleDragEnd = useCallback(
+    ({ active, over }: DragEndEvent) => {
+      if (!over || active.id === over.id) return
+
+      setRightColumnOrder((previousOrder) => {
+        const oldIndex = previousOrder.indexOf(active.id as RightColumnPanelId)
+        const newIndex = previousOrder.indexOf(over.id as RightColumnPanelId)
+
+        if (oldIndex === -1 || newIndex === -1) {
+          return previousOrder
+        }
+
+        const nextOrder = arrayMove(previousOrder, oldIndex, newIndex)
+        persistRightColumnOrder(nextOrder)
+        return nextOrder
+      })
+    },
+    [persistRightColumnOrder]
+  )
+
   return (
     <div className="h-screen flex flex-col bg-background overflow-hidden">
       {/* Titlebar drag region */}
@@ -112,85 +219,96 @@ export function Dashboard(): React.ReactElement {
 
       {/* Scrollable content */}
       <div className="flex-1 overflow-y-auto px-6 pb-6">
-        <div className="max-w-7xl mx-auto space-y-4">
-          {/* Header — greeting + date + refresh */}
-          <div className="flex items-end justify-between">
-            <div className="flex items-center gap-3">
-              <SamoyedMascot size={44} className="mascot-idle drop-shadow-sm" />
-              <div>
-                <h1 className="text-xl font-bold bg-gradient-to-r from-focus via-primary to-accent bg-clip-text text-transparent">
-                  {getGreeting()}, Holly
-                </h1>
-                <p className="text-text-tertiary text-xs mt-0.5">
-                  {getFormattedDate()}
-                </p>
+        <div className="mx-auto max-w-7xl space-y-4">
+          <div>
+            {/* Header — greeting + date + refresh */}
+            <div className="flex items-end justify-between">
+              <div className="flex items-center gap-3">
+                <SamoyedMascot size={44} className="mascot-idle drop-shadow-sm" />
+                <div>
+                  <h1 className="bg-gradient-to-r from-focus via-primary to-accent bg-clip-text text-xl font-bold text-transparent">
+                    {getGreeting()}, Holly
+                  </h1>
+                  <p className="mt-0.5 text-xs text-text-tertiary">{getFormattedDate()}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setShowMeetingNotes(true)}
+                  className="text-sm text-text-muted transition-colors hover:text-blue-400"
+                  title="Start Meeting Notes"
+                >
+                  🎙️
+                </button>
+                <button
+                  onClick={() => setShowScreamVoid(true)}
+                  className="text-sm text-text-muted transition-colors hover:text-red-400"
+                  title="Scream Into The Void"
+                >
+                  🗣️
+                </button>
+                <KatyaToggleButton />
+                <button
+                  onClick={() => setShowFocusMode(true)}
+                  className="text-sm text-text-muted transition-colors hover:text-focus"
+                  title="Focus Mode (⌘⇧F)"
+                >
+                  🎯
+                </button>
+                <button
+                  onClick={() => setShowSettings(true)}
+                  className="text-sm text-text-muted transition-colors hover:text-accent"
+                  title="Settings"
+                >
+                  ⚙
+                </button>
+                <button
+                  onClick={refreshAll}
+                  className="text-sm text-text-muted transition-colors hover:text-focus"
+                  title="Refresh all"
+                >
+                  ↻
+                </button>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setShowScreamVoid(true)}
-                className="text-text-muted hover:text-red-400 text-sm transition-colors"
-                title="Scream Into The Void"
-              >
-                🗣️
-              </button>
-              <button
-                onClick={() => setShowFocusMode(true)}
-                className="text-text-muted hover:text-focus text-sm transition-colors"
-                title="Focus Mode (⌘⇧F)"
-              >
-                🎯
-              </button>
-              <button
-                onClick={() => setShowSettings(true)}
-                className="text-text-muted hover:text-accent text-sm transition-colors"
-                title="Settings"
-              >
-                ⚙
-              </button>
-              <button
-                onClick={refreshAll}
-                className="text-text-muted hover:text-focus text-sm transition-colors"
-                title="Refresh all"
-              >
-                ↻
-              </button>
-            </div>
           </div>
 
-          {/* Quick Capture — full width */}
-          <QuickCaptureBox onStartRecording={() => setShowVoiceRecorder(true)} />
+          <div>
+            {/* Quick Capture — full width */}
+            <QuickCaptureBox />
+          </div>
 
           {/* Main grid: 2 columns on lg */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
             {/* Today's notes — left, spans 2 cols */}
-            <div className="lg:col-span-2 min-w-0">
-              <TodayView />
+            <div className="min-w-0 lg:col-span-2">
+              <NotesView />
             </div>
 
-            {/* Right column — Rituals + Calendar + Focus + Notifications + PRs stacked */}
-            <div className="min-w-0 space-y-4">
-              <RitualMetrics
-                onStartMorning={() => startRitual('morning')}
-                onStartEvening={() => startRitual('evening')}
-                onStartTouchGrass={() => startRitual('touch_grass')}
-              />
-              <CalendarSection />
-              <FocusSection />
-              <NotificationsPanel />
-              <PullRequestsPanel />
-            </div>
+            {/* Right column — draggable */}
+            <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+              <SortableContext items={rightColumnOrder} strategy={verticalListSortingStrategy}>
+                <div className="min-w-0 space-y-4 lg:max-h-[600px] lg:overflow-y-auto lg:pr-1">
+                  {rightColumnOrder.map((panelId) => {
+                    const panel = panelComponents[panelId]
+                    if (!panel) return null
+
+                    return (
+                      <SortablePanel key={panelId} id={panelId}>
+                        {panel}
+                      </SortablePanel>
+                    )
+                  })}
+                </div>
+              </SortableContext>
+            </DndContext>
           </div>
 
-          {/* Goals — full width row below main grid */}
-          <GoalsPanel compact />
+          <div>
+            <KanbanBoard />
+          </div>
         </div>
       </div>
-
-      {/* Focus Mode overlay */}
-      {showFocusMode && (
-        <FocusModeOverlay onExit={() => setShowFocusMode(false)} />
-      )}
 
       {/* Ritual flow overlays */}
       {activeRitual === 'morning' && (
@@ -203,36 +321,35 @@ export function Dashboard(): React.ReactElement {
         <TouchGrassFlow onComplete={endRitual} onClose={endRitual} />
       )}
 
-      {/* Voice Recorder overlay */}
-      {showVoiceRecorder && (
-        <VoiceRecorder
-          onComplete={() => {
-            setShowVoiceRecorder(false)
-            obsidianRefresh()
-          }}
-          onClose={() => setShowVoiceRecorder(false)}
-        />
-      )}
-
-      {/* Scream Into The Void */}
-      {showScreamVoid && (
-        <ScreamIntoTheVoid onClose={() => setShowScreamVoid(false)} />
-      )}
-
-      {/* Settings slide-over */}
-      {showSettings && (
-        <div className="fixed inset-0 z-50 flex justify-end">
-          {/* Backdrop */}
-          <div
-            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-            onClick={() => setShowSettings(false)}
+      <AnimatePresence>
+        {showFocusMode && <FocusModeOverlay key="focus" onExit={() => setShowFocusMode(false)} />}
+        {showScreamVoid && (
+          <ScreamIntoTheVoid key="scream" onClose={() => setShowScreamVoid(false)} />
+        )}
+        {showMeetingNotes && (
+          <MeetingNotesOverlay
+            key="meeting"
+            onClose={() => setShowMeetingNotes(false)}
           />
-          {/* Panel */}
-          <div className="relative w-full max-w-md bg-background border-l border-surface-border/40 overflow-y-auto p-6 shadow-2xl">
-            <SettingsPanel onClose={() => setShowSettings(false)} />
-          </div>
-        </div>
-      )}
+        )}
+
+        {showSettings && (
+          <AnimatedOverlay
+            key="settings"
+            onClose={() => setShowSettings(false)}
+            animation="slide-right"
+            maxWidth="max-w-md"
+            closeOnBackdrop
+          >
+            <div className="h-full bg-background border-l border-surface-border/40 overflow-y-auto p-6 shadow-2xl">
+              <SettingsPanel onClose={() => setShowSettings(false)} />
+            </div>
+          </AnimatedOverlay>
+        )}
+      </AnimatePresence>
+
+      {/* Katya chat drawer */}
+      <KatyaDrawer />
     </div>
   )
 }

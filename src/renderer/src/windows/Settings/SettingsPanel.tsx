@@ -78,6 +78,7 @@ export function SettingsPanel({ onClose }: { onClose: () => void }): React.React
         theme: settings.theme,
         userName: settings.userName,
         meetingFilterPatterns: settings.meetingFilterPatterns,
+        openaiApiKey: settings.openaiApiKey,
       })
       setSettings(saved)
       setDirty(false)
@@ -354,6 +355,33 @@ export function SettingsPanel({ onClose }: { onClose: () => void }): React.React
               </option>
             ))}
           </select>
+        </Label>
+      </Section>
+
+      {/* ── Meeting Transcription ────────────── */}
+      <Section title="Meeting Transcription" icon="🎙️">
+        <Label text="OpenAI API Key">
+          <div className="flex gap-2">
+            <input
+              type="password"
+              value={settings.openaiApiKey || ''}
+              onChange={(e) => update('openaiApiKey', e.target.value)}
+              placeholder="sk-..."
+              className="settings-input flex-1"
+            />
+          </div>
+          <p className="text-xs text-text-muted mt-1">
+            Required for meeting transcription with speaker diarization.
+            Get your key from{' '}
+            <a
+              href="https://platform.openai.com/api-keys"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-focus hover:underline"
+            >
+              platform.openai.com/api-keys
+            </a>
+          </p>
         </Label>
       </Section>
 

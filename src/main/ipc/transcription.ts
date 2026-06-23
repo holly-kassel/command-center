@@ -115,7 +115,8 @@ export function registerTranscriptionIpc(): void {
         const apiKey = settings.get('openaiApiKey')
         if (!apiKey) throw new Error('OpenAI API key not configured. Add it in Settings.')
         const model = settings.get('meetingSummaryModel') || 'gpt-4o-mini'
-        return await summarizeMeeting(transcript, apiKey, participants || [], model)
+        const userName = settings.get('userName') || ''
+        return await summarizeMeeting(transcript, apiKey, participants || [], model, userName)
       } catch (error) {
         log.error('[IPC] transcription:summarizeMeeting error:', error)
         throw error
@@ -220,8 +221,15 @@ export function registerTranscriptionIpc(): void {
             lines.push('')
           }
 
+          if (meeting.notes.myActionItems?.length > 0) {
+            lines.push('## My Action Items')
+            lines.push('')
+            for (const item of meeting.notes.myActionItems) lines.push(`- [ ] ${item}`)
+            lines.push('')
+          }
+
           if (meeting.notes.actionItems?.length > 0) {
-            lines.push('## Action Items')
+            lines.push(meeting.notes.myActionItems?.length > 0 ? '## All Action Items' : '## Action Items')
             lines.push('')
             for (const item of meeting.notes.actionItems) lines.push(`- [ ] ${item}`)
             lines.push('')

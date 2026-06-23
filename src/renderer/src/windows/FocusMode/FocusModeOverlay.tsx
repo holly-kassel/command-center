@@ -6,6 +6,7 @@
  * and a 25-minute countdown with circular SVG progress ring.
  */
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { motion } from 'framer-motion'
 import { useObsidianStore } from '../../store/obsidianStore'
 import { useCalendarStore } from '../../store/calendarStore'
 
@@ -94,14 +95,24 @@ export function FocusModeOverlay({ onExit }: { onExit: () => void }): React.Reac
   // ── Next meeting info ────────────────────────────────────────
 
   const meetingInfo = nextMeeting
-    ? `Next: ${nextMeeting.subject} at ${new Date(nextMeeting.start).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`
+    ? `Next: ${nextMeeting.title} at ${new Date(nextMeeting.start).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`
     : null
 
   return (
-    <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-background">
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.3 }}
+      className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-background"
+    >
       {/* Escape hint */}
       <div className="absolute top-6 right-6 text-text-muted text-xs opacity-60">
-        Press <kbd className="px-1.5 py-0.5 rounded bg-surface-muted text-text-tertiary text-[10px] font-mono">Esc</kbd> to exit
+        Press{' '}
+        <kbd className="px-1.5 py-0.5 rounded bg-surface-muted text-text-tertiary text-[10px] font-mono">
+          Esc
+        </kbd>{' '}
+        to exit
       </div>
 
       {/* Center content */}
@@ -149,13 +160,15 @@ export function FocusModeOverlay({ onExit }: { onExit: () => void }): React.Reac
 
           {/* Time display in center of ring */}
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <span className={`text-5xl font-mono font-light tracking-wider ${
-              timerState === 'complete' ? 'text-warning' : 'text-text-primary'
-            }`}>
+            <span
+              className={`text-5xl font-mono font-light tracking-wider ${
+                timerState === 'complete' ? 'text-warning' : 'text-text-primary'
+              }`}
+            >
               {timeDisplay}
             </span>
             {timerState === 'complete' && (
-              <span className="text-warning text-sm mt-1 animate-pulse">Time's up!</span>
+              <span className="text-warning text-sm mt-1 animate-pulse">Time&apos;s up!</span>
             )}
             {timerState === 'idle' && (
               <span className="text-text-muted text-xs mt-1">25 min pomodoro</span>
@@ -166,50 +179,32 @@ export function FocusModeOverlay({ onExit }: { onExit: () => void }): React.Reac
         {/* Controls */}
         <div className="flex items-center gap-3 mt-2">
           {timerState === 'idle' && (
-            <button
-              onClick={startTimer}
-              className="focus-btn-primary"
-            >
+            <button onClick={startTimer} className="focus-btn-primary">
               ▶ Start
             </button>
           )}
           {timerState === 'running' && (
-            <button
-              onClick={pauseTimer}
-              className="focus-btn-secondary"
-            >
+            <button onClick={pauseTimer} className="focus-btn-secondary">
               ⏸ Pause
             </button>
           )}
           {timerState === 'paused' && (
             <>
-              <button
-                onClick={resumeTimer}
-                className="focus-btn-primary"
-              >
+              <button onClick={resumeTimer} className="focus-btn-primary">
                 ▶ Resume
               </button>
-              <button
-                onClick={resetTimer}
-                className="focus-btn-ghost"
-              >
+              <button onClick={resetTimer} className="focus-btn-ghost">
                 ↺ Reset
               </button>
             </>
           )}
           {timerState === 'complete' && (
-            <button
-              onClick={resetTimer}
-              className="focus-btn-primary"
-            >
+            <button onClick={resetTimer} className="focus-btn-primary">
               ↺ Start Another
             </button>
           )}
-          {(timerState === 'running') && (
-            <button
-              onClick={resetTimer}
-              className="focus-btn-ghost"
-            >
+          {timerState === 'running' && (
+            <button onClick={resetTimer} className="focus-btn-ghost">
               ↺ Reset
             </button>
           )}
@@ -223,6 +218,6 @@ export function FocusModeOverlay({ onExit }: { onExit: () => void }): React.Reac
           <span>{meetingInfo}</span>
         </div>
       )}
-    </div>
+    </motion.div>
   )
 }

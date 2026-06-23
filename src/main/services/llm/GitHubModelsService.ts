@@ -91,3 +91,99 @@ export async function chatCompletion(
     usage: data.usage
   }
 }
+
+/**
+ * Send a streaming chat completion request to GitHub Models.
+ * Yields content chunks as they arrive via SSE.
+ */
+export async function* chatCompletionStream(
+  messages: ChatMessage[],
+  options: ChatCompletionOptions = {}
+): AsyncGenerator<string, void, unknown> {
+  const pat = credentialManager.getGitHubPAT()
+  if (!pat) {
+    throw new Error('GitHub PAT not configured. Set it in Settings → GitHub.')
+  }
+
+  const model = options.model ?? DEFAULT_MODEL
+  const body = {
+    model,
+    messages,
+    temperature: options.temperature ?? 0.3,
+    max_tokens: options.maxTokens ?? 2048,
+    stream: true
+  }
+
+  log.info(`[LLM] Sending streaming chat completion (model: ${model}, messages: ${messages.length})`)
+
+  const response = await fetch(GITHUB_MODELS_URL, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${pat}`,
+      Accept: 'application/vnd.github+json',
+      'Content-Type': 'application/json',
+      'X-GitHub-Api-Version': '2022-11-28'
+    },
+    body: JSON.stringify(body)
+  })
+
+  if (!response.ok) {
+    const errorText = await response.text()
+    log.error(`[LLM] Streaming API error ${response.status}: ${errorText}`)
+
+    if (response.status === 401) {
+      throw new Error('GitHub PAT is invalid or missing models:read scope.')
+    }
+    if (response.status === 429) {
+      throw new Error('Rate limited by GitHub Models. Try again in a moment.')
+    }
+
+    throw new Error(`GitHub Models API error (${response.status}): ${errorText}`)
+  }
+
+  if (!response.body) {
+    throw new Error('No response body for streaming request')
+  }
+
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+
+      buffer += decoder.decode(value, { stream: true })
+
+      // Process complete SSE lines
+      const lines = buffer.split('\n')
+      // Keep the last potentially incomplete line in the buffer
+      buffer = lines.pop() || ''
+
+      for (const line of lines) {
+        const trimmed = line.trim()
+        if (!trimmed || trimmed.startsWith(':')) continue
+
+        if (trimmed.startsWith('data: ')) {
+          const data = trimmed.slice(6)
+          if (data === '[DONE]') return
+
+          try {
+            const parsed = JSON.parse(data)
+            const content = parsed.choices?.[0]?.delta?.content
+            if (content) {
+              yield content
+            }
+          } catch {
+            // Skip malformed JSON chunks
+          }
+        }
+      }
+    }
+  } finally {
+    reader.releaseLock()
+  }
+
+  log.info('[LLM] Streaming chat completion finished')
+}

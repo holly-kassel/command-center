@@ -29,7 +29,10 @@ export function TouchGrassFlow({ onComplete, onClose }: TouchGrassFlowProps): Re
   }
 
   return (
-    <div className="fixed inset-0 z-40 bg-background/95 backdrop-blur-md flex items-center justify-center">
+    <div
+      className="fixed inset-0 z-40 bg-background/95 backdrop-blur-md flex items-center justify-center"
+      style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+    >
       <div className="w-full max-w-md mx-auto px-6">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">

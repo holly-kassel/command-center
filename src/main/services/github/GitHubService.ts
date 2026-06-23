@@ -45,6 +45,7 @@ const PARTICIPATING_REASONS = new Set([
   'comment',
   'ci_activity',
   'state_change',
+  'subscribed',
 ])
 
 
@@ -218,7 +219,7 @@ export class GitHubService {
   ): GitHubNotification[] {
     return raw
       .map((item) => this.parseNotification(item))
-      .filter((n) => !n.repository.startsWith('holly-kassel/'))
+      .filter((n) => n.repository.startsWith('github/'))
       .filter((n) => PARTICIPATING_REASONS.has(n.reason))
   }
 
@@ -323,7 +324,7 @@ export class GitHubService {
     }
 
     const all = Array.from(prMap.values())
-      .filter((pr) => !pr.repository.startsWith('holly-kassel/'))
+      .filter((pr) => pr.repository.startsWith('github/'))
       .filter((pr) => !pr.author.endsWith('[bot]'))
       .sort((a, b) => involvementPriority[a.involvement] - involvementPriority[b.involvement]
         || new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())

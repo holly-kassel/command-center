@@ -269,8 +269,10 @@ async function loadContext(): Promise<string> {
  * Build a participant hint for the system prompt when participant names are provided.
  */
 function buildParticipantHint(participants: string[]): string {
-  if (participants.length === 0) return ''
-  return `\n\nMeeting participants: ${participants.join(', ')}. Use these names to identify speakers — map generic speaker labels (Speaker 0, Speaker 1, A, B, etc.) to real names based on context clues like introductions, role mentions, and conversational references.`
+  if (participants.length > 0) {
+    return `\n\nMeeting participants: ${participants.join(', ')}. Use these names to identify speakers — map generic speaker labels (Speaker 0, Speaker 1, A, B, etc.) to real names based on context clues like introductions, role mentions, and conversational references.`
+  }
+  return `\n\nNo participant list was provided. Infer real first names from the conversation itself — look for introductions ("I'm David"), name mentions ("thanks Brittany"), and role references. Use inferred first names in action items. If a speaker's name truly cannot be determined, use "Unknown" — never use generic labels like "A", "Participant A", or "A participant".`
 }
 
 /**
@@ -281,12 +283,16 @@ export async function summarizeMeeting(
   transcript: string,
   apiKey: string,
   participants: string[] = [],
-  model: string = 'gpt-4o-mini'
+  model: string = 'gpt-4o-mini',
+  userName: string = ''
 ): Promise<MeetingNotes> {
   log.info('[Transcription] Generating meeting summary...')
 
   const context = await loadContext()
   const participantHint = buildParticipantHint(participants)
+  const myItemsHint = userName
+    ? `\n\nThe person recording this meeting is "${userName}". In "myActionItems", include ONLY action items where ${userName} is the owner — things ${userName} committed to, was asked to do, or was assigned. This is a strict subset of "actionItems". If ${userName} has no action items, return an empty array.`
+    : ''
 
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
@@ -303,25 +309,30 @@ export async function summarizeMeeting(
 - "summary" (string): A detailed 5-7 sentence summary covering the main discussion, context, and outcomes. Include who discussed what and any important nuances.
 - "keyTopics" (array of strings): Main topics/themes discussed, each 2-5 words.
 - "keyPoints" (array of strings): Detailed key points — each should be a full sentence capturing the substance of what was said, not just a topic label. Include specifics like names, numbers, and concrete details from the discussion.
-- "actionItems" (array of strings): EVERY commitment, next step, or follow-up mentioned — both explicit ("I'll do X") and implicit ("we should do X", "can you look into X", "yeah I can get that done"). Include the owner's name when identifiable. Err on the side of capturing MORE rather than fewer. If someone said they'd share, review, send, schedule, create, update, or follow up on anything, include it.
+- "actionItems" (array of strings): Concrete follow-up tasks and commitments that need to happen AFTER this meeting. Extract both explicit ("I'll do X") and implicit ("we should do X", "can you look into X") commitments.
 
-  Common action item patterns you MUST NOT miss:
-  * End-of-meeting wrap-up asks: "will you write the summary?", "can you send that to X?"
+  QUALITY RULES — follow these strictly:
+  * DEDUPLICATE: Each action item must appear exactly once. If the same commitment is mentioned multiple times in the conversation, merge into one clear item. Aim for 5-15 well-deduped items. If you have more than 20, you are almost certainly duplicating.
+  * EXCLUDE in-meeting actions: Skip things already completed during the call (e.g., "I'll share my screen", "I'm recording this", "let me look at the board").
+  * EXCLUDE personal/social items: Skip non-work items (e.g., posting vacation photos, personal travel plans, moving apartments).
+  * EXCLUDE status updates: "I'm working on X" or "I've been doing X" describes current work, NOT a new commitment. Only include if someone is explicitly taking on NEW work or making a new promise.
+  * EXCLUDE informational statements: "I'm out of office Wednesday" is information, not an action item.
+  * BE SPECIFIC: Describe the concrete next step, not a vague restatement of the problem. Bad: "Address the license discrepancy." Good: "Investigate why Microsoft's snapshot shows 217k licenses vs 29k billed."
+
+  Patterns to capture:
+  * End-of-meeting wrap-up asks and post-meeting follow-ups
   * Casual commitments: "I'll get those answers for you", "let me share that"
-  * Requirements stated as needs: "we need to make sure X doesn't show Y before date Z"
-  * Requests for information: "please give me X when you have it"
-  * Advocacy requests: "please reconsider removing X", "push back on Y"
-  * Sharing/access: "I'll give you access to the repo", "I'll send the link"
-  * Scheduling/coordination: "let's set up a meeting with X", "we should align with X"
-  * Information gathering: "I'll get those answers", "I need to find out about X"
-  * Pay special attention to the BEGINNING and END of the meeting — wrap-up items and post-meeting asks are commonly missed.
-  * Look for "I'll", "I can", "let me", "I need to", "we should", "can you", "will you" patterns.
-  * Include commitments made on behalf of others ("Holly will follow up", "the team needs to").
-  * Format each item as: "[Owner] action description" (use first names).
+  * Scheduling/coordination: "let's set up a meeting with X"
+  * Information gathering: "I need to find out about X"
+  * Commitments made on behalf of others ("Holly will follow up")
+  * Pay special attention to the BEGINNING and END of the meeting.
 
+  FORMAT: Every item must use this exact format: "[FirstName] action description" — use real first names inferred from the conversation. Never use "A", "B", "Participant A", "A participant", or "A team member". If the owner is truly unknown, use "[Unknown]".
+
+- "myActionItems" (array of strings): A filtered subset of "actionItems" containing ONLY items owned by the person recording this meeting. Same format as actionItems. If no user identity is provided, return an empty array.
 - "decisions" (array of strings): Any decisions made or conclusions reached during the meeting.
 - "openQuestions" (array of strings): Unresolved questions or topics that need follow-up.
-Return ONLY valid JSON, no markdown.${participantHint}${context}`
+Return ONLY valid JSON, no markdown.${participantHint}${myItemsHint}${context}`
         },
         {
           role: 'user',
@@ -349,7 +360,8 @@ Return ONLY valid JSON, no markdown.${participantHint}${context}`
       summary: parsed.summary || '',
       keyTopics: parsed.keyTopics || [],
       keyPoints: parsed.keyPoints || [],
-      actionItems: parsed.actionItems || [],
+      actionItems: deduplicateItems(parsed.actionItems || []),
+      myActionItems: deduplicateItems(parsed.myActionItems || []),
       decisions: parsed.decisions || [],
       openQuestions: parsed.openQuestions || [],
     }
@@ -360,8 +372,67 @@ Return ONLY valid JSON, no markdown.${participantHint}${context}`
       keyTopics: [],
       keyPoints: [],
       actionItems: [],
+      myActionItems: [],
       decisions: [],
       openQuestions: [],
     }
   }
+}
+
+/**
+ * Deduplicate action items by removing entries whose normalized text
+ * is a high-overlap subset of another item already in the list.
+ * Uses word-level Jaccard similarity — items sharing ≥60% of words are duplicates.
+ */
+function deduplicateItems(items: string[]): string[] {
+  if (items.length <= 1) return items
+
+  const STOP_WORDS = new Set([
+    'the', 'and', 'for', 'that', 'this', 'with', 'will', 'can', 'need',
+    'should', 'would', 'could', 'about', 'into', 'from', 'have', 'has',
+    'been', 'are', 'was', 'were', 'not', 'all', 'also', 'any', 'but',
+    'get', 'got', 'its', 'let', 'may', 'our', 'out', 'own', 'too',
+    'make', 'sure', 'going', 'look', 'ensure', 'check', 'address',
+    'participant', 'team', 'member', 'them', 'their', 'they'
+  ])
+
+  const normalize = (s: string): Set<string> => {
+    const words = s
+      .toLowerCase()
+      .replace(/^\[.*?\]\s*/, '') // strip "[Name]" prefix
+      .replace(/[^a-z0-9\s]/g, '')
+      .split(/\s+/)
+      .filter((w) => w.length > 2 && !STOP_WORDS.has(w))
+    return new Set(words)
+  }
+
+  const kept: string[] = []
+  const keptSets: Set<string>[] = []
+
+  for (const item of items) {
+    const words = normalize(item)
+    if (words.size === 0) {
+      kept.push(item)
+      keptSets.push(words)
+      continue
+    }
+
+    const isDuplicate = keptSets.some((existing) => {
+      if (existing.size === 0) return false
+      const intersection = new Set([...words].filter((w) => existing.has(w)))
+      const smaller = Math.min(words.size, existing.size)
+      return smaller > 0 && intersection.size / smaller >= 0.65
+    })
+
+    if (!isDuplicate) {
+      kept.push(item)
+      keptSets.push(words)
+    }
+  }
+
+  if (kept.length < items.length) {
+    log.info(`[Transcription] Deduped action items: ${items.length} → ${kept.length}`)
+  }
+
+  return kept
 }

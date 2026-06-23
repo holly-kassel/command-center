@@ -12,7 +12,7 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import { useObsidianStore } from '../../store/obsidianStore'
 import type { SlashCommandInfo } from '../../../../shared/types/obsidian'
 
-export function QuickCaptureBox({ onStartRecording }: { onStartRecording?: () => void }): React.JSX.Element {
+export function QuickCaptureBox(): React.JSX.Element {
   const [text, setText] = useState('')
   const [status, setStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle')
   const [statusMessage, setStatusMessage] = useState('')
@@ -142,18 +142,7 @@ export function QuickCaptureBox({ onStartRecording }: { onStartRecording?: () =>
           {isMultiline && (
             <span className="text-[11px] text-text-muted">⌘⏎ to submit</span>
           )}
-          {onStartRecording && (
-            <button
-              onClick={onStartRecording}
-              disabled={status === 'saving'}
-              className="px-3 py-2.5 rounded-lg bg-red-500/10 text-red-400 text-sm
-                       hover:bg-red-500/20 disabled:opacity-40 disabled:cursor-not-allowed
-                       transition-colors border border-red-500/20"
-              title="Record voice → transcribe → summarize"
-            >
-              🎙️
-            </button>
-          )}
+
           <button
             onClick={handleSubmit}
             disabled={!text.trim() || status === 'saving'}

@@ -7,7 +7,7 @@
  * 3. Intention — Set daily intention
  * 4. Commit — Focus commitment
  */
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { BreathingExercise } from './BreathingExercise'
 import { useObsidianStore } from '../../store/obsidianStore'
 import { useCalendarStore } from '../../store/calendarStore'
@@ -24,6 +24,7 @@ export function MorningRitualFlow({ onComplete, onClose }: MorningRitualFlowProp
   const [intention, setIntention] = useState('')
   const [focusCommitted, setFocusCommitted] = useState(false)
   const [saving, setSaving] = useState(false)
+  const intentionRef = useRef<HTMLTextAreaElement>(null)
 
   const currentFocus = useObsidianStore((s) => s.currentFocus)
   const nextMeeting = useCalendarStore((s) => s.nextMeeting)
@@ -36,6 +37,13 @@ export function MorningRitualFlow({ onComplete, onClose }: MorningRitualFlowProp
   const isLast = currentStep === steps.length - 1
 
   const morningStreak = streaks?.morning_ritual
+
+  // Ensure the intention textarea receives focus when its step activates
+  useEffect(() => {
+    if (step.id === 'intention') {
+      requestAnimationFrame(() => intentionRef.current?.focus())
+    }
+  }, [step.id])
 
   const handleNext = useCallback(() => {
     if (isLast) return
@@ -130,12 +138,12 @@ export function MorningRitualFlow({ onComplete, onClose }: MorningRitualFlowProp
               What do you want to accomplish or how do you want to show up today?
             </p>
             <textarea
+              ref={intentionRef}
               value={intention}
               onChange={(e) => setIntention(e.target.value)}
               placeholder="Today I will..."
               rows={3}
               className="w-full bg-surface-muted/30 border border-surface-border/40 rounded-lg px-3 py-2 text-text-primary text-sm placeholder:text-text-muted/50 focus:outline-none focus:border-focus/50 resize-none"
-              autoFocus
             />
           </div>
         )
@@ -182,7 +190,10 @@ export function MorningRitualFlow({ onComplete, onClose }: MorningRitualFlowProp
     true
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/95 backdrop-blur-sm">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-background/95 backdrop-blur-sm"
+      style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+    >
       <div className="w-full max-w-lg mx-auto p-6">
         {/* Close button */}
         <button

@@ -259,6 +259,115 @@ section.rounded-xl {
   --tw-prose-hr: var(--color-border);
 }
 
+/* ─── Breathing Exercise ─────────────────────────────── */
+
+.breathing-ring {
+  position: absolute;
+  border-radius: 9999px;
+  border-width: 1.5px;
+  border-style: solid;
+}
+.breathing-inner { inset: 18%; }
+.breathing-middle { inset: 6%; opacity: 0.55; }
+.breathing-outer { inset: -4%; opacity: 0.3; }
+
+/* Phase colors — dark theme */
+.breathing-phase-inhale {
+  border-color: rgba(52, 211, 153, 0.45);
+  background: rgba(52, 211, 153, 0.06);
+  box-shadow: 0 0 30px 10px rgba(52, 211, 153, 0.08), inset 0 0 20px rgba(52, 211, 153, 0.04);
+}
+.breathing-phase-hold {
+  border-color: rgba(251, 191, 36, 0.35);
+  background: rgba(251, 191, 36, 0.04);
+  box-shadow: 0 0 25px 8px rgba(251, 191, 36, 0.06), inset 0 0 15px rgba(251, 191, 36, 0.03);
+}
+.breathing-phase-exhale {
+  border-color: rgba(167, 139, 250, 0.45);
+  background: rgba(167, 139, 250, 0.06);
+  box-shadow: 0 0 30px 10px rgba(167, 139, 250, 0.08), inset 0 0 20px rgba(167, 139, 250, 0.04);
+}
+.breathing-phase-rest {
+  border-color: rgba(100, 110, 140, 0.15);
+  background: rgba(100, 110, 140, 0.02);
+  box-shadow: none;
+}
+
+/* Ready state orb — gentle pulse */
+.breathing-ready-orb {
+  width: 8rem;
+  height: 8rem;
+  border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(52, 211, 153, 0.06);
+  border: 1.5px solid rgba(52, 211, 153, 0.2);
+  animation: breathing-ready-pulse 3s ease-in-out infinite;
+}
+
+@keyframes breathing-ready-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.04); }
+}
+
+/* Completion orb — soft entrance */
+.breathing-done-orb {
+  width: 7rem;
+  height: 7rem;
+  border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(52, 211, 153, 0.08);
+  border: 1.5px solid rgba(52, 211, 153, 0.25);
+  animation: breathing-done-in 0.8s ease-out;
+}
+
+@keyframes breathing-done-in {
+  0% { transform: scale(0.85); opacity: 0; }
+  60% { transform: scale(1.03); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* Text crossfade */
+@keyframes breathing-text-in {
+  0% { opacity: 0; transform: translateY(4px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+.breathing-text-in {
+  animation: breathing-text-in 0.5s ease-out forwards;
+}
+
+/* Light theme overrides */
+[data-theme='light'] .breathing-phase-inhale {
+  border-color: rgba(5, 150, 105, 0.35);
+  background: rgba(5, 150, 105, 0.05);
+  box-shadow: 0 0 25px 8px rgba(5, 150, 105, 0.06);
+}
+[data-theme='light'] .breathing-phase-hold {
+  border-color: rgba(217, 119, 6, 0.3);
+  background: rgba(217, 119, 6, 0.04);
+  box-shadow: 0 0 20px 6px rgba(217, 119, 6, 0.05);
+}
+[data-theme='light'] .breathing-phase-exhale {
+  border-color: rgba(124, 58, 237, 0.35);
+  background: rgba(124, 58, 237, 0.05);
+  box-shadow: 0 0 25px 8px rgba(124, 58, 237, 0.06);
+}
+[data-theme='light'] .breathing-phase-rest {
+  border-color: rgba(209, 213, 219, 0.3);
+  background: rgba(209, 213, 219, 0.03);
+}
+[data-theme='light'] .breathing-ready-orb {
+  background: rgba(5, 150, 105, 0.05);
+  border-color: rgba(5, 150, 105, 0.2);
+}
+[data-theme='light'] .breathing-done-orb {
+  background: rgba(5, 150, 105, 0.06);
+  border-color: rgba(5, 150, 105, 0.2);
+}
+
 /* ─── Mascot animations ──────────────────────────────── */
 
 /* ─── Interactive checkboxes in rendered markdown ───── */
@@ -304,4 +413,30 @@ section.rounded-xl {
 @keyframes mascot-idle {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-2px); }
+}
+
+/* ─── Katya Chat Animations ──────────────────────────────────── */
+
+/* Chat bubble entrance — soft fade + slide up */
+@keyframes chatBubbleIn {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Gentle fade in for empty state */
+@keyframes fadeIn {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+/* Gentle bounce for paw emoji in empty state */
+@keyframes gentleBounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
 }

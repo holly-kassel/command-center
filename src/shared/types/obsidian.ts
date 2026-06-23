@@ -67,3 +67,39 @@ export interface SlashCommandInfo {
   argHint: string
   multiline?: boolean
 }
+
+/** Summary of a weekly note file for the sidebar */
+export interface WeeklyNoteSummary {
+  /** Filename, e.g. "2026-03-16-week.md" */
+  filename: string
+  /** Full path to the weekly note file */
+  filePath: string
+  /** Year */
+  year: number
+  /** ISO week number */
+  weekNumber: number
+  /** Monday date as YYYY-MM-DD */
+  startDate: string
+  /** Friday date as YYYY-MM-DD */
+  endDate: string
+  /** Days present in this weekly note */
+  days: WeeklyNoteDaySummary[]
+}
+
+/** Summary of a single day within a weekly note */
+export interface WeeklyNoteDaySummary {
+  /** YYYY-MM-DD */
+  date: string
+  /** e.g. "Monday" */
+  dayOfWeek: string
+  /** Whether this day has any content in the note */
+  hasContent: boolean
+}
+
+/** Result from reading a weekly-level section (priorities or reflection) */
+export interface WeeklySectionResult {
+  content: string
+  filePath: string
+  weekStart: string
+  section: 'priorities' | 'reflection'
+}

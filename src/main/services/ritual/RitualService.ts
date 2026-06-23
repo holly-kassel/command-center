@@ -63,6 +63,7 @@ function emptyLog(date: string): DailyLog {
     morningRitualCompleted: false,
     morningRitualTime: null,
     intention: null,
+    touchGrassCount: 0,
     eveningRitualCompleted: false,
     eveningRitualTime: null,
     reflection: null,

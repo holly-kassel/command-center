@@ -4,14 +4,23 @@
  * Manages notification state, PAT configuration, and MCP connection status.
  */
 import { create } from 'zustand'
-import type { GitHubNotification, GitHubPullRequest } from '@shared/types/github'
+import type {
+  GitHubNotification,
+  GitHubPullRequest,
+  NotificationTriageData,
+  TriagePriority,
+  TriageStatus
+} from '@shared/types/github'
 
 interface GitHubState {
   notifications: GitHubNotification[]
   pullRequests: GitHubPullRequest[]
+  triageData: Record<string, NotificationTriageData>
+  triageSortOrder: string[]
   isConfigured: boolean
   isLoading: boolean
   isPRsLoading: boolean
+  triageLoading: boolean
   error: string | null
   lastRefresh: number | null
 
@@ -22,16 +31,52 @@ interface GitHubState {
   initialize: () => Promise<void>
   fetchNotifications: () => Promise<void>
   fetchPullRequests: () => Promise<void>
+  loadTriageData: () => Promise<void>
   markAsRead: (threadId: string) => Promise<void>
   setPAT: (pat: string) => Promise<void>
+  setTriageStatus: (notificationId: string, status: TriageStatus) => Promise<void>
+  setTriagePriority: (notificationId: string, priority: TriagePriority) => Promise<void>
+  setTriageNotes: (notificationId: string, notes: string) => Promise<void>
+  setTriageSortOrder: (order: string[]) => Promise<void>
+}
+
+function createTriageEntry(
+  notificationId: string,
+  existing?: NotificationTriageData
+): NotificationTriageData {
+  return (
+    existing ?? {
+      notificationId,
+      status: 'needs_triage',
+      priority: 0,
+      notes: '',
+      updatedAt: new Date().toISOString()
+    }
+  )
+}
+
+function applyTriagePatch(
+  notificationId: string,
+  existing: NotificationTriageData | undefined,
+  patch: Partial<NotificationTriageData>
+): NotificationTriageData {
+  return {
+    ...createTriageEntry(notificationId, existing),
+    ...patch,
+    notificationId,
+    updatedAt: new Date().toISOString()
+  }
 }
 
 export const useGitHubStore = create<GitHubState>((set, get) => ({
   notifications: [],
   pullRequests: [],
+  triageData: {},
+  triageSortOrder: [],
   isConfigured: false,
   isLoading: false,
   isPRsLoading: false,
+  triageLoading: false,
   error: null,
   lastRefresh: null,
   actionableCount: 0,
@@ -45,6 +90,7 @@ export const useGitHubStore = create<GitHubState>((set, get) => ({
         await Promise.all([
           get().fetchNotifications(),
           get().fetchPullRequests(),
+          get().loadTriageData()
         ])
       }
     } catch (error) {
@@ -60,8 +106,9 @@ export const useGitHubStore = create<GitHubState>((set, get) => ({
         notifications,
         actionableCount: notifications.filter((n) => n.unread).length,
         isLoading: false,
-        lastRefresh: Date.now(),
+        lastRefresh: Date.now()
       })
+      await get().loadTriageData()
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Failed to fetch notifications'
 
@@ -85,13 +132,30 @@ export const useGitHubStore = create<GitHubState>((set, get) => ({
     }
   },
 
+  loadTriageData: async () => {
+    try {
+      set({ triageLoading: true })
+      const [triageData, triageSortOrder] = await Promise.all([
+        window.api.github.getAllTriageData(),
+        window.api.github.getTriageSortOrder(),
+      ])
+      set({ triageData, triageSortOrder, triageLoading: false })
+    } catch (error) {
+      console.error('[GitHubStore] loadTriageData error:', error)
+      set({
+        triageLoading: false,
+        error: error instanceof Error ? error.message : 'Failed to load triage data'
+      })
+    }
+  },
+
   markAsRead: async (threadId: string) => {
     // Optimistic update
     set((state) => ({
       notifications: state.notifications.map((n) =>
         n.id === threadId ? { ...n, unread: false } : n
       ),
-      actionableCount: Math.max(0, state.actionableCount - 1),
+      actionableCount: Math.max(0, state.actionableCount - 1)
     }))
 
     const result = await window.api.github.markAsRead(threadId)
@@ -113,11 +177,130 @@ export const useGitHubStore = create<GitHubState>((set, get) => ({
       }
     } catch (error) {
       set({
-        error: error instanceof Error ? error.message : 'Failed to save PAT',
+        error: error instanceof Error ? error.message : 'Failed to save PAT'
       })
     } finally {
       set({ isLoading: false })
     }
+  },
+
+  setTriageStatus: async (notificationId: string, status: TriageStatus) => {
+    const previous = get().triageData[notificationId]
+    const optimistic = applyTriagePatch(notificationId, previous, { status })
+
+    set((state) => ({
+      triageData: {
+        ...state.triageData,
+        [notificationId]: optimistic
+      },
+      error: null
+    }))
+
+    try {
+      const saved = await window.api.github.setTriageStatus(notificationId, status)
+      set((state) => ({
+        triageData: {
+          ...state.triageData,
+          [notificationId]: saved
+        }
+      }))
+    } catch (error) {
+      set((state) => {
+        const triageData = { ...state.triageData }
+        if (previous) {
+          triageData[notificationId] = previous
+        } else {
+          delete triageData[notificationId]
+        }
+
+        return {
+          triageData,
+          error: error instanceof Error ? error.message : 'Failed to update triage status'
+        }
+      })
+      throw error
+    }
+  },
+
+  setTriagePriority: async (notificationId: string, priority: TriagePriority) => {
+    const previous = get().triageData[notificationId]
+    const optimistic = applyTriagePatch(notificationId, previous, { priority })
+
+    set((state) => ({
+      triageData: {
+        ...state.triageData,
+        [notificationId]: optimistic
+      },
+      error: null
+    }))
+
+    try {
+      const saved = await window.api.github.setTriagePriority(notificationId, priority)
+      set((state) => ({
+        triageData: {
+          ...state.triageData,
+          [notificationId]: saved
+        }
+      }))
+    } catch (error) {
+      set((state) => {
+        const triageData = { ...state.triageData }
+        if (previous) {
+          triageData[notificationId] = previous
+        } else {
+          delete triageData[notificationId]
+        }
+
+        return {
+          triageData,
+          error: error instanceof Error ? error.message : 'Failed to update triage priority'
+        }
+      })
+      throw error
+    }
+  },
+
+  setTriageNotes: async (notificationId: string, notes: string) => {
+    const previous = get().triageData[notificationId]
+    const optimistic = applyTriagePatch(notificationId, previous, { notes })
+
+    set((state) => ({
+      triageData: {
+        ...state.triageData,
+        [notificationId]: optimistic
+      },
+      error: null
+    }))
+
+    try {
+      const saved = await window.api.github.setTriageNotes(notificationId, notes)
+      set((state) => ({
+        triageData: {
+          ...state.triageData,
+          [notificationId]: saved
+        }
+      }))
+    } catch (error) {
+      set((state) => {
+        const triageData = { ...state.triageData }
+        if (previous) {
+          triageData[notificationId] = previous
+        } else {
+          delete triageData[notificationId]
+        }
+
+        return {
+          triageData,
+          error: error instanceof Error ? error.message : 'Failed to update triage notes'
+        }
+      })
+      throw error
+    }
+  },
+
+  setTriageSortOrder: async (order: string[]) => {
+    set({ triageSortOrder: order })
+    await window.api.github.setTriageSortOrder(order)
   },
 }))
 
@@ -126,6 +309,6 @@ window.api.github.onSyncUpdate((notifications) => {
   useGitHubStore.setState({
     notifications,
     actionableCount: notifications.filter((n) => n.unread).length,
-    lastRefresh: Date.now(),
+    lastRefresh: Date.now()
   })
 })

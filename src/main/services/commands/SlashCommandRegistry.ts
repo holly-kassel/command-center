@@ -11,6 +11,7 @@ import { join } from 'node:path'
 import { getObsidianService } from '../obsidian/ObsidianService'
 import { chatCompletion } from '../llm'
 import { SlackParser } from '../slack/SlackParser'
+import type { CalendarEvent } from '../../../shared/types/calendar'
 
 export interface SlashCommandResult {
   success: boolean
@@ -119,6 +120,24 @@ async function loadLLMContext(fileNames: string[]): Promise<string> {
     '\n\n## Personal Context (use this to understand the user, their team, and domain terminology)\n\n' +
     sections.join('\n\n')
   )
+}
+
+/**
+ * Format a meeting's date/time range for display in notes.
+ * CalendarEvent start/end already carry the correct UTC offset — pass them
+ * straight to `new Date(...)`; never append "Z".
+ */
+function formatMeetingWhen(meeting: CalendarEvent): string {
+  const start = new Date(meeting.start)
+  const dateLabel = start.toLocaleDateString([], {
+    weekday: 'long',
+    month: 'short',
+    day: 'numeric'
+  })
+  if (meeting.isAllDay) return dateLabel
+  const timeOpts: Intl.DateTimeFormatOptions = { hour: '2-digit', minute: '2-digit' }
+  const end = new Date(meeting.end)
+  return `${dateLabel}, ${start.toLocaleTimeString([], timeOpts)} – ${end.toLocaleTimeString([], timeOpts)}`
 }
 
 class SlashCommandRegistry {
@@ -325,6 +344,82 @@ class SlashCommandRegistry {
       argHint,
       multiline
     }))
+  }
+
+  /**
+   * Summarize a meeting transcript captured against a specific calendar event,
+   * then append the result to today's notes. Unlike the generic /transcript
+   * command, this injects the real meeting metadata (title, time, scheduled
+   * attendees) so the summary is accurate even if those details aren't spoken,
+   * and prepends a header that ties the note to the actual meeting.
+   */
+  async summarizeMeeting(meeting: CalendarEvent, transcript: string): Promise<SlashCommandResult> {
+    const text = transcript.trim()
+    if (!text || text.length < 50) {
+      return {
+        success: false,
+        command: 'meeting',
+        message: 'Transcript is too short to summarize (need at least a few lines).'
+      }
+    }
+
+    log.info(`[SlashCommands] Summarizing meeting "${meeting.title}" (${text.length} chars)`)
+
+    const context = await loadLLMContext(TRANSCRIPT_CONTEXT_FILES)
+    const systemPrompt = TRANSCRIPT_SYSTEM_PROMPT + context
+
+    const when = formatMeetingWhen(meeting)
+    const scheduledAttendees =
+      meeting.attendees && meeting.attendees.length > 0 ? meeting.attendees.join(', ') : 'Unknown'
+
+    // Give the model the real calendar metadata so participants/topic are
+    // correct even when they aren't mentioned aloud in the transcript.
+    const userMessage = [
+      `Meeting title: ${meeting.title}`,
+      `When: ${when}`,
+      meeting.location ? `Location: ${meeting.location}` : null,
+      `Scheduled attendees: ${scheduledAttendees}`,
+      '',
+      'Transcript:',
+      text
+    ]
+      .filter((line): line is string => line !== null)
+      .join('\n')
+
+    const result = await chatCompletion(
+      [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userMessage }
+      ],
+      { temperature: 0.2, maxTokens: 1024 }
+    )
+
+    const block = `${this.buildMeetingHeader(meeting, when)}\n\n${result.content}`
+
+    const obsidian = getObsidianService()
+    await obsidian.appendBlockToToday(block)
+
+    return {
+      success: true,
+      command: 'meeting',
+      message: `Meeting notes for "${meeting.title}" added to today's notes`
+    }
+  }
+
+  /**
+   * Build a compact markdown header that pins a note to the real calendar event.
+   */
+  private buildMeetingHeader(meeting: CalendarEvent, when: string): string {
+    const lines = [`#### 🎙️ ${meeting.title}`, `**When:** ${when}`]
+    if (meeting.attendees && meeting.attendees.length > 0) {
+      lines.push(`**Attendees:** ${meeting.attendees.join(', ')}`)
+    }
+    if (meeting.onlineMeetingUrl) {
+      lines.push(`**Join:** ${meeting.onlineMeetingUrl}`)
+    } else if (meeting.location) {
+      lines.push(`**Location:** ${meeting.location}`)
+    }
+    return lines.join('\n')
   }
 }
 

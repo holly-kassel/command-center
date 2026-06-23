@@ -9,17 +9,21 @@ import { memo } from 'react'
 interface MeetingCardProps {
   event: CalendarEvent
   isNext?: boolean
+  onRecord?: (event: CalendarEvent) => void
 }
 
 function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
 
-export const MeetingCard = memo(function MeetingCard({ event, isNext }: MeetingCardProps): React.ReactElement {
+export const MeetingCard = memo(function MeetingCard({
+  event,
+  isNext,
+  onRecord
+}: MeetingCardProps): React.ReactElement {
   const isPast = new Date(event.end).getTime() < Date.now()
   const isNow =
-    new Date(event.start).getTime() <= Date.now() &&
-    new Date(event.end).getTime() > Date.now()
+    new Date(event.start).getTime() <= Date.now() && new Date(event.end).getTime() > Date.now()
 
   return (
     <div
@@ -52,15 +56,11 @@ export const MeetingCard = memo(function MeetingCard({ event, isNext }: MeetingC
           </div>
 
           {/* Title */}
-          <div className="text-text-primary mt-0.5 truncate text-sm font-medium">
-            {event.title}
-          </div>
+          <div className="text-text-primary mt-0.5 truncate text-sm font-medium">{event.title}</div>
 
           {/* Location */}
           {event.location && (
-            <div className="text-text-tertiary mt-0.5 truncate text-xs">
-              {event.location}
-            </div>
+            <div className="text-text-tertiary mt-0.5 truncate text-xs">{event.location}</div>
           )}
 
           {/* Attendees count */}
@@ -71,15 +71,27 @@ export const MeetingCard = memo(function MeetingCard({ event, isNext }: MeetingC
           )}
         </div>
 
-        {/* Join button for online meetings */}
-        {event.isOnlineMeeting && event.onlineMeetingUrl && (
-          <button
-            onClick={() => window.open(event.onlineMeetingUrl, '_blank')}
-            className="bg-primary/10 text-primary hover:bg-primary/20 flex-shrink-0 rounded px-2 py-1 text-xs font-medium transition-colors"
-          >
-            Join
-          </button>
-        )}
+        {/* Actions: Join + Record */}
+        <div className="flex flex-shrink-0 flex-col items-end gap-1">
+          {event.isOnlineMeeting && event.onlineMeetingUrl && (
+            <button
+              onClick={() => window.open(event.onlineMeetingUrl, '_blank')}
+              className="bg-primary/10 text-primary hover:bg-primary/20 rounded px-2 py-1 text-xs font-medium transition-colors"
+            >
+              Join
+            </button>
+          )}
+          {onRecord && !event.isAllDay && !isPast && (
+            <button
+              onClick={() => onRecord(event)}
+              title="Record this meeting and save notes"
+              className="bg-urgent/10 text-urgent hover:bg-urgent/20 flex items-center gap-1 rounded px-2 py-1 text-xs font-medium transition-colors"
+            >
+              <span className="bg-urgent h-1.5 w-1.5 rounded-full" />
+              Record
+            </button>
+          )}
+        </div>
       </div>
     </div>
   )

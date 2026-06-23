@@ -21,3 +21,10 @@ export interface TranscriptionAndSummaryResult {
   /** Duration of the audio in seconds */
   durationSeconds: number
 }
+
+export interface MeetingSummaryResult {
+  /** Whether the summary was generated and saved */
+  success: boolean
+  /** Human-readable status message */
+  message: string
+}

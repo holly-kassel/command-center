@@ -1,5 +1,11 @@
 import { ElectronAPI } from '@electron-toolkit/preload'
-import type { TodaySection, VaultStatus, WeeklyNote, SlashCommandResult, SlashCommandInfo } from '../shared/types/obsidian'
+import type {
+  TodaySection,
+  VaultStatus,
+  WeeklyNote,
+  SlashCommandResult,
+  SlashCommandInfo
+} from '../shared/types/obsidian'
 import type { CalendarEvent } from '../shared/types/calendar'
 import type { GitHubNotification, GitHubPullRequest } from '../shared/types/github'
 import type { ParsedSlackThread } from '../shared/types/slack'
@@ -13,9 +19,13 @@ import type {
   UpdateGoalInput,
   GoalLevel,
   GoalCategory,
-  GoalStatus,
+  GoalStatus
 } from '../shared/types/goal'
-import type { TranscriptionResult, TranscriptionAndSummaryResult } from '../shared/types/transcription'
+import type {
+  TranscriptionResult,
+  TranscriptionAndSummaryResult,
+  MeetingSummaryResult
+} from '../shared/types/transcription'
 
 interface ObsidianApi {
   findVault(): Promise<string>
@@ -31,7 +41,9 @@ interface ObsidianApi {
   executeSlashCommand(text: string): Promise<SlashCommandResult>
   getSlashCommands(): Promise<SlashCommandInfo[]>
   onFileChanged(callback: (data: { filePath: string }) => void): () => void
-  onSyncUpdate(callback: (data: { todaySection: TodaySection | null; currentFocus: string | null }) => void): () => void
+  onSyncUpdate(
+    callback: (data: { todaySection: TodaySection | null; currentFocus: string | null }) => void
+  ): () => void
 }
 
 interface AuthApi {
@@ -60,7 +72,10 @@ interface GitHubApi {
 
 interface SlackApi {
   parseThread(rawText: string): Promise<ParsedSlackThread>
-  saveToObsidian(thread: ParsedSlackThread, customTitle?: string): Promise<{ success: boolean; path: string }>
+  saveToObsidian(
+    thread: ParsedSlackThread,
+    customTitle?: string
+  ): Promise<{ success: boolean; path: string }>
 }
 
 interface SettingsApi {
@@ -82,7 +97,9 @@ interface RitualApi {
   updateStreak(type: StreakType): Promise<Streak>
   checkFullDayStreak(): Promise<Streak | null>
   getWeeklyMetrics(weekStart?: string): Promise<WeeklyRitualMetrics>
-  onSyncUpdate(callback: (data: { todayLog: DailyLog; streaks: Record<StreakType, Streak> }) => void): () => void
+  onSyncUpdate(
+    callback: (data: { todayLog: DailyLog; streaks: Record<StreakType, Streak> }) => void
+  ): () => void
 }
 
 interface GoalApi {
@@ -104,13 +121,27 @@ interface GoalApi {
   getAllTaskLinks(): Promise<GoalTaskLink[]>
   updateTaskCompletion(taskText: string, completed: boolean): Promise<GoalTaskLink[]>
   recalculateProgress(goalId: string): Promise<number>
-  getSummary(): Promise<{ totalActive: number; byLevel: Record<GoalLevel, number>; byCategory: Record<GoalCategory, number>; completedThisWeek: number }>
-  onSyncUpdate(callback: (data: { goals: Goal[]; summary: { totalActive: number; completedThisWeek: number } }) => void): () => void
+  getSummary(): Promise<{
+    totalActive: number
+    byLevel: Record<GoalLevel, number>
+    byCategory: Record<GoalCategory, number>
+    completedThisWeek: number
+  }>
+  onSyncUpdate(
+    callback: (data: {
+      goals: Goal[]
+      summary: { totalActive: number; completedThisWeek: number }
+    }) => void
+  ): () => void
 }
 
 interface TranscriptionApi {
   transcribe(audioBuffer: ArrayBuffer, durationSeconds: number): Promise<TranscriptionResult>
-  transcribeAndSummarize(audioBuffer: ArrayBuffer, durationSeconds: number): Promise<TranscriptionAndSummaryResult>
+  transcribeAndSummarize(
+    audioBuffer: ArrayBuffer,
+    durationSeconds: number
+  ): Promise<TranscriptionAndSummaryResult>
+  summarizeMeeting(meeting: CalendarEvent, transcript: string): Promise<MeetingSummaryResult>
 }
 
 interface AppApi {

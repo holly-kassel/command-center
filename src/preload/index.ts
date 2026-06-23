@@ -1,6 +1,12 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
-import type { TodaySection, VaultStatus, WeeklyNote, SlashCommandResult, SlashCommandInfo } from '../shared/types/obsidian'
+import type {
+  TodaySection,
+  VaultStatus,
+  WeeklyNote,
+  SlashCommandResult,
+  SlashCommandInfo
+} from '../shared/types/obsidian'
 import type { CalendarEvent } from '../shared/types/calendar'
 import type { GitHubNotification, GitHubPullRequest } from '../shared/types/github'
 import type { ParsedSlackThread } from '../shared/types/slack'
@@ -14,11 +20,12 @@ import type {
   UpdateGoalInput,
   GoalLevel,
   GoalCategory,
-  GoalStatus,
+  GoalStatus
 } from '../shared/types/goal'
 import type {
   TranscriptionResult,
   TranscriptionAndSummaryResult,
+  MeetingSummaryResult
 } from '../shared/types/transcription'
 
 // Obsidian API exposed to renderer
@@ -49,11 +56,16 @@ const obsidianApi = {
     ipcRenderer.on('obsidian:file-changed', handler)
     return () => ipcRenderer.removeListener('obsidian:file-changed', handler)
   },
-  onSyncUpdate: (callback: (data: { todaySection: unknown; currentFocus: string | null }) => void): (() => void) => {
-    const handler = (_e: Electron.IpcRendererEvent, data: { todaySection: unknown; currentFocus: string | null }): void => callback(data)
+  onSyncUpdate: (
+    callback: (data: { todaySection: unknown; currentFocus: string | null }) => void
+  ): (() => void) => {
+    const handler = (
+      _e: Electron.IpcRendererEvent,
+      data: { todaySection: unknown; currentFocus: string | null }
+    ): void => callback(data)
     ipcRenderer.on('sync:obsidian', handler)
     return () => ipcRenderer.removeListener('sync:obsidian', handler)
-  },
+  }
 }
 
 // Auth API exposed to renderer
@@ -61,145 +73,155 @@ const authApi = {
   loginMicrosoft: (): Promise<{ success: boolean; error?: string }> =>
     ipcRenderer.invoke('auth:loginMicrosoft'),
   isAuthenticated: (): Promise<boolean> => ipcRenderer.invoke('auth:isAuthenticated'),
-  logout: (): Promise<{ success: boolean; error?: string }> =>
-    ipcRenderer.invoke('auth:logout'),
+  logout: (): Promise<{ success: boolean; error?: string }> => ipcRenderer.invoke('auth:logout')
 }
 
 // Calendar API exposed to renderer
 const calendarApi = {
-  getTodayEvents: (): Promise<CalendarEvent[]> =>
-    ipcRenderer.invoke('calendar:getTodayEvents'),
+  getTodayEvents: (): Promise<CalendarEvent[]> => ipcRenderer.invoke('calendar:getTodayEvents'),
   getNextMeeting: (): Promise<CalendarEvent | null> =>
     ipcRenderer.invoke('calendar:getNextMeeting'),
   getEvents: (startISO: string, endISO: string): Promise<CalendarEvent[]> =>
     ipcRenderer.invoke('calendar:getEvents', startISO, endISO),
-  refresh: (): Promise<{ success: boolean }> =>
-    ipcRenderer.invoke('calendar:refresh'),
+  refresh: (): Promise<{ success: boolean }> => ipcRenderer.invoke('calendar:refresh'),
   onSyncUpdate: (callback: (events: CalendarEvent[]) => void): (() => void) => {
-    const handler = (_e: Electron.IpcRendererEvent, events: CalendarEvent[]): void => callback(events)
+    const handler = (_e: Electron.IpcRendererEvent, events: CalendarEvent[]): void =>
+      callback(events)
     ipcRenderer.on('sync:calendar', handler)
     return () => ipcRenderer.removeListener('sync:calendar', handler)
   },
   onNextMeetingUpdate: (callback: (meeting: CalendarEvent | null) => void): (() => void) => {
-    const handler = (_e: Electron.IpcRendererEvent, meeting: CalendarEvent | null): void => callback(meeting)
+    const handler = (_e: Electron.IpcRendererEvent, meeting: CalendarEvent | null): void =>
+      callback(meeting)
     ipcRenderer.on('sync:nextMeeting', handler)
     return () => ipcRenderer.removeListener('sync:nextMeeting', handler)
-  },
+  }
 }
 
 // GitHub API exposed to renderer
 const githubApi = {
   getNotifications: (): Promise<GitHubNotification[]> =>
     ipcRenderer.invoke('github:getNotifications'),
-  getPullRequests: (): Promise<GitHubPullRequest[]> =>
-    ipcRenderer.invoke('github:getPullRequests'),
+  getPullRequests: (): Promise<GitHubPullRequest[]> => ipcRenderer.invoke('github:getPullRequests'),
   markAsRead: (threadId: string): Promise<{ success: boolean; error?: string }> =>
     ipcRenderer.invoke('github:markAsRead', threadId),
-  isConfigured: (): Promise<boolean> =>
-    ipcRenderer.invoke('github:isConfigured'),
+  isConfigured: (): Promise<boolean> => ipcRenderer.invoke('github:isConfigured'),
   setPAT: (pat: string): Promise<{ success: boolean; error?: string }> =>
     ipcRenderer.invoke('github:setPAT', pat),
   onSyncUpdate: (callback: (notifications: GitHubNotification[]) => void): (() => void) => {
-    const handler = (_e: Electron.IpcRendererEvent, notifs: GitHubNotification[]): void => callback(notifs)
+    const handler = (_e: Electron.IpcRendererEvent, notifs: GitHubNotification[]): void =>
+      callback(notifs)
     ipcRenderer.on('sync:github', handler)
     return () => ipcRenderer.removeListener('sync:github', handler)
-  },
+  }
 }
 
 // Slack API exposed to renderer
 const slackApi = {
   parseThread: (rawText: string): Promise<ParsedSlackThread> =>
     ipcRenderer.invoke('slack:parseThread', rawText),
-  saveToObsidian: (thread: ParsedSlackThread, customTitle?: string): Promise<{ success: boolean; path: string }> =>
-    ipcRenderer.invoke('slack:saveToObsidian', thread, customTitle),
+  saveToObsidian: (
+    thread: ParsedSlackThread,
+    customTitle?: string
+  ): Promise<{ success: boolean; path: string }> =>
+    ipcRenderer.invoke('slack:saveToObsidian', thread, customTitle)
 }
 
 // Ritual API exposed to renderer
 const ritualApi = {
-  getDailyLog: (date: string): Promise<DailyLog> =>
-    ipcRenderer.invoke('ritual:getDailyLog', date),
-  getTodayLog: (): Promise<DailyLog> =>
-    ipcRenderer.invoke('ritual:getTodayLog'),
+  getDailyLog: (date: string): Promise<DailyLog> => ipcRenderer.invoke('ritual:getDailyLog', date),
+  getTodayLog: (): Promise<DailyLog> => ipcRenderer.invoke('ritual:getTodayLog'),
   saveDailyLog: (date: string, partial: Partial<DailyLog>): Promise<DailyLog> =>
     ipcRenderer.invoke('ritual:saveDailyLog', date, partial),
   getLogsInRange: (start: string, end: string): Promise<DailyLog[]> =>
     ipcRenderer.invoke('ritual:getLogsInRange', start, end),
-  getStreak: (type: StreakType): Promise<Streak> =>
-    ipcRenderer.invoke('ritual:getStreak', type),
+  getStreak: (type: StreakType): Promise<Streak> => ipcRenderer.invoke('ritual:getStreak', type),
   getAllStreaks: (): Promise<Record<StreakType, Streak>> =>
     ipcRenderer.invoke('ritual:getAllStreaks'),
   updateStreak: (type: StreakType): Promise<Streak> =>
     ipcRenderer.invoke('ritual:updateStreak', type),
-  checkFullDayStreak: (): Promise<Streak | null> =>
-    ipcRenderer.invoke('ritual:checkFullDayStreak'),
+  checkFullDayStreak: (): Promise<Streak | null> => ipcRenderer.invoke('ritual:checkFullDayStreak'),
   getWeeklyMetrics: (weekStart?: string): Promise<WeeklyRitualMetrics> =>
     ipcRenderer.invoke('ritual:getWeeklyMetrics', weekStart),
-  onSyncUpdate: (callback: (data: { todayLog: DailyLog; streaks: Record<StreakType, Streak> }) => void): (() => void) => {
-    const handler = (_e: Electron.IpcRendererEvent, data: { todayLog: DailyLog; streaks: Record<StreakType, Streak> }): void => callback(data)
+  onSyncUpdate: (
+    callback: (data: { todayLog: DailyLog; streaks: Record<StreakType, Streak> }) => void
+  ): (() => void) => {
+    const handler = (
+      _e: Electron.IpcRendererEvent,
+      data: { todayLog: DailyLog; streaks: Record<StreakType, Streak> }
+    ): void => callback(data)
     ipcRenderer.on('sync:ritual', handler)
     return () => ipcRenderer.removeListener('sync:ritual', handler)
-  },
+  }
 }
 
 // Goal API exposed to renderer
 const goalApi = {
-  create: (input: CreateGoalInput): Promise<Goal> =>
-    ipcRenderer.invoke('goal:create', input),
-  get: (id: string): Promise<Goal | null> =>
-    ipcRenderer.invoke('goal:get', id),
-  getAll: (): Promise<Goal[]> =>
-    ipcRenderer.invoke('goal:getAll'),
+  create: (input: CreateGoalInput): Promise<Goal> => ipcRenderer.invoke('goal:create', input),
+  get: (id: string): Promise<Goal | null> => ipcRenderer.invoke('goal:get', id),
+  getAll: (): Promise<Goal[]> => ipcRenderer.invoke('goal:getAll'),
   update: (id: string, updates: UpdateGoalInput): Promise<Goal | null> =>
     ipcRenderer.invoke('goal:update', id, updates),
-  delete: (id: string): Promise<boolean> =>
-    ipcRenderer.invoke('goal:delete', id),
-  getByLevel: (level: GoalLevel): Promise<Goal[]> =>
-    ipcRenderer.invoke('goal:getByLevel', level),
+  delete: (id: string): Promise<boolean> => ipcRenderer.invoke('goal:delete', id),
+  getByLevel: (level: GoalLevel): Promise<Goal[]> => ipcRenderer.invoke('goal:getByLevel', level),
   getByCategory: (category: GoalCategory): Promise<Goal[]> =>
     ipcRenderer.invoke('goal:getByCategory', category),
   getByStatus: (status: GoalStatus): Promise<Goal[]> =>
     ipcRenderer.invoke('goal:getByStatus', status),
-  getActive: (): Promise<Goal[]> =>
-    ipcRenderer.invoke('goal:getActive'),
+  getActive: (): Promise<Goal[]> => ipcRenderer.invoke('goal:getActive'),
   getChildren: (parentId: string): Promise<Goal[]> =>
     ipcRenderer.invoke('goal:getChildren', parentId),
-  getTree: (): Promise<GoalWithChildren[]> =>
-    ipcRenderer.invoke('goal:getTree'),
+  getTree: (): Promise<GoalWithChildren[]> => ipcRenderer.invoke('goal:getTree'),
   getSuggestedParents: (level: GoalLevel): Promise<Goal[]> =>
     ipcRenderer.invoke('goal:getSuggestedParents', level),
   linkTask: (goalId: string, taskText: string): Promise<GoalTaskLink> =>
     ipcRenderer.invoke('goal:linkTask', goalId, taskText),
-  unlinkTask: (linkId: string): Promise<boolean> =>
-    ipcRenderer.invoke('goal:unlinkTask', linkId),
+  unlinkTask: (linkId: string): Promise<boolean> => ipcRenderer.invoke('goal:unlinkTask', linkId),
   getTaskLinks: (goalId: string): Promise<GoalTaskLink[]> =>
     ipcRenderer.invoke('goal:getTaskLinks', goalId),
-  getAllTaskLinks: (): Promise<GoalTaskLink[]> =>
-    ipcRenderer.invoke('goal:getAllTaskLinks'),
+  getAllTaskLinks: (): Promise<GoalTaskLink[]> => ipcRenderer.invoke('goal:getAllTaskLinks'),
   updateTaskCompletion: (taskText: string, completed: boolean): Promise<GoalTaskLink[]> =>
     ipcRenderer.invoke('goal:updateTaskCompletion', taskText, completed),
   recalculateProgress: (goalId: string): Promise<number> =>
     ipcRenderer.invoke('goal:recalculateProgress', goalId),
-  getSummary: (): Promise<{ totalActive: number; byLevel: Record<GoalLevel, number>; byCategory: Record<GoalCategory, number>; completedThisWeek: number }> =>
-    ipcRenderer.invoke('goal:getSummary'),
-  onSyncUpdate: (callback: (data: { goals: Goal[]; summary: { totalActive: number; completedThisWeek: number } }) => void): (() => void) => {
-    const handler = (_e: Electron.IpcRendererEvent, data: { goals: Goal[]; summary: { totalActive: number; completedThisWeek: number } }): void => callback(data)
+  getSummary: (): Promise<{
+    totalActive: number
+    byLevel: Record<GoalLevel, number>
+    byCategory: Record<GoalCategory, number>
+    completedThisWeek: number
+  }> => ipcRenderer.invoke('goal:getSummary'),
+  onSyncUpdate: (
+    callback: (data: {
+      goals: Goal[]
+      summary: { totalActive: number; completedThisWeek: number }
+    }) => void
+  ): (() => void) => {
+    const handler = (
+      _e: Electron.IpcRendererEvent,
+      data: { goals: Goal[]; summary: { totalActive: number; completedThisWeek: number } }
+    ): void => callback(data)
     ipcRenderer.on('sync:goal', handler)
     return () => ipcRenderer.removeListener('sync:goal', handler)
-  },
+  }
 }
 
 // Transcription API exposed to renderer
 const transcriptionApi = {
   transcribe: (audioBuffer: ArrayBuffer, durationSeconds: number): Promise<TranscriptionResult> =>
     ipcRenderer.invoke('transcription:transcribe', audioBuffer, durationSeconds),
-  transcribeAndSummarize: (audioBuffer: ArrayBuffer, durationSeconds: number): Promise<TranscriptionAndSummaryResult> =>
+  transcribeAndSummarize: (
+    audioBuffer: ArrayBuffer,
+    durationSeconds: number
+  ): Promise<TranscriptionAndSummaryResult> =>
     ipcRenderer.invoke('transcription:transcribeAndSummarize', audioBuffer, durationSeconds),
+  summarizeMeeting: (meeting: CalendarEvent, transcript: string): Promise<MeetingSummaryResult> =>
+    ipcRenderer.invoke('transcription:summarizeMeeting', meeting, transcript)
 }
 
 // App utilities
 const appApi = {
   getSound: (filename: string): Promise<ArrayBuffer | null> =>
-    ipcRenderer.invoke('app:getSound', filename),
+    ipcRenderer.invoke('app:getSound', filename)
 }
 
 // Settings API exposed to renderer
@@ -209,8 +231,7 @@ const settingsApi = {
     ipcRenderer.invoke('settings:update', partial),
   get: <K extends keyof AppSettings>(key: K): Promise<AppSettings[K]> =>
     ipcRenderer.invoke('settings:get', key),
-  browseVaultPath: (): Promise<string | null> =>
-    ipcRenderer.invoke('settings:browseVaultPath'),
+  browseVaultPath: (): Promise<string | null> => ipcRenderer.invoke('settings:browseVaultPath'),
   onFocusModeToggle: (callback: () => void): (() => void) => {
     const handler = (): void => callback()
     ipcRenderer.on('app:toggleFocusMode', handler)
@@ -220,7 +241,7 @@ const settingsApi = {
     const handler = (): void => callback()
     ipcRenderer.on('menu:openSettings', handler)
     return () => ipcRenderer.removeListener('menu:openSettings', handler)
-  },
+  }
 }
 
 // Custom APIs for renderer
@@ -234,7 +255,7 @@ const api = {
   goal: goalApi,
   transcription: transcriptionApi,
   settings: settingsApi,
-  app: appApi,
+  app: appApi
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to

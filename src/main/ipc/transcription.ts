@@ -11,8 +11,10 @@ import { transcribeAudio } from '../services/transcription'
 import { getSlashCommandRegistry } from '../services/commands/SlashCommandRegistry'
 import type {
   TranscriptionResult,
-  TranscriptionAndSummaryResult
+  TranscriptionAndSummaryResult,
+  MeetingSummaryResult
 } from '../../shared/types/transcription'
+import type { CalendarEvent } from '../../shared/types/calendar'
 
 export function registerTranscriptionIpc(): void {
   /**
@@ -52,9 +54,7 @@ export function registerTranscriptionIpc(): void {
         const transcription = await transcribeAudio(pcm, durationSeconds)
 
         if (!transcription.text || transcription.text.length < 10) {
-          throw new Error(
-            'Transcription was too short or empty. Try speaking louder or longer.'
-          )
+          throw new Error('Transcription was too short or empty. Try speaking louder or longer.')
         }
 
         const registry = getSlashCommandRegistry()
@@ -71,6 +71,25 @@ export function registerTranscriptionIpc(): void {
         }
       } catch (error) {
         log.error('[IPC] transcription:transcribeAndSummarize error:', error)
+        throw error
+      }
+    }
+  )
+
+  /**
+   * Summarize an already-transcribed (and possibly user-edited) meeting
+   * transcript against a specific calendar event, then save to today's notes.
+   * No audio is processed here — the recorder transcribes first, then calls this
+   * with the final text once a meeting is bound.
+   */
+  ipcMain.handle(
+    'transcription:summarizeMeeting',
+    async (_event, meeting: CalendarEvent, transcript: string): Promise<MeetingSummaryResult> => {
+      try {
+        const registry = getSlashCommandRegistry()
+        return await registry.summarizeMeeting(meeting, transcript)
+      } catch (error) {
+        log.error('[IPC] transcription:summarizeMeeting error:', error)
         throw error
       }
     }

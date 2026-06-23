@@ -12,6 +12,7 @@
  * summarization and saved to today's notes.
  */
 import { useState, useRef, useEffect, useCallback } from 'react'
+import type { CalendarEvent } from '@shared/types/calendar'
 
 type RecorderState =
   | 'idle'
@@ -25,6 +26,8 @@ type RecorderState =
 interface VoiceRecorderProps {
   onComplete: () => void
   onClose: () => void
+  /** When set, the recording is bound to this meeting and saved with its metadata. */
+  meeting?: CalendarEvent
 }
 
 // ─── Audio Decode Helper ──────────────────────────────────────
@@ -45,9 +48,18 @@ async function decodeAudioBlob(blob: Blob): Promise<Float32Array> {
   }
 }
 
+/** Format a meeting start time (already offset-correct — never append "Z"). */
+function formatMeetingTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+}
+
 // ─── Component ────────────────────────────────────────────────
 
-export function VoiceRecorder({ onComplete, onClose }: VoiceRecorderProps): React.ReactElement {
+export function VoiceRecorder({
+  onComplete,
+  onClose,
+  meeting
+}: VoiceRecorderProps): React.ReactElement {
   const [state, setState] = useState<RecorderState>('idle')
   const [elapsed, setElapsed] = useState(0)
   const [errorMessage, setErrorMessage] = useState('')
@@ -141,10 +153,7 @@ export function VoiceRecorder({ onComplete, onClose }: VoiceRecorderProps): Reac
     try {
       const pcm = await decodeAudioBlob(blob)
       // Send Float32 PCM as ArrayBuffer via IPC → main process Whisper
-      const result = await window.api.transcription.transcribe(
-        pcm.buffer as ArrayBuffer,
-        elapsed
-      )
+      const result = await window.api.transcription.transcribe(pcm.buffer as ArrayBuffer, elapsed)
       setTranscript(result.text)
       setState('editing')
     } catch (err) {
@@ -167,7 +176,9 @@ export function VoiceRecorder({ onComplete, onClose }: VoiceRecorderProps): Reac
     setState('summarizing')
     setErrorMessage('')
     try {
-      const result = await window.api.obsidian.executeSlashCommand(`/transcript ${text}`)
+      const result = meeting
+        ? await window.api.transcription.summarizeMeeting(meeting, text)
+        : await window.api.obsidian.executeSlashCommand(`/transcript ${text}`)
       if (result.success) {
         setSummary(result.message)
         setState('done')
@@ -180,7 +191,7 @@ export function VoiceRecorder({ onComplete, onClose }: VoiceRecorderProps): Reac
       setErrorMessage(msg)
       setState('error')
     }
-  }, [transcript])
+  }, [transcript, meeting])
 
   const formatTime = (seconds: number): string => {
     const m = Math.floor(seconds / 60)
@@ -195,9 +206,18 @@ export function VoiceRecorder({ onComplete, onClose }: VoiceRecorderProps): Reac
         <div className="flex items-center justify-between mb-6">
           <div>
             <h2 className="text-lg font-bold text-text-primary flex items-center gap-2">
-              <span>🎙️</span> Voice Recorder
+              <span>🎙️</span> {meeting ? 'Record Meeting' : 'Voice Recorder'}
             </h2>
-            <p className="text-xs text-text-muted mt-0.5">Record → Transcribe → Summarize → Save</p>
+            {meeting ? (
+              <p className="text-xs text-text-muted mt-0.5 max-w-sm truncate">
+                {meeting.title}
+                {!meeting.isAllDay && ` · ${formatMeetingTime(meeting.start)}`}
+              </p>
+            ) : (
+              <p className="text-xs text-text-muted mt-0.5">
+                Record → Transcribe → Summarize → Save
+              </p>
+            )}
           </div>
           <button
             onClick={onClose}
@@ -328,7 +348,9 @@ export function VoiceRecorder({ onComplete, onClose }: VoiceRecorderProps): Reac
             </div>
             <div className="text-center">
               <p className="text-text-primary font-medium">Summarizing…</p>
-              <p className="text-xs text-text-muted mt-1">Running through /transcript</p>
+              <p className="text-xs text-text-muted mt-1">
+                {meeting ? 'Building meeting notes…' : 'Running through /transcript'}
+              </p>
             </div>
           </div>
         )}

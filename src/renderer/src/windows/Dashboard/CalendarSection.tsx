@@ -4,23 +4,17 @@
  * Shows today's calendar events, next meeting countdown, and auth state.
  * Auto-refreshes every 5 minutes.
  */
-import { useEffect } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useCalendarStore } from '../../store/calendarStore'
 import { MeetingCard } from './MeetingCard'
 import { CountdownTimer } from './CountdownTimer'
 import { Skeleton } from '../../components/ui/Skeleton'
+import { VoiceRecorder } from '../../components/VoiceRecorder'
+import type { CalendarEvent } from '@shared/types/calendar'
 
 export function CalendarSection(): React.ReactElement {
-  const {
-    events,
-    nextMeeting,
-    isAuthenticated,
-    isLoading,
-    error,
-    initialize,
-    refreshAll,
-    login,
-  } = useCalendarStore()
+  const { events, nextMeeting, isAuthenticated, isLoading, error, initialize, refreshAll, login } =
+    useCalendarStore()
 
   // Init on mount
   useEffect(() => {
@@ -31,12 +25,20 @@ export function CalendarSection(): React.ReactElement {
   useEffect(() => {
     if (!isAuthenticated) return
 
-    const interval = setInterval(() => {
-      refreshAll()
-    }, 5 * 60 * 1000)
+    const interval = setInterval(
+      () => {
+        refreshAll()
+      },
+      5 * 60 * 1000
+    )
 
     return () => clearInterval(interval)
   }, [isAuthenticated, refreshAll])
+
+  // Meeting bound to the live recorder (null = recorder closed)
+  const [recordingMeeting, setRecordingMeeting] = useState<CalendarEvent | null>(null)
+  const handleRecord = useCallback((event: CalendarEvent) => setRecordingMeeting(event), [])
+  const stopRecording = useCallback(() => setRecordingMeeting(null), [])
 
   // ─── Not authenticated ─────────────────────────────────────────
   if (!isAuthenticated) {
@@ -46,19 +48,20 @@ export function CalendarSection(): React.ReactElement {
           Calendar
         </h2>
         <div className="flex flex-col items-center gap-3 py-4">
-          <p className="text-text-secondary text-sm">
-            Connect your Microsoft 365 calendar to see today&apos;s meetings.
+          <p className="text-text-secondary text-center text-sm">
+            Connect your Microsoft 365 calendar (via WorkIQ) to see today&apos;s meetings.
           </p>
           <button
             onClick={login}
             disabled={isLoading}
             className="bg-primary hover:bg-primary/90 disabled:bg-primary/50 rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors"
           >
-            {isLoading ? 'Connecting...' : 'Connect Calendar'}
+            {isLoading ? 'Connecting…' : 'Connect Calendar'}
           </button>
-          {error && (
-            <p className="text-urgent text-xs">{error}</p>
-          )}
+          <p className="text-text-tertiary text-center text-xs">
+            The first connect can take a few seconds while WorkIQ starts.
+          </p>
+          {error && <p className="text-urgent text-xs">{error}</p>}
         </div>
       </section>
     )
@@ -96,9 +99,7 @@ export function CalendarSection(): React.ReactElement {
         </button>
       </div>
 
-      {error && (
-        <p className="text-urgent mb-2 text-xs">{error}</p>
-      )}
+      {error && <p className="text-urgent mb-2 text-xs">{error}</p>}
 
       {/* Countdown to next meeting */}
       {nextMeeting && (
@@ -127,6 +128,7 @@ export function CalendarSection(): React.ReactElement {
               key={event.id}
               event={event}
               isNext={nextMeeting?.id === event.id}
+              onRecord={handleRecord}
             />
           ))}
         </div>
@@ -134,6 +136,15 @@ export function CalendarSection(): React.ReactElement {
         <div className="text-text-tertiary py-3 text-center text-sm">
           No meetings today — focus time! 🎯
         </div>
+      )}
+
+      {/* Meeting-bound recorder overlay (fixed inset-0; nesting here is fine) */}
+      {recordingMeeting && (
+        <VoiceRecorder
+          meeting={recordingMeeting}
+          onComplete={stopRecording}
+          onClose={stopRecording}
+        />
       )}
     </section>
   )

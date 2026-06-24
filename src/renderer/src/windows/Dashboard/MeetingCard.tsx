@@ -5,6 +5,7 @@
  */
 import type { CalendarEvent } from '@shared/types/calendar'
 import { memo } from 'react'
+import { useMeetingStore } from '../../store/meetingStore'
 
 interface MeetingCardProps {
   event: CalendarEvent
@@ -20,6 +21,18 @@ export const MeetingCard = memo(function MeetingCard({ event, isNext }: MeetingC
   const isNow =
     new Date(event.start).getTime() <= Date.now() &&
     new Date(event.end).getTime() > Date.now()
+
+  const openRecorder = useMeetingStore((s) => s.openRecorder)
+
+  const handleRecord = (): void => {
+    openRecorder({
+      title: event.title,
+      participants: event.attendees ?? [],
+      calendarEventId: event.id,
+      startTime: event.start,
+      endTime: event.end
+    })
+  }
 
   return (
     <div
@@ -71,15 +84,29 @@ export const MeetingCard = memo(function MeetingCard({ event, isNext }: MeetingC
           )}
         </div>
 
-        {/* Join button for online meetings */}
-        {event.isOnlineMeeting && event.onlineMeetingUrl && (
+        {/* Action buttons */}
+        <div className="flex flex-shrink-0 items-center gap-1.5">
+          {/* Join button for online meetings */}
+          {event.isOnlineMeeting && event.onlineMeetingUrl && (
+            <button
+              onClick={() => window.open(event.onlineMeetingUrl, '_blank')}
+              className="bg-primary/10 text-primary hover:bg-primary/20 rounded px-2 py-1 text-xs font-medium transition-colors"
+            >
+              Join
+            </button>
+          )}
+
+          {/* Record button — captures this meeting with its calendar info */}
           <button
-            onClick={() => window.open(event.onlineMeetingUrl, '_blank')}
-            className="bg-primary/10 text-primary hover:bg-primary/20 flex-shrink-0 rounded px-2 py-1 text-xs font-medium transition-colors"
+            onClick={handleRecord}
+            title={`Record "${event.title}"`}
+            aria-label={`Record ${event.title}`}
+            className="group flex items-center gap-1 rounded bg-red-500/10 px-2 py-1 text-xs font-medium text-red-500 transition-colors hover:bg-red-500/20"
           >
-            Join
+            <span className="h-2 w-2 rounded-full bg-red-500 transition-transform group-hover:scale-110" />
+            Rec
           </button>
-        )}
+        </div>
       </div>
     </div>
   )

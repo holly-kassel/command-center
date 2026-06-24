@@ -32,6 +32,7 @@ import { EveningRitualFlow } from '../../components/rituals/EveningRitualFlow'
 import { TouchGrassFlow } from '../../components/rituals/TouchGrassFlow'
 import { ScreamIntoTheVoid } from '../../components/ScreamIntoTheVoid'
 import { MeetingNotesOverlay } from '../../components/meeting'
+import { useMeetingStore } from '../../store/meetingStore'
 import { KanbanBoard } from '../../components/kanban/KanbanBoard'
 import { KatyaDrawer, KatyaToggleButton } from '../../components/chat'
 import { useChatStore } from '../../store/chatStore'
@@ -88,7 +89,9 @@ export function Dashboard(): React.ReactElement {
   const [showSettings, setShowSettings] = useState(false)
   const [showFocusMode, setShowFocusMode] = useState(false)
   const [showScreamVoid, setShowScreamVoid] = useState(false)
-  const [showMeetingNotes, setShowMeetingNotes] = useState(false)
+  const isRecorderOpen = useMeetingStore((s) => s.isRecorderOpen)
+  const openRecorder = useMeetingStore((s) => s.openRecorder)
+  const closeRecorder = useMeetingStore((s) => s.closeRecorder)
   const [rightColumnOrder, setRightColumnOrder] = useState<RightColumnPanelId[]>(() =>
     reconcileRightColumnOrder(DEFAULT_DASHBOARD_LAYOUT.rightColumn)
   )
@@ -234,7 +237,7 @@ export function Dashboard(): React.ReactElement {
               </div>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => setShowMeetingNotes(true)}
+                  onClick={() => openRecorder()}
                   className="text-sm text-text-muted transition-colors hover:text-blue-400"
                   title="Start Meeting Notes"
                 >
@@ -326,12 +329,7 @@ export function Dashboard(): React.ReactElement {
         {showScreamVoid && (
           <ScreamIntoTheVoid key="scream" onClose={() => setShowScreamVoid(false)} />
         )}
-        {showMeetingNotes && (
-          <MeetingNotesOverlay
-            key="meeting"
-            onClose={() => setShowMeetingNotes(false)}
-          />
-        )}
+        {isRecorderOpen && <MeetingNotesOverlay key="meeting" onClose={closeRecorder} />}
 
         {showSettings && (
           <AnimatedOverlay

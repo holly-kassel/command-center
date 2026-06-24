@@ -8,6 +8,15 @@ import type {
   SpeakerMap
 } from '@shared/types/transcription'
 
+/** Context passed when the recorder is opened from a specific calendar event */
+export interface RecordingContext {
+  title: string
+  participants: string[]
+  calendarEventId?: string
+  startTime?: string
+  endTime?: string
+}
+
 interface MeetingState {
   // Live meeting state
   isRecording: boolean
@@ -38,6 +47,10 @@ interface MeetingState {
   speakerFilter: string | null
   searchQuery: string
 
+  // Recorder overlay (meeting-aware)
+  isRecorderOpen: boolean
+  recordingContext: RecordingContext | null
+
   // Actions
   addSegments: (segments: MeetingSegment[]) => void
   setAudioLevel: (level: number) => void
@@ -55,9 +68,13 @@ interface MeetingState {
   // Async actions
   transcribeChunk: (audioBuffer: ArrayBuffer) => Promise<void>
   generateNotes: () => Promise<void>
-  saveMeeting: () => Promise<void>
+  saveMeeting: (title?: string) => Promise<void>
   loadMeetings: () => Promise<void>
   deleteMeeting: (id: string) => Promise<void>
+
+  // Recorder overlay actions
+  openRecorder: (context?: RecordingContext | null) => void
+  closeRecorder: () => void
 
   // Reset
   resetMeeting: () => void
@@ -89,6 +106,8 @@ export const useMeetingStore = create<MeetingState>((set, get) => ({
   savedMeetings: [],
   speakerFilter: null,
   searchQuery: '',
+  isRecorderOpen: false,
+  recordingContext: null,
 
   addSegments: (newSegments) =>
     set((state) => {
@@ -191,7 +210,7 @@ export const useMeetingStore = create<MeetingState>((set, get) => ({
     }
   },
 
-  saveMeeting: async () => {
+  saveMeeting: async (title) => {
     const { segments, notes, manualNotes, elapsedTime, settings } = get()
 
     // Save if there are segments OR manual notes — don't silently discard
@@ -203,7 +222,7 @@ export const useMeetingStore = create<MeetingState>((set, get) => ({
     const speakers = [...new Set(segments.map((s) => s.speaker))]
     const meeting: SavedMeeting = {
       id: Date.now().toString(),
-      title: 'Meeting Notes',
+      title: title?.trim() || get().recordingContext?.title?.trim() || 'Meeting Notes',
       duration: elapsedTime,
       segments,
       transcript: segments.map((s) => `${s.speaker}: ${s.text}`).join('\n'),
@@ -241,6 +260,18 @@ export const useMeetingStore = create<MeetingState>((set, get) => ({
       set({ error: msg })
     }
   },
+
+  openRecorder: (context = null) =>
+    set((state) => ({
+      isRecorderOpen: true,
+      recordingContext: context,
+      settings:
+        context?.participants && context.participants.length > 0
+          ? { ...state.settings, participants: context.participants }
+          : state.settings
+    })),
+
+  closeRecorder: () => set({ isRecorderOpen: false, recordingContext: null }),
 
   resetMeeting: () =>
     set({

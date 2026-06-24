@@ -38,6 +38,7 @@ export function MeetingNotesOverlay({ onClose }: MeetingNotesOverlayProps): Reac
     manualNotes,
     error,
     settings,
+    recordingContext,
     setIsRecording,
     setIsPaused,
     setElapsedTime,
@@ -54,7 +55,9 @@ export function MeetingNotesOverlay({ onClose }: MeetingNotesOverlayProps): Reac
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [showDoneOptions, setShowDoneOptions] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
-  const [meetingTitle, setMeetingTitle] = useState('Meeting Notes')
+  const [meetingTitle, setMeetingTitle] = useState(
+    recordingContext?.title?.trim() || 'Meeting Notes'
+  )
   const [isEditingTitle, setIsEditingTitle] = useState(false)
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
@@ -248,17 +251,17 @@ export function MeetingNotesOverlay({ onClose }: MeetingNotesOverlayProps): Reac
   const handleSaveOnly = useCallback(async () => {
     setIsSaving(true)
     try {
-      await saveMeeting()
+      await saveMeeting(meetingTitle)
     } catch {
       // Meeting save is best-effort at this point
     }
     onClose()
-  }, [saveMeeting, onClose])
+  }, [saveMeeting, onClose, meetingTitle])
 
   const handleSummarizeAndLink = useCallback(async () => {
     setIsSaving(true)
     try {
-      await saveMeeting()
+      await saveMeeting(meetingTitle)
 
       const { notes, segments, manualNotes: currentManualNotes, elapsedTime: currentElapsed } = useMeetingStore.getState()
 

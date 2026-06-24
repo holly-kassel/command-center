@@ -43,6 +43,8 @@ const obsidianApi = {
     ipcRenderer.invoke('obsidian:appendToToday', text),
   appendBlockToToday: (block: string): Promise<void> =>
     ipcRenderer.invoke('obsidian:appendBlockToToday', block),
+  appendMeetingNote: (heading: string, note: string): Promise<void> =>
+    ipcRenderer.invoke('obsidian:appendMeetingNote', heading, note),
   updateTodayContent: (content: string): Promise<void> =>
     ipcRenderer.invoke('obsidian:updateTodayContent', content),
   toggleCheckbox: (lineOffset: number): Promise<void> =>

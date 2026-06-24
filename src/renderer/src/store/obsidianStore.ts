@@ -26,6 +26,7 @@ interface ObsidianState {
   fetchWeeklyNotesList: () => Promise<void>
   selectDate: (dateStr: string) => void
   appendToToday: (text: string) => Promise<void>
+  appendMeetingNote: (heading: string, note: string) => Promise<void>
   updateTodayContent: (content: string) => Promise<void>
   updateDayContent: (dateStr: string, content: string) => Promise<void>
   toggleCheckbox: (lineOffset: number) => Promise<void>
@@ -102,6 +103,17 @@ export const useObsidianStore = create<ObsidianState>((set, get) => ({
   appendToToday: async (text: string) => {
     try {
       await window.api.obsidian.appendToToday(text)
+      await get().fetchTodaySection()
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to append'
+      set({ error: message })
+      throw error
+    }
+  },
+
+  appendMeetingNote: async (heading: string, note: string) => {
+    try {
+      await window.api.obsidian.appendMeetingNote(heading, note)
       await get().fetchTodaySection()
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to append'

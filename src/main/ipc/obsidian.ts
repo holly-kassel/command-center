@@ -116,6 +116,18 @@ export function registerObsidianIpc(): void {
     }
   })
 
+  ipcMain.handle(
+    'obsidian:appendMeetingNote',
+    async (_event, heading: string, note: string) => {
+      try {
+        await obsidian.appendMeetingNoteToToday(heading, note)
+      } catch (error) {
+        log.error('[IPC] obsidian:appendMeetingNote error:', error)
+        throw error
+      }
+    }
+  )
+
   ipcMain.handle('obsidian:updateTodayContent', async (_event, content: string) => {
     try {
       await obsidian.updateTodayContent(content)

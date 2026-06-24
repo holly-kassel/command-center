@@ -30,6 +30,7 @@ interface ObsidianApi {
   getWeeklyNote(): Promise<WeeklyNote | null>
   appendToToday(text: string): Promise<void>
   appendBlockToToday(block: string): Promise<void>
+  appendMeetingNote(heading: string, note: string): Promise<void>
   updateTodayContent(content: string): Promise<void>
   toggleCheckbox(lineOffset: number): Promise<void>
   listWeeklyNotes(): Promise<WeeklyNoteSummary[]>

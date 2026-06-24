@@ -4,8 +4,9 @@
  * Displays a single calendar event with time, title, location, and join button.
  */
 import type { CalendarEvent } from '@shared/types/calendar'
-import { memo } from 'react'
+import { memo, useState } from 'react'
 import { useMeetingStore } from '../../store/meetingStore'
+import { useObsidianStore } from '../../store/obsidianStore'
 
 interface MeetingCardProps {
   event: CalendarEvent
@@ -23,6 +24,14 @@ export const MeetingCard = memo(function MeetingCard({ event, isNext }: MeetingC
     new Date(event.end).getTime() > Date.now()
 
   const openRecorder = useMeetingStore((s) => s.openRecorder)
+  const appendMeetingNote = useObsidianStore((s) => s.appendMeetingNote)
+
+  const [notesOpen, setNotesOpen] = useState(false)
+  const [note, setNote] = useState('')
+  const [status, setStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle')
+
+  const timeLabel = event.isAllDay ? 'All day' : formatTime(event.start)
+  const meetingHeading = `**🗓️ ${event.title} · ${timeLabel}**`
 
   const handleRecord = (): void => {
     openRecorder({
@@ -32,6 +41,28 @@ export const MeetingCard = memo(function MeetingCard({ event, isNext }: MeetingC
       startTime: event.start,
       endTime: event.end
     })
+  }
+
+  const handleSaveNote = async (): Promise<void> => {
+    const trimmed = note.trim()
+    if (!trimmed) return
+    setStatus('saving')
+    try {
+      await appendMeetingNote(meetingHeading, trimmed)
+      setNote('')
+      setStatus('success')
+      setTimeout(() => setStatus('idle'), 2500)
+    } catch {
+      setStatus('error')
+      setTimeout(() => setStatus('idle'), 2500)
+    }
+  }
+
+  const handleNoteKeyDown = (e: React.KeyboardEvent): void => {
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault()
+      void handleSaveNote()
+    }
   }
 
   return (
@@ -106,8 +137,62 @@ export const MeetingCard = memo(function MeetingCard({ event, isNext }: MeetingC
             <span className="h-2 w-2 rounded-full bg-red-500 transition-transform group-hover:scale-110" />
             Rec
           </button>
+
+          {/* Notes button — jot a note saved under this meeting in today's notes */}
+          <button
+            onClick={() => setNotesOpen((v) => !v)}
+            title={`Notes for "${event.title}"`}
+            aria-label={`Notes for ${event.title}`}
+            aria-expanded={notesOpen}
+            className={`rounded px-2 py-1 text-xs font-medium transition-colors ${
+              notesOpen
+                ? 'bg-focus/20 text-focus'
+                : 'bg-surface-secondary/60 text-text-secondary hover:bg-surface-secondary'
+            }`}
+          >
+            Notes
+          </button>
         </div>
       </div>
+
+      {notesOpen && (
+        <div className="border-surface-border/40 mt-2 border-t pt-2">
+          <textarea
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            onKeyDown={handleNoteKeyDown}
+            placeholder="Jot a note — saved under this meeting in today's notes"
+            rows={2}
+            autoFocus
+            disabled={status === 'saving'}
+            className="bg-surface-muted border-surface-border/60 text-text-primary placeholder:text-text-tertiary focus:ring-focus/50 w-full resize-y rounded-md border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2"
+          />
+          <div className="mt-1.5 flex items-center justify-between gap-2">
+            <span
+              className={`text-[11px] ${
+                status === 'success'
+                  ? 'text-focus'
+                  : status === 'error'
+                    ? 'text-red-500'
+                    : 'text-text-tertiary'
+              }`}
+            >
+              {status === 'success'
+                ? "✓ Added to today's notes"
+                : status === 'error'
+                  ? '✗ Failed — check vault'
+                  : '⌘⏎ to save'}
+            </span>
+            <button
+              onClick={() => void handleSaveNote()}
+              disabled={!note.trim() || status === 'saving'}
+              className="bg-focus text-text-inverse hover:bg-focus/90 rounded-md px-2.5 py-1 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {status === 'saving' ? 'Saving…' : 'Save note'}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 })

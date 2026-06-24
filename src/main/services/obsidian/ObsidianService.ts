@@ -655,6 +655,115 @@ export class ObsidianService {
       throw error
     }
   }
+
+  /**
+   * Append a timestamped note bullet to today's "Tasks & Notes", grouped under
+   * a stable per-meeting heading. If the heading already exists in today's
+   * section, the new bullet is added beneath the existing group; otherwise a
+   * fresh heading + bullet group is created.
+   *
+   * `heading` must be a stable single line (e.g. "**🗓️ Standup · 9:00 AM**")
+   * so repeated notes for the same meeting cluster together.
+   */
+  async appendMeetingNoteToToday(heading: string, note: string): Promise<void> {
+    if (!this.vaultPath) {
+      throw new Error('Vault path not set')
+    }
+
+    const filePath = getWeekFilePath(this.vaultPath)
+    if (!existsSync(filePath)) {
+      throw new Error(`Weekly note not found: ${filePath}`)
+    }
+
+    const backupPath = `${filePath}.backup`
+    const now = new Date()
+    const dayOfWeek = getDayOfWeek(now)
+
+    const hours = now.getHours()
+    const minutes = String(now.getMinutes()).padStart(2, '0')
+    const ampm = hours >= 12 ? 'PM' : 'AM'
+    const h12 = hours % 12 || 12
+    const timestamp = `${h12}:${minutes} ${ampm}`
+    const bullet = `- [${timestamp}] ${note}`
+    const headingLine = heading.trim()
+
+    try {
+      await copyFile(filePath, backupPath)
+
+      const content = await readFile(filePath, 'utf-8')
+      const lines = content.split('\n')
+
+      const { sectionStart, sectionEnd } = findDaySection(lines, dayOfWeek)
+      if (sectionStart === -1) {
+        throw new Error(`Could not find section for ${dayOfWeek} in ${filePath}`)
+      }
+
+      // Locate the "### Tasks & Notes" subsection and its content range.
+      let tasksHeader = -1
+      for (let i = sectionStart; i < sectionEnd; i++) {
+        if (lines[i].trim() === '### Tasks & Notes') {
+          tasksHeader = i
+          break
+        }
+      }
+      if (tasksHeader === -1) {
+        throw new Error(`Could not find "### Tasks & Notes" subsection for ${dayOfWeek}`)
+      }
+      let contentEnd = sectionEnd
+      for (let i = tasksHeader + 1; i < sectionEnd; i++) {
+        if (lines[i].startsWith('### ')) {
+          contentEnd = i
+          break
+        }
+      }
+
+      // Is there already a group for this meeting today?
+      let headingIdx = -1
+      for (let i = tasksHeader + 1; i < contentEnd; i++) {
+        if (lines[i].trim() === headingLine) {
+          headingIdx = i
+          break
+        }
+      }
+
+      if (headingIdx !== -1) {
+        // Insert after the last content line belonging to this group, stopping
+        // at the next meeting heading (**...**) or another ### subsection.
+        let insertAt = headingIdx + 1
+        for (let i = headingIdx + 1; i < contentEnd; i++) {
+          const t = lines[i].trim()
+          if (t === '') continue
+          if (t.startsWith('**') && t.endsWith('**')) break
+          if (t.startsWith('#')) break
+          insertAt = i + 1
+        }
+        lines.splice(insertAt, 0, bullet)
+      } else {
+        // New group: append heading + bullet at the end of Tasks & Notes.
+        const insertPoint = findTasksNotesInsertPoint(lines, sectionStart, sectionEnd)
+        if (insertPoint === -1) {
+          throw new Error(`Could not find "### Tasks & Notes" subsection for ${dayOfWeek}`)
+        }
+        lines.splice(insertPoint, 0, '', headingLine, bullet)
+      }
+
+      await writeFile(filePath, lines.join('\n'), 'utf-8')
+      await unlink(backupPath)
+
+      log.info(`[Obsidian] Appended meeting note to ${dayOfWeek}: ${headingLine}`)
+    } catch (error) {
+      if (existsSync(backupPath)) {
+        try {
+          await copyFile(backupPath, filePath)
+          await unlink(backupPath)
+          log.info('[Obsidian] Restored from backup after error')
+        } catch {
+          log.error('[Obsidian] Failed to restore backup')
+        }
+      }
+      throw error
+    }
+  }
 }
 
 // ─── Internal helpers ──────────────────────────────────────────────

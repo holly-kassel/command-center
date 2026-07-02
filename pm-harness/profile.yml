@@ -1,0 +1,59 @@
+# PM Harness — operator profile
+#
+# THIS is the single file an adopter edits to retarget the harness to themselves.
+# The dispatcher (.github/agents/pm-harness.agent.md) reads this FIRST on every load.
+# Everywhere the foundation/skills say "the operator" (or "you"), it means whoever is
+# configured here. Ship-default values below are the current operator, so behavior is
+# unchanged out of the box — but every field is meant to be swapped.
+
+operator:
+  name: Holly                       # how the harness addresses you
+  role: Product Manager III         # your job title / function (shapes framing + audience)
+  technical_depth: semi-technical   # how much to translate/bridge for you:
+                                    #   non-technical  -> bridge business <-> technical heavily, no code
+                                    #   semi-technical -> translate the hard parts, lighter hand-holding
+                                    #   technical      -> minimal translation; you read code/specs directly
+  pronouns: she/her                 # used whenever the harness refers to you in the third person
+
+preferences:
+  verbosity: minimal-but-loud       # minimal-but-loud | balanced | detailed
+                                    #   minimal-but-loud -> terse by default; loud only about what matters
+  options_before_recommendation: true   # lay out neutral options + stakes BEFORE the recommendation (which comes last)
+  confirm_before_writes: true            # explain consequences and wait for explicit yes before any write to a source of truth
+  interruption_safe: true                # preserve state aggressively; support cheap drop-and-resume
+
+identity:                           # optional — operational infra for connectors
+  # WARNING: These are the CURRENT operator's real credentials.
+  # Adopters MUST replace them before warehouse re-auth or they will use the wrong identity.
+  warehouse_tenant: 398a6654-997b-47e9-b12b-9515b896b4de   # GitHubAzure tenant that holds warehouse access
+  warehouse_login: hollykassel@githubazure.com             # the identity authorized to read the warehouse  # TODO: unverified best-effort from handle - fix before warehouse re-auth
+  # Microsoft 365 (for the m365 connector — Word/Excel/Outlook/OneDrive/SharePoint). SCAFFOLD: only used
+  # once an M365 MCP server is wired. The m365 identity is SEPARATE from the warehouse identity above.
+  m365_login: hollykassel@microsoft.com                    # the M365 identity used for Office reads/writes
+  m365_tenant: 72f988bf-86f1-41af-91ab-2d7cd011db47        # the M365 (Entra) tenant for that identity
+  m365_onedrive_path: OneDrive/PM-Harness                  # default (flexible) write target — the operator's own space
+  m365_sharepoint_allow: []                                # shared sites/libraries writes are allowed to (extra caution); empty = none
+
+# ─────────────────────────────────────────────────────────────────────────────
+# EXAMPLE — how another adopter would retarget the harness to themselves.
+# Copy these values up into the blocks above (and set your own identity.*) to switch operators.
+#
+# operator:
+#   name: Sam
+#   role: Engineering Manager
+#   technical_depth: technical      # Sam reads specs/code directly — dial DOWN translation and hand-holding
+#   pronouns: they/them
+# preferences:
+#   verbosity: balanced
+#   options_before_recommendation: true
+#   confirm_before_writes: true
+#   interruption_safe: true
+# identity:
+#   warehouse_tenant: <your-tenant-guid>
+#   warehouse_login: <you>@<your-org>.com
+#   m365_login: <you>@<your-org>.com
+#   m365_tenant: <your-m365-entra-tenant-guid>
+#   m365_onedrive_path: OneDrive/PM-Harness          # your own space — flexible default write target
+#   m365_sharepoint_allow:                           # shared libraries you allow writes to (extra caution)
+#     - "Marketing/Shared Documents/Product Updates"
+# ─────────────────────────────────────────────────────────────────────────────

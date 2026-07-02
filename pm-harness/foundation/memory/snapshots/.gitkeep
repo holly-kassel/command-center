@@ -1,0 +1,5 @@
+# Resume snapshots live here.
+#
+# One file per active thread (e.g. mobile-onboarding.md), written from
+# ../../.specify/templates/resume-snapshot-template.md. Newest state at the top.
+# This .gitkeep just holds the directory; delete it once real snapshots exist.

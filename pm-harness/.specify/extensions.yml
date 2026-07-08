@@ -1,0 +1,106 @@
+# Spec-kit extension hooks — the official seam for injecting the operator's connectors
+#
+# This is how the PM harness feeds evidence into the spec-kit loop WITHOUT forking spec-kit.
+# Each hook fires before a loop command and pulls relevant signal from the five connectors
+# (see ../foundation/connectors/). Hooks are documented capabilities in iteration 1: they tell
+# the harness which sources to consult at each step and how to fail gracefully.
+#
+# LAZY LOADING: connectors load at hook time. A hook's `pull:` list is the ONLY set of connector
+# docs to read when it fires — never load all five up front (see the dispatcher's load rule).
+#
+# Governing rules for every hook (from the Constitution + connector policy):
+#   - Cite everything pulled; keep evidence separate from assumptions.
+#   - Never fabricate when a source is unreachable — flag the gap and continue degraded.
+#   - Slack private/DM access needs the operator's per-use consent.
+#   - Warehouse "not authorized" => surface the re-auth runbook, never invent numbers.
+
+version: 1
+
+connectors:
+  github:            { doc: ../foundation/connectors/github.md,            mode: read }
+  customer_feedback: { doc: ../foundation/connectors/customer-feedback.md, mode: read }
+  slack:             { doc: ../foundation/connectors/slack.md,             mode: read, consent: per_use_private_dm }
+  web:               { doc: ../foundation/connectors/web-research.md,      mode: read, scope: public_only }
+  warehouse:         { doc: ../foundation/connectors/data-warehouse.md,    mode: read, reauth_runbook: true }
+  # Microsoft 365 — read + GATED write. SCAFFOLD: not wired until an M365 MCP server is configured and
+  # its tools are added to the dispatcher allowlist. Until then it reads as unreachable (degrade gracefully).
+  # Write protocol = draft_first_promote_on_permission; OneDrive (personal) is the flexible default,
+  # shared SharePoint/Teams gets extra caution. See ../foundation/connectors/microsoft365.md.
+  m365:              { doc: ../foundation/connectors/microsoft365.md,      mode: read_write, status: scaffold, write: draft_first_promote_on_permission, reauth_runbook: true }
+
+hooks:
+  # SENSE — before triaging raw signal, gather across all sources, then cluster + weight.
+  before_triage:
+    pull: [customer_feedback, slack, github, web, warehouse]
+    purpose: >
+      Gather raw signal across the connectors, cluster recurring pain, and weight each cluster by
+      impact × urgency × effort against roadmap/capacity (Constitution III). Cite every signal;
+      keep evidence separate from assumptions; never present a bare list.
+    on_source_unreachable: flag_gap_continue   # never fabricate; degrade gracefully (incl. warehouse re-auth)
+
+  # SHAPE — before turning intent into a spec, gather supporting evidence for the outcome.
+  before_specify:
+    pull: [customer_feedback, warehouse, github, slack, web]
+    purpose: >
+      Gather cited evidence for the outcome before drafting. Separate evidence from assumptions;
+      flag any data gaps (incl. warehouse re-auth) in the spec's §4.
+    on_source_unreachable: flag_gap_continue   # never fabricate; degrade gracefully
+
+  # SHAPE — before clarifying open questions, try to answer them from sources first.
+  before_clarify:
+    pull: [warehouse, customer_feedback, github]
+    purpose: >
+      If an open question can be answered by a source (e.g. "how many accounts?" -> warehouse),
+      pull it instead of asking the operator. Only ask what the data can't settle.
+    on_source_unreachable: flag_gap_continue
+
+  # SHAPE — before the checklist gate, confirm citations resolve and gaps are explicit.
+  before_checklist:
+    pull: []
+    purpose: >
+      Verify every load-bearing claim is cited or labeled an assumption and that data gaps are
+      filled. No new fetching; an integrity pass over what the spec already cites.
+
+  # ALIGN — before drafting a POV brief, triangulate evidence across all three legs.
+  before_pov:
+    pull: [customer_feedback, warehouse, github, slack, web]
+    purpose: >
+      Gather cited evidence for a position across customer + data + vision (Constitution II) before
+      taking a stance. Keep evidence separate from assumptions; if the POV rests on one leg, flag it
+      THIN. Warehouse "not authorized" -> surface the re-auth runbook and mark the data leg a ⚠ gap.
+      Read-only: the POV brief writes nothing to a source of truth.
+    on_source_unreachable: flag_gap_continue   # never fabricate; degrade gracefully
+
+  # ALIGN — before drafting a stakeholder update, gather the period's shipped work + metrics.
+  before_status:
+    pull: [github, warehouse, customer_feedback, slack, web]
+    purpose: >
+      Gather the period's signal for an executive update: merged PRs/closed issues/releases from
+      GitHub (raw material to TRANSLATE into themes, not paste verbatim) and week-over-week measures
+      from the warehouse. Cite every item; group shipped work into 2-3 user-facing themes, not a PR
+      dump. Warehouse "not authorized" -> surface the re-auth runbook and mark the metric a ⚠ gap;
+      never invent a number. Read-only: the stakeholder update writes/posts nothing.
+    on_source_unreachable: flag_gap_continue   # never fabricate; degrade gracefully
+
+  # ALIGN — before an eng handoff, refresh the GitHub view the issues will attach to.
+  before_eng_handoff:
+    pull: [github]
+    purpose: >
+      Refresh related issues/PRs/projects so a handoff attaches to current state. Filing issues is
+      a WRITE — gated by explicit confirmation in ../skills/eng-handoff/skill.md (and documented in
+      commands/eng-handoff.md), not by this hook. This hook is read-only: it refreshes context only.
+    on_source_unreachable: flag_gap_continue
+
+  # ALIGN (OPTIONAL, SCAFFOLD) — before promoting a finished artifact into a Microsoft 365 Office doc.
+  # Not pulled by any built skill yet; opt-in only, so existing skills are unchanged. Wire a skill to it
+  # once an M365 MCP server is configured (see ../foundation/connectors/microsoft365.md).
+  before_publish:
+    pull: [m365]
+    purpose: >
+      Promote an already-drafted, operator-refined artifact (e.g. a Stakeholder Update) into a Word/Excel
+      doc in Microsoft 365. WRITE protocol = draft_first_promote_on_permission: the artifact is drafted
+      and refined locally FIRST; promotion to M365 happens only on the operator's explicit permission.
+      Disclose the exact destination (OneDrive vs which SharePoint site/library), file name, new-vs-edit,
+      and who can see it. OneDrive (personal) is the flexible default; shared SharePoint/Teams gets extra
+      caution. Never fabricate a document or a saved-link.
+    on_source_unreachable: flag_gap_continue   # scaffold: reads as unreachable until wired; degrade gracefully

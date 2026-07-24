@@ -31,7 +31,7 @@ import { MorningRitualFlow } from '../../components/rituals/MorningRitualFlow'
 import { EveningRitualFlow } from '../../components/rituals/EveningRitualFlow'
 import { TouchGrassFlow } from '../../components/rituals/TouchGrassFlow'
 import { ScreamIntoTheVoid } from '../../components/ScreamIntoTheVoid'
-import { MeetingNotesOverlay } from '../../components/meeting'
+import { DraftRecoveryPrompt, MeetingCaptureDock } from '../../components/meeting'
 import { useMeetingStore } from '../../store/meetingStore'
 import { KanbanBoard } from '../../components/kanban/KanbanBoard'
 import { KatyaDrawer, KatyaToggleButton } from '../../components/chat'
@@ -91,7 +91,7 @@ export function Dashboard(): React.ReactElement {
   const [showScreamVoid, setShowScreamVoid] = useState(false)
   const isRecorderOpen = useMeetingStore((s) => s.isRecorderOpen)
   const openRecorder = useMeetingStore((s) => s.openRecorder)
-  const closeRecorder = useMeetingStore((s) => s.closeRecorder)
+  const loadMeetingDraft = useMeetingStore((s) => s.loadDraft)
   const [rightColumnOrder, setRightColumnOrder] = useState<RightColumnPanelId[]>(() =>
     reconcileRightColumnOrder(DEFAULT_DASHBOARD_LAYOUT.rightColumn)
   )
@@ -118,7 +118,7 @@ export function Dashboard(): React.ReactElement {
     focus: <FocusSection />,
     triage: <NotificationsPanel />,
     pullRequests: <PullRequestsPanel />,
-    transcripts: <TranscriptsPanel />,
+    transcripts: <TranscriptsPanel />
   }
   const kanbanInit = useKanbanStore((s) => s.initialize)
   const kanbanRefresh = useKanbanStore((s) => s.refreshTasks)
@@ -145,6 +145,10 @@ export function Dashboard(): React.ReactElement {
 
   // Auto-refresh sets up the interval (5 min)
   useAutoRefresh(initAll, 5 * 60 * 1000)
+
+  useEffect(() => {
+    void loadMeetingDraft()
+  }, [loadMeetingDraft])
 
   // Listen for focus mode toggle from main process (Cmd+Shift+F)
   useEffect(() => {
@@ -329,7 +333,6 @@ export function Dashboard(): React.ReactElement {
         {showScreamVoid && (
           <ScreamIntoTheVoid key="scream" onClose={() => setShowScreamVoid(false)} />
         )}
-        {isRecorderOpen && <MeetingNotesOverlay key="meeting" onClose={closeRecorder} />}
 
         {showSettings && (
           <AnimatedOverlay
@@ -345,6 +348,9 @@ export function Dashboard(): React.ReactElement {
           </AnimatedOverlay>
         )}
       </AnimatePresence>
+
+      {isRecorderOpen && <MeetingCaptureDock />}
+      {!isRecorderOpen && <DraftRecoveryPrompt />}
 
       {/* Katya chat drawer */}
       <KatyaDrawer />

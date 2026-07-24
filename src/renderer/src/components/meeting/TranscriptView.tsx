@@ -1,4 +1,4 @@
-import { useEffect, useRef, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMeetingStore } from '../../store/meetingStore'
 
 const SPEAKER_COLORS = [
@@ -13,96 +13,101 @@ const SPEAKER_COLORS = [
 ]
 
 function SpeakerMapPanel(): React.ReactElement | null {
-  const { segments, speakerMap, renameSpeaker, settings } = useMeetingStore()
+  const { segments, renameSpeaker, settings, recordingContext } = useMeetingStore()
   const [editingInputs, setEditingInputs] = useState<Record<string, string>>({})
 
-  // Collect all original speaker labels (before mapping) by checking
-  // which keys exist in the map, plus any unmapped labels in segments
   const detectedSpeakers = useMemo(() => {
-    const labels = new Set<string>()
-    // Keys in speakerMap are the original labels
-    for (const key of Object.keys(speakerMap)) {
-      labels.add(key)
-    }
-    // Also check segments for speakers that look like diarization labels
-    for (const seg of segments) {
-      const speaker = seg.speaker
-      // If this speaker name is a mapped value, skip — the original key is already tracked
-      const isMappedValue = Object.values(speakerMap).includes(speaker)
-      if (!isMappedValue && /^(Speaker\s*\d+|[A-Z]|Unknown)$/i.test(speaker)) {
-        labels.add(speaker)
+    const found = new Map<
+      string,
+      { key: string; label: string; chunkId?: string; chunkNumber: number }
+    >()
+    const chunkNumbers = new Map<string, number>()
+    for (const segment of segments) {
+      if (segment.speakerIdentity?.verified) continue
+      const chunkId = segment.chunkId
+      if (chunkId && !chunkNumbers.has(chunkId)) chunkNumbers.set(chunkId, chunkNumbers.size + 1)
+      const key = chunkId ? `${chunkId}:${segment.speaker}` : segment.speaker
+      if (!found.has(key)) {
+        found.set(key, {
+          key,
+          label: segment.speaker,
+          chunkId,
+          chunkNumber: chunkId ? (chunkNumbers.get(chunkId) ?? 1) : 1
+        })
       }
     }
-    return Array.from(labels).sort()
-  }, [segments, speakerMap])
+    return [...found.values()]
+  }, [segments])
+
+  const participantNames = [
+    ...new Set([
+      ...settings.participants,
+      ...(recordingContext?.participants.map((participant) => participant.displayName) ?? [])
+    ])
+  ]
 
   if (detectedSpeakers.length === 0) return null
 
-  const handleRename = (originalLabel: string): void => {
-    const newName = editingInputs[originalLabel]?.trim()
-    if (newName && newName !== originalLabel) {
-      renameSpeaker(originalLabel, newName)
-      setEditingInputs((prev) => {
-        const next = { ...prev }
-        delete next[originalLabel]
-        return next
-      })
-    }
+  const handleRename = (speaker: (typeof detectedSpeakers)[number]): void => {
+    const newName = editingInputs[speaker.key]?.trim()
+    if (!newName) return
+    renameSpeaker(speaker.label, newName, speaker.chunkId)
+    setEditingInputs((current) => {
+      const next = { ...current }
+      delete next[speaker.key]
+      return next
+    })
   }
 
   return (
-    <div className="mb-3 p-2.5 rounded-lg bg-surface-muted/50 border border-surface-border">
-      <h4 className="text-[11px] font-semibold text-text-muted uppercase tracking-wider mb-2 flex items-center gap-1.5">
-        <span>🎤</span> Identify Speakers
+    <div className="mb-3 rounded-lg border border-yellow-500/20 bg-yellow-500/5 p-2.5">
+      <h4 className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-yellow-400">
+        Identify local speakers
       </h4>
+      <p className="mb-2 text-[10px] leading-relaxed text-text-muted">
+        Local labels can change between chunks. Each correction applies only to that audio chunk.
+        Teams names replace these after sync.
+      </p>
       <div className="space-y-1.5">
-        {detectedSpeakers.map((label) => {
-          const mappedName = speakerMap[label]
-          const inputValue = editingInputs[label] ?? ''
-
-          return (
-            <div key={label} className="flex items-center gap-2">
-              <span
-                className="text-[11px] text-text-muted w-20 flex-shrink-0 truncate"
-                title={label}
-              >
-                {label}
-              </span>
-              <span className="text-text-muted text-[10px]">→</span>
-              {mappedName ? (
-                <span className="text-[11px] text-text-primary font-medium flex-1 truncate">
-                  {mappedName}
-                </span>
-              ) : (
-                <div className="flex-1 flex gap-1">
-                  <input
-                    type="text"
-                    value={inputValue}
-                    onChange={(e) =>
-                      setEditingInputs((prev) => ({ ...prev, [label]: e.target.value }))
-                    }
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault()
-                        handleRename(label)
-                      }
-                    }}
-                    placeholder={settings.participants[detectedSpeakers.indexOf(label)] || 'Name…'}
-                    className="flex-1 px-2 py-0.5 rounded bg-surface-muted/50 border border-surface-border text-text-primary text-[11px] placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-focus/50"
-                  />
-                  <button
-                    onClick={() => handleRename(label)}
-                    disabled={!inputValue.trim()}
-                    className="px-1.5 py-0.5 rounded bg-focus/20 text-focus text-[10px] font-medium border border-focus/30 hover:bg-focus/30 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                  >
-                    ✓
-                  </button>
-                </div>
-              )}
-            </div>
-          )
-        })}
+        {detectedSpeakers.map((speaker) => (
+          <div key={speaker.key} className="flex items-center gap-2">
+            <span
+              className="w-24 flex-shrink-0 truncate text-[10px] text-text-muted"
+              title={speaker.label}
+            >
+              {speaker.label} · part {speaker.chunkNumber}
+            </span>
+            <input
+              type="text"
+              value={editingInputs[speaker.key] ?? ''}
+              onChange={(event) =>
+                setEditingInputs((current) => ({ ...current, [speaker.key]: event.target.value }))
+              }
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault()
+                  handleRename(speaker)
+                }
+              }}
+              placeholder="Enter or choose a name"
+              list="meeting-participant-names"
+              className="min-w-0 flex-1 rounded border border-surface-border bg-surface-muted/50 px-2 py-0.5 text-[11px] text-text-primary placeholder:text-text-muted focus:border-focus/50 focus:outline-none"
+            />
+            <button
+              onClick={() => handleRename(speaker)}
+              disabled={!editingInputs[speaker.key]?.trim()}
+              className="rounded bg-focus/20 px-1.5 py-0.5 text-[10px] font-medium text-focus disabled:opacity-30"
+            >
+              Save
+            </button>
+          </div>
+        ))}
       </div>
+      <datalist id="meeting-participant-names">
+        {participantNames.map((name) => (
+          <option key={name} value={name} />
+        ))}
+      </datalist>
     </div>
   )
 }
@@ -114,99 +119,93 @@ export function TranscriptView(): React.ReactElement {
 
   const speakerColorMap = useMemo(() => {
     const map = new Map<string, (typeof SPEAKER_COLORS)[number]>()
-    const seen: string[] = []
-    for (const seg of segments) {
-      if (!seen.includes(seg.speaker)) {
-        seen.push(seg.speaker)
-        map.set(seg.speaker, SPEAKER_COLORS[seen.length - 1] ?? SPEAKER_COLORS[0])
-      }
+    for (const segment of segments) {
+      if (!map.has(segment.speaker))
+        map.set(segment.speaker, SPEAKER_COLORS[map.size] ?? SPEAKER_COLORS[0])
     }
     return map
   }, [segments])
 
-  const uniqueSpeakers = useMemo(() => {
-    const set = new Set<string>()
-    for (const seg of segments) set.add(seg.speaker)
-    return Array.from(set)
-  }, [segments])
-
-  const filteredSegments = useMemo(() => {
-    return segments.filter((seg) => {
-      if (speakerFilter && seg.speaker !== speakerFilter) return false
-      if (searchQuery && !seg.text.toLowerCase().includes(searchQuery.toLowerCase())) return false
-      return true
-    })
-  }, [segments, speakerFilter, searchQuery])
+  const uniqueSpeakers = useMemo(
+    () => [...new Set(segments.map((segment) => segment.speaker))],
+    [segments]
+  )
+  const filteredSegments = useMemo(
+    () =>
+      segments.filter((segment) => {
+        if (speakerFilter && segment.speaker !== speakerFilter) return false
+        return !searchQuery || segment.text.toLowerCase().includes(searchQuery.toLowerCase())
+      }),
+    [searchQuery, segments, speakerFilter]
+  )
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [filteredSegments])
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Speaker identification panel */}
+    <div className="flex h-full flex-col">
       <SpeakerMapPanel />
-
-      {/* Filters */}
-      <div className="flex gap-2 mb-3">
+      <div className="mb-3 flex gap-2">
         <input
           type="text"
           placeholder="Search transcript…"
           value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="flex-1 px-3 py-1.5 rounded-lg bg-surface-muted/50 border border-surface-border text-text-primary text-xs placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-focus/50"
+          onChange={(event) => setSearchQuery(event.target.value)}
+          className="min-w-0 flex-1 rounded-lg border border-surface-border bg-surface-muted/50 px-3 py-1.5 text-xs text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-focus/50"
         />
         <select
           value={speakerFilter ?? ''}
-          onChange={(e) => setSpeakerFilter(e.target.value)}
-          className="px-2 py-1.5 rounded-lg bg-surface-muted/50 border border-surface-border text-text-primary text-xs cursor-pointer focus:outline-none focus:ring-2 focus:ring-focus/50"
+          onChange={(event) => setSpeakerFilter(event.target.value || null)}
+          className="max-w-32 rounded-lg border border-surface-border bg-surface-muted/50 px-2 py-1.5 text-xs text-text-primary focus:outline-none"
         >
-          <option value="">All Speakers</option>
-          {uniqueSpeakers.map((s) => (
-            <option key={s} value={s}>
-              {s}
+          <option value="">All speakers</option>
+          {uniqueSpeakers.map((speaker) => (
+            <option key={speaker} value={speaker}>
+              {speaker}
             </option>
           ))}
         </select>
       </div>
 
-      {/* Segments */}
-      <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+      <div className="flex-1 space-y-2 overflow-y-auto pr-1">
         {filteredSegments.length === 0 && !isRecording && (
-          <div className="flex flex-col items-center justify-center py-10">
-            <p className="text-text-muted text-xs">Transcript will appear here…</p>
-          </div>
+          <p className="py-10 text-center text-xs text-text-muted">Transcript will appear here.</p>
         )}
-
-        {filteredSegments.map((seg) => {
-          const color = speakerColorMap.get(seg.speaker) ?? SPEAKER_COLORS[0]
-          const initial = seg.speaker.charAt(0).toUpperCase()
-
+        {filteredSegments.map((segment) => {
+          const color = speakerColorMap.get(segment.speaker) ?? SPEAKER_COLORS[0]
+          const verified = segment.speakerIdentity?.verified === true
           return (
-            <div key={seg.id} className="flex gap-2.5 items-start">
+            <div key={segment.id} className="flex items-start gap-2.5">
               <div
-                className={`w-6 h-6 rounded-full ${color.bg}/20 flex items-center justify-center flex-shrink-0 mt-0.5`}
+                className={`mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full ${color.bg}/20`}
               >
-                <span className={`text-[10px] font-bold ${color.text}`}>{initial}</span>
+                <span className={`text-[10px] font-bold ${color.text}`}>
+                  {segment.speaker.charAt(0).toUpperCase()}
+                </span>
               </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-baseline gap-2">
-                  <span className={`text-xs font-medium ${color.text}`}>{seg.speaker}</span>
-                  <span className="text-[10px] text-text-muted">{seg.timestamp}</span>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-baseline gap-1.5">
+                  <span className={`text-xs font-medium ${color.text}`}>{segment.speaker}</span>
+                  <span
+                    title={verified ? 'Verified identity' : 'Unverified local label'}
+                    className={verified ? 'text-green-400' : 'text-yellow-400'}
+                  >
+                    {verified ? '✓' : '?'}
+                  </span>
+                  <span className="text-[10px] text-text-muted">{segment.timestamp}</span>
                 </div>
-                <p className="text-xs text-text-secondary mt-0.5 leading-relaxed">{seg.text}</p>
+                <p className="mt-0.5 text-xs leading-relaxed text-text-secondary">{segment.text}</p>
               </div>
             </div>
           )
         })}
-
         {isRecording && (
           <div className="flex items-center gap-2 py-2">
-            <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+            <span className="h-2 w-2 animate-pulse rounded-full bg-red-500" />
             <span className="text-xs text-text-muted">Listening…</span>
           </div>
         )}
-
         <div ref={bottomRef} />
       </div>
     </div>

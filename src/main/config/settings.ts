@@ -21,7 +21,6 @@ export interface AppSettings {
   meetingFilterPatterns: string[]
   katyaNudgeConfig: NudgeConfig
   dashboardLayout: DashboardLayout
-  openaiApiKey: string
   meetingSummaryModel: string
   decisionEvalModel: string
 }
@@ -35,9 +34,8 @@ export const DEFAULT_SETTINGS: Omit<AppSettings, 'windowBounds' | 'lastSyncTime'
   meetingFilterPatterns: ['Lunch', 'Focus Time', 'OOO', 'No Meetings'],
   katyaNudgeConfig: DEFAULT_NUDGE_CONFIG,
   dashboardLayout: DEFAULT_DASHBOARD_LAYOUT,
-  openaiApiKey: '',
-  meetingSummaryModel: 'gpt-4o-mini',
-  decisionEvalModel: 'gpt-4o-mini'
+  meetingSummaryModel: 'openai/gpt-5',
+  decisionEvalModel: 'openai/gpt-4o-mini'
 }
 
 const store = new (ElectronStore.default || ElectronStore)({
@@ -47,6 +45,23 @@ const store = new (ElectronStore.default || ElectronStore)({
     lastSyncTime: 0
   }
 })
+
+const storedSummaryModel = store.get('meetingSummaryModel') as string
+if (storedSummaryModel === 'gpt-4.1') {
+  store.set('meetingSummaryModel', 'openai/gpt-4.1')
+} else if (storedSummaryModel === 'gpt-4o-mini') {
+  store.set(
+    'meetingSummaryModel',
+    store.get('meetingSummaryModelExplicit') ? 'openai/gpt-4o-mini' : 'openai/gpt-4.1'
+  )
+}
+if (store.get('decisionEvalModel') === 'gpt-4o-mini') {
+  store.set('decisionEvalModel', 'openai/gpt-4o-mini')
+}
+if (store.get('meetingSummaryModelDefaultVersion') !== 2) {
+  store.set('meetingSummaryModel', 'openai/gpt-5')
+  store.set('meetingSummaryModelDefaultVersion', 2)
+}
 
 export const settings = {
   get<K extends keyof AppSettings>(key: K): AppSettings[K] {
@@ -73,10 +88,10 @@ export const settings = {
         'No Meetings'
       ],
       katyaNudgeConfig: (store.get('katyaNudgeConfig') as NudgeConfig) || DEFAULT_NUDGE_CONFIG,
-      dashboardLayout: (store.get('dashboardLayout') as DashboardLayout) || DEFAULT_DASHBOARD_LAYOUT,
-      openaiApiKey: (store.get('openaiApiKey') as string) || '',
-      meetingSummaryModel: (store.get('meetingSummaryModel') as string) || 'gpt-4o-mini',
-      decisionEvalModel: (store.get('decisionEvalModel') as string) || 'gpt-4o-mini'
+      dashboardLayout:
+        (store.get('dashboardLayout') as DashboardLayout) || DEFAULT_DASHBOARD_LAYOUT,
+      meetingSummaryModel: (store.get('meetingSummaryModel') as string) || 'openai/gpt-5',
+      decisionEvalModel: (store.get('decisionEvalModel') as string) || 'openai/gpt-4o-mini'
     }
   },
 
@@ -84,7 +99,18 @@ export const settings = {
     for (const [key, value] of Object.entries(partial)) {
       store.set(key, value)
     }
+    if (partial.meetingSummaryModel) {
+      store.set('meetingSummaryModelExplicit', true)
+    }
     return this.getAll()
+  },
+
+  getLegacyOpenAIApiKey(): string {
+    return (store.get('openaiApiKey') as string) || ''
+  },
+
+  deleteLegacyOpenAIApiKey(): void {
+    store.delete('openaiApiKey')
   },
 
   getObsidianVaultPath(): string {

@@ -13,6 +13,7 @@ import { getGitHubService } from '../github/GitHubService'
 import { getObsidianService } from '../obsidian/ObsidianService'
 import { getRitualService } from '../ritual/RitualService'
 import { getGoalService } from '../goal/GoalService'
+import { getTeamsTranscriptSyncService } from '../transcription/TeamsTranscriptSyncService'
 import { settings } from '../../config/settings'
 import type { CalendarEvent } from '../../../shared/types/calendar'
 import type { GitHubNotification } from '../../../shared/types/github'
@@ -53,6 +54,9 @@ export class SyncManager {
 
     // Goal sync — every 2 minutes
     this.setInterval('goal', () => this.syncGoal(), 2 * 60 * 1000)
+
+    // Teams transcripts become available after meetings end.
+    this.setInterval('meetingTranscripts', () => this.syncMeetingTranscripts(), 5 * 60 * 1000)
   }
 
   /**
@@ -141,10 +145,23 @@ export class SyncManager {
       const goalService = getGoalService()
       const goals = goalService.getActiveGoals()
       const summary = goalService.getSummary()
-      this.sendToRenderer('sync:goal', { goals, summary: { totalActive: summary.totalActive, completedThisWeek: summary.completedThisWeek } })
+      this.sendToRenderer('sync:goal', {
+        goals,
+        summary: { totalActive: summary.totalActive, completedThisWeek: summary.completedThisWeek }
+      })
       logger.debug(`[SyncManager] Goals synced: ${goals.length} active`)
     } catch {
       // Silent — goal data is non-critical
+    }
+  }
+
+  private async syncMeetingTranscripts(): Promise<void> {
+    try {
+      if (!getCalendarService().isConnected()) return
+      const meetings = await getTeamsTranscriptSyncService().syncPending()
+      for (const meeting of meetings) this.sendToRenderer('sync:meeting', meeting)
+    } catch (error) {
+      logger.warn('[SyncManager] Teams transcript sync failed:', error)
     }
   }
 

@@ -13,12 +13,12 @@ const REFRESH_OPTIONS = [
   { label: '5 minutes', value: 5 },
   { label: '10 minutes', value: 10 },
   { label: '15 minutes', value: 15 },
-  { label: '30 minutes', value: 30 },
+  { label: '30 minutes', value: 30 }
 ]
 
 const HOTKEYS = [
   { label: 'Quick Capture', shortcut: '⌘ + ⌥ + Space' },
-  { label: "What's Next", shortcut: '⌘ + ⇧ + N' },
+  { label: "What's Next", shortcut: '⌘ + ⇧ + N' }
 ]
 
 export function SettingsPanel({ onClose }: { onClose: () => void }): React.ReactElement {
@@ -26,6 +26,8 @@ export function SettingsPanel({ onClose }: { onClose: () => void }): React.React
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [dirty, setDirty] = useState(false)
+  const [openAIConfigured, setOpenAIConfigured] = useState(false)
+  const [openAIKey, setOpenAIKey] = useState('')
 
   // Microsoft auth state
   const [msftAuthed, setMsftAuthed] = useState(false)
@@ -41,14 +43,16 @@ export function SettingsPanel({ onClose }: { onClose: () => void }): React.React
   useEffect(() => {
     const load = async (): Promise<void> => {
       try {
-        const [s, authed, configured] = await Promise.all([
+        const [s, authed, configured, aiConfigured] = await Promise.all([
           window.api.settings.getAll(),
           window.api.auth.isAuthenticated(),
           window.api.github.isConfigured(),
+          window.api.auth.isOpenAIConfigured()
         ])
         setSettings(s)
         setMsftAuthed(authed)
         setGhConfigured(configured)
+        setOpenAIConfigured(aiConfigured)
       } catch (err) {
         toast.error('Failed to load settings')
         console.error(err)
@@ -78,8 +82,13 @@ export function SettingsPanel({ onClose }: { onClose: () => void }): React.React
         theme: settings.theme,
         userName: settings.userName,
         meetingFilterPatterns: settings.meetingFilterPatterns,
-        openaiApiKey: settings.openaiApiKey,
+        meetingSummaryModel: settings.meetingSummaryModel
       })
+      if (openAIKey.trim()) {
+        await window.api.auth.setOpenAIKey(openAIKey)
+        setOpenAIConfigured(true)
+        setOpenAIKey('')
+      }
       setSettings(saved)
       setDirty(false)
       toast.success('Settings saved')
@@ -257,7 +266,10 @@ export function SettingsPanel({ onClose }: { onClose: () => void }): React.React
                 {pattern}
                 <button
                   onClick={() => {
-                    update('meetingFilterPatterns', (settings.meetingFilterPatterns || []).filter((p) => p !== pattern))
+                    update(
+                      'meetingFilterPatterns',
+                      (settings.meetingFilterPatterns || []).filter((p) => p !== pattern)
+                    )
                   }}
                   className="text-text-muted hover:text-urgent ml-0.5 transition-colors"
                   title="Remove filter"
@@ -331,16 +343,13 @@ export function SettingsPanel({ onClose }: { onClose: () => void }): React.React
               placeholder={ghConfigured ? '••••••••' : 'ghp_...'}
               className="settings-input flex-1"
             />
-            <button
-              onClick={saveGhPat}
-              disabled={!ghPat.trim()}
-              className="settings-btn-secondary"
-            >
+            <button onClick={saveGhPat} disabled={!ghPat.trim()} className="settings-btn-secondary">
               Save
             </button>
           </div>
           <p className="text-xs text-text-muted mt-1">
-            Requires a classic PAT with <code className="text-accent">notifications</code> scope
+            Requires notification access and <code className="text-accent">models:read</code> for
+            meeting summaries
           </p>
         </Label>
         <Label text="Refresh Interval">
@@ -364,15 +373,30 @@ export function SettingsPanel({ onClose }: { onClose: () => void }): React.React
           <div className="flex gap-2">
             <input
               type="password"
-              value={settings.openaiApiKey || ''}
-              onChange={(e) => update('openaiApiKey', e.target.value)}
-              placeholder="sk-..."
+              value={openAIKey}
+              onChange={(e) => {
+                setOpenAIKey(e.target.value)
+                setDirty(true)
+              }}
+              placeholder={openAIConfigured ? 'Configured' : 'sk-...'}
               className="settings-input flex-1"
             />
+            {openAIConfigured && (
+              <button
+                onClick={async () => {
+                  await window.api.auth.deleteOpenAIKey()
+                  setOpenAIConfigured(false)
+                  toast.success('OpenAI key removed')
+                }}
+                className="settings-btn-secondary"
+              >
+                Remove
+              </button>
+            )}
           </div>
           <p className="text-xs text-text-muted mt-1">
-            Required for meeting transcription with speaker diarization.
-            Get your key from{' '}
+            Used only for local audio transcription with speaker diarization. Summaries use GitHub
+            Models. Get your key from{' '}
             <a
               href="https://platform.openai.com/api-keys"
               target="_blank"
@@ -381,6 +405,21 @@ export function SettingsPanel({ onClose }: { onClose: () => void }): React.React
             >
               platform.openai.com/api-keys
             </a>
+          </p>
+        </Label>
+        <Label text="Summary quality">
+          <select
+            value={settings.meetingSummaryModel}
+            onChange={(e) => update('meetingSummaryModel', e.target.value)}
+            className="settings-select"
+          >
+            <option value="openai/gpt-5">Highest quality, GPT-5 via GitHub Models</option>
+            <option value="openai/gpt-5-mini">Balanced, GPT-5 mini via GitHub Models</option>
+            <option value="openai/gpt-4.1">Fast, GPT-4.1 via GitHub Models</option>
+            <option value="openai/gpt-4o-mini">Economy, GPT-4o mini via GitHub Models</option>
+          </select>
+          <p className="text-xs text-text-muted mt-1">
+            Summaries use two passes for evidence-backed action items and meeting notes.
           </p>
         </Label>
       </Section>
@@ -397,9 +436,7 @@ export function SettingsPanel({ onClose }: { onClose: () => void }): React.React
             </div>
           ))}
         </div>
-        <p className="text-xs text-text-muted mt-2 italic">
-          Customizable hotkeys coming soon
-        </p>
+        <p className="text-xs text-text-muted mt-2 italic">Customizable hotkeys coming soon</p>
       </Section>
 
       {/* ── Appearance ──────────────────────── */}
@@ -436,11 +473,7 @@ export function SettingsPanel({ onClose }: { onClose: () => void }): React.React
       {dirty && (
         <div className="flex items-center justify-end gap-3 pt-2 border-t border-surface-border/40">
           <span className="text-xs text-warning">Unsaved changes</span>
-          <button
-            onClick={save}
-            disabled={saving}
-            className="settings-btn-primary"
-          >
+          <button onClick={save} disabled={saving} className="settings-btn-primary">
             {saving ? 'Saving...' : 'Save Changes'}
           </button>
         </div>
@@ -454,7 +487,7 @@ export function SettingsPanel({ onClose }: { onClose: () => void }): React.React
 function Section({
   title,
   icon,
-  children,
+  children
 }: {
   title: string
   icon: string
@@ -473,7 +506,7 @@ function Section({
 
 function Label({
   text,
-  children,
+  children
 }: {
   text: string
   children: React.ReactNode
@@ -491,9 +524,7 @@ function Label({
 function StatusDot({ connected }: { connected: boolean }): React.ReactElement {
   return (
     <span
-      className={`inline-block w-2 h-2 rounded-full ${
-        connected ? 'bg-focus' : 'bg-text-muted'
-      }`}
+      className={`inline-block w-2 h-2 rounded-full ${connected ? 'bg-focus' : 'bg-text-muted'}`}
     />
   )
 }

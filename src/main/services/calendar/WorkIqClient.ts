@@ -28,6 +28,7 @@ import { join } from 'node:path'
 import { existsSync } from 'node:fs'
 import log from 'electron-log'
 import { McpClient } from '../mcp/McpClient'
+import type { MeetingCalendarContext } from '../../../shared/types/transcription'
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const ElectronStore = require('electron-store')
@@ -45,6 +46,21 @@ const CALL_TIMEOUT = 90_000 // natural-language calendar queries can take ~30s
 const EULA_URL = 'https://github.com/microsoft/work-iq-mcp'
 const ASK_TOOL = 'ask_work_iq'
 const EULA_TOOL = 'accept_eula'
+
+export interface WorkIqTranscriptSegment {
+  speaker: string
+  text: string
+  start: number
+  end: number
+}
+
+export interface WorkIqMeetingTranscript {
+  available: boolean
+  reason?: string
+  attributionAvailable: boolean
+  participants: Array<{ displayName: string; email?: string }>
+  segments: WorkIqTranscriptSegment[]
+}
 
 export class WorkIqClient {
   private mcp = new McpClient()
@@ -86,16 +102,29 @@ export class WorkIqClient {
    * start/end are ISO 8601 strings that already include a UTC offset.
    */
   async getCalendarView(startISO: string, endISO: string): Promise<Record<string, unknown>[]> {
-    await this.ensureConnected()
-
     const question = this.buildCalendarQuestion(startISO, endISO)
+    return this.extractEvents(await this.ask(question))
+  }
+
+  async getMeetingTranscript(context: MeetingCalendarContext): Promise<WorkIqMeetingTranscript> {
+    return this.extractMeetingTranscript(
+      await this.ask(this.buildMeetingTranscriptQuestion(context))
+    )
+  }
+
+  private async ask(question: string): Promise<unknown> {
+    await this.ensureConnected()
     const raw = await this.withTimeout(
       this.mcp.callTool(ASK_TOOL, { question }),
       CALL_TIMEOUT,
       'WORKIQ_CALL_TIMEOUT'
     )
-
-    return this.extractEvents(raw)
+    if (typeof raw !== 'string') return raw
+    const parsed = this.parseLooseJson(raw)
+    if (parsed === null) {
+      throw new Error(raw.trim().slice(0, 400) || 'Empty WorkIQ response')
+    }
+    return parsed
   }
 
   /** Kill the subprocess but keep the connected flag (used on app quit). */
@@ -162,8 +191,27 @@ export class WorkIqClient {
       '"isOnlineMeeting" (boolean),',
       '"onlineMeetingUrl" (string Teams/online join URL, or empty string),',
       '"isAllDay" (boolean),',
-      '"attendees" (array of attendee display-name strings).',
+      '"attendees" (array of objects with "displayName" string and optional "email" string).',
       'Exclude cancelled events. If there are no events, return exactly [].'
+    ].join(' ')
+  }
+
+  private buildMeetingTranscriptQuestion(context: MeetingCalendarContext): string {
+    const joinUrl = context.onlineMeetingUrl || 'not available'
+    return [
+      'Find exactly one Microsoft Teams meeting from my Microsoft 365 data.',
+      `The subject is ${JSON.stringify(context.title)}.`,
+      `The scheduled start is ${context.startTime || 'unknown'} and end is ${context.endTime || 'unknown'}.`,
+      `The Teams join URL is ${joinUrl}.`,
+      'Return ONLY raw JSON with no markdown or explanation.',
+      'If the final meeting transcript is unavailable, return exactly this shape:',
+      '{"available":false,"reason":"brief reason","attributionAvailable":false,"participants":[],"segments":[]}.',
+      'If it is available, return the complete transcript without summarizing or dropping utterances.',
+      'Use exactly these keys: "available" true, "reason" optional string,',
+      '"attributionAvailable" boolean indicating whether Teams supplied speaker attribution,',
+      '"participants" array of objects with "displayName" and optional "email",',
+      'and "segments" array ordered by time with "speaker", "text", "start", and "end".',
+      'Use numeric seconds for start and end. Preserve generic speaker labels when Teams did not attribute names.'
     ].join(' ')
   }
 
@@ -247,6 +295,52 @@ export class WorkIqClient {
       if (typeof rec.subject === 'string') return [rec]
     }
     return []
+  }
+
+  private extractMeetingTranscript(raw: unknown): WorkIqMeetingTranscript {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+      throw new Error('WorkIQ returned an invalid meeting transcript response.')
+    }
+    const record = raw as Record<string, unknown>
+    const available = record.available === true
+    const attributionAvailable = record.attributionAvailable === true
+    const reason = typeof record.reason === 'string' ? record.reason : undefined
+    const participants = Array.isArray(record.participants)
+      ? record.participants.flatMap((participant) => {
+          if (typeof participant === 'string' && participant.trim()) {
+            return [{ displayName: participant.trim() }]
+          }
+          if (!participant || typeof participant !== 'object') return []
+          const item = participant as Record<string, unknown>
+          const displayName = typeof item.displayName === 'string' ? item.displayName.trim() : ''
+          if (!displayName) return []
+          const email = typeof item.email === 'string' ? item.email.trim() : ''
+          return [{ displayName, ...(email ? { email } : {}) }]
+        })
+      : []
+    const segments = Array.isArray(record.segments)
+      ? record.segments.flatMap((segment) => {
+          if (!segment || typeof segment !== 'object') return []
+          const item = segment as Record<string, unknown>
+          const text = typeof item.text === 'string' ? item.text.trim() : ''
+          if (!text) return []
+          const start = Number(item.start ?? 0)
+          const end = Number(item.end ?? start)
+          return [
+            {
+              speaker:
+                typeof item.speaker === 'string' ? item.speaker.trim() || 'Unknown' : 'Unknown',
+              text,
+              start: Number.isFinite(start) ? start : 0,
+              end: Number.isFinite(end) ? end : 0
+            }
+          ]
+        })
+      : []
+    if (available && segments.length === 0) {
+      throw new Error('WorkIQ reported an available transcript without transcript segments.')
+    }
+    return { available, reason, attributionAvailable, participants, segments }
   }
 
   /** Find and parse the first balanced JSON object/array within a string. */

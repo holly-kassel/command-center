@@ -10,10 +10,23 @@
  */
 import { ipcMain } from 'electron'
 import { getCalendarService } from '../services/calendar/CalendarService'
+import { credentialManager } from '../services/auth/CredentialManager'
+import { settings } from '../config/settings'
 import log from 'electron-log'
 
 export function registerAuthIpc(): void {
   const calendar = getCalendarService()
+  const legacyOpenAIKey = settings.getLegacyOpenAIApiKey()
+  if (legacyOpenAIKey && !credentialManager.getOpenAIKey()) {
+    try {
+      credentialManager.storeOpenAIKey(legacyOpenAIKey)
+      settings.deleteLegacyOpenAIApiKey()
+    } catch (error) {
+      log.error('[IPC] Could not migrate the legacy OpenAI API key to secure storage:', error)
+    }
+  } else if (legacyOpenAIKey) {
+    settings.deleteLegacyOpenAIApiKey()
+  }
 
   ipcMain.handle('auth:loginMicrosoft', async () => {
     try {
@@ -43,5 +56,21 @@ export function registerAuthIpc(): void {
         error: error instanceof Error ? error.message : 'Unknown error'
       }
     }
+  })
+
+  ipcMain.handle('auth:isOpenAIConfigured', () => {
+    return Boolean(credentialManager.getOpenAIKey())
+  })
+
+  ipcMain.handle('auth:setOpenAIKey', (_event, apiKey: string) => {
+    const trimmed = apiKey.trim()
+    if (!trimmed) throw new Error('OpenAI API key cannot be empty.')
+    credentialManager.storeOpenAIKey(trimmed)
+    return { success: true }
+  })
+
+  ipcMain.handle('auth:deleteOpenAIKey', () => {
+    credentialManager.deleteOpenAIKey()
+    return { success: true }
   })
 }

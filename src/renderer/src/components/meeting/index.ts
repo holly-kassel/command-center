@@ -1,1 +1,1 @@
-export { MeetingNotesOverlay } from './MeetingNotesOverlay'
+export { MeetingCaptureDock, DraftRecoveryPrompt } from './MeetingCaptureDock'

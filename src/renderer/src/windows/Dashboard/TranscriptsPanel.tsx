@@ -6,12 +6,14 @@
  * and add the summary to today's weekly notes.
  */
 import { useEffect, useState, useMemo, useCallback, memo } from 'react'
+import { formatMeetingForWeekly } from '@shared/formatMeetingMarkdown'
 import { useMeetingStore } from '../../store/meetingStore'
 import type {
   SavedMeeting,
   MeetingNotes,
   EvaluatedDecision,
-  DecisionConfidence
+  DecisionConfidence,
+  MeetingActionItem
 } from '@shared/types/transcription'
 
 const CONFIDENCE_CONFIG: Record<
@@ -77,74 +79,6 @@ function timeAgo(isoDate: string): string {
   return `${days}d ago`
 }
 
-/** Build a formatted markdown block from MeetingNotes for weekly notes */
-function formatNotesForWeekly(meeting: SavedMeeting): string {
-  const lines: string[] = []
-  const notes = meeting.notes
-
-  lines.push(`#### 📝 ${meeting.title} (${formatDuration(meeting.duration)})`)
-  lines.push('')
-
-  if (notes?.summary) {
-    lines.push(`**Summary:** ${notes.summary}`)
-    lines.push('')
-  }
-
-  if (notes?.keyTopics && notes.keyTopics.length > 0) {
-    lines.push('**Key Topics:**')
-    for (const topic of notes.keyTopics) {
-      lines.push(`- ${topic}`)
-    }
-    lines.push('')
-  }
-
-  if (notes?.keyPoints && notes.keyPoints.length > 0) {
-    lines.push('**Key Points:**')
-    for (const point of notes.keyPoints) {
-      lines.push(`- ${point}`)
-    }
-    lines.push('')
-  }
-
-  if (notes?.myActionItems && notes.myActionItems.length > 0) {
-    lines.push('**My Action Items:**')
-    for (const item of notes.myActionItems) {
-      lines.push(`- [ ] ${item}`)
-    }
-    lines.push('')
-  }
-
-  if (notes?.actionItems && notes.actionItems.length > 0) {
-    lines.push(notes?.myActionItems && notes.myActionItems.length > 0 ? '**All Action Items:**' : '**Action Items:**')
-    for (const item of notes.actionItems) {
-      lines.push(`- [ ] ${item}`)
-    }
-    lines.push('')
-  }
-
-  if (notes?.decisions && notes.decisions.length > 0) {
-    lines.push('**Decisions:**')
-    for (const decision of notes.decisions) {
-      lines.push(`- ✓ ${decision}`)
-    }
-    lines.push('')
-  }
-
-  if (notes?.openQuestions && notes.openQuestions.length > 0) {
-    lines.push('**Open Questions:**')
-    for (const question of notes.openQuestions) {
-      lines.push(`- ? ${question}`)
-    }
-    lines.push('')
-  }
-
-  if (meeting.speakers.length > 0) {
-    lines.push(`*Speakers: ${meeting.speakers.join(', ')}*`)
-  }
-
-  return lines.join('\n')
-}
-
 /** Highlight search matches in text */
 function highlightText(text: string, query: string): React.ReactNode[] {
   if (!query.trim()) return [text]
@@ -174,6 +108,7 @@ const TranscriptListItem = memo(function TranscriptListItem({
   isSelected: boolean
   onClick: () => void
 }): React.ReactElement {
+  const activeArtifact = meeting.transcriptArtifacts[meeting.activeTranscriptSource]
   return (
     <div
       className={`group flex items-start gap-2 rounded-lg border px-2.5 py-1.5 transition-colors cursor-pointer
@@ -205,28 +140,128 @@ const TranscriptListItem = memo(function TranscriptListItem({
             </>
           )}
         </div>
+        <div className="mt-1 flex flex-wrap gap-1 text-[9px]">
+          <span
+            className={
+              meeting.activeTranscriptSource === 'teams'
+                ? 'rounded bg-blue-500/10 px-1.5 py-0.5 text-blue-400'
+                : 'rounded bg-surface-muted px-1.5 py-0.5 text-text-muted'
+            }
+          >
+            {meeting.activeTranscriptSource === 'teams' ? 'Teams' : 'Local mic'}
+          </span>
+          <span
+            className={
+              activeArtifact?.attribution === 'verified'
+                ? 'rounded bg-green-500/10 px-1.5 py-0.5 text-green-400'
+                : 'rounded bg-yellow-500/10 px-1.5 py-0.5 text-yellow-400'
+            }
+          >
+            {activeArtifact?.attribution === 'verified' ? 'Names verified' : 'Names unverified'}
+          </span>
+          {meeting.teamsSync.status === 'pending' && (
+            <span className="rounded bg-blue-500/10 px-1.5 py-0.5 text-blue-400">
+              Teams sync pending
+            </span>
+          )}
+          {meeting.teamsSync.status === 'error' && (
+            <span className="rounded bg-red-500/10 px-1.5 py-0.5 text-red-400">
+              Teams sync failed
+            </span>
+          )}
+          {meeting.teamsSync.status === 'available' &&
+            meeting.teamsSync.summaryStatus !== 'available' && (
+              <span className="rounded bg-purple-500/10 px-1.5 py-0.5 text-purple-400">
+                Final summary {meeting.teamsSync.summaryStatus}
+              </span>
+            )}
+        </div>
       </div>
       <span className="text-[10px] text-text-muted mt-0.5 flex-shrink-0">
-        {timeAgo(meeting.createdAt)}
+        {timeAgo(meeting.updatedAt)}
       </span>
     </div>
   )
 })
 
+function SavedActionItemRow({
+  item,
+  onReview
+}: {
+  item: MeetingActionItem
+  onReview?: (id: string, status: 'accepted' | 'dismissed') => void
+}): React.ReactElement {
+  const [showEvidence, setShowEvidence] = useState(false)
+  return (
+    <li className="rounded-md border border-surface-border bg-surface-muted/20 p-2 text-xs text-text-primary">
+      <div className="flex gap-1.5">
+        <span className={item.reviewStatus === 'accepted' ? 'text-focus' : 'text-yellow-400'}>
+          ☐
+        </span>
+        <div className="min-w-0 flex-1">
+          <p>{item.description}</p>
+          <div className="mt-1 flex flex-wrap gap-1.5 text-[10px] text-text-muted">
+            {item.owner && <span>{item.owner.displayName}</span>}
+            {item.dueDate && <span>Due {item.dueDate}</span>}
+            <button
+              onClick={() => setShowEvidence((shown) => !shown)}
+              className="text-focus hover:underline"
+            >
+              {showEvidence ? 'Hide evidence' : 'Show evidence'}
+            </button>
+          </div>
+          {showEvidence && (
+            <blockquote className="mt-1 border-l-2 border-focus/30 pl-2 italic text-text-muted">
+              “{item.evidence.quote}”
+            </blockquote>
+          )}
+        </div>
+      </div>
+      {item.reviewStatus === 'needs-review' && onReview && (
+        <div className="mt-2 flex justify-end gap-2">
+          <button
+            onClick={() => onReview(item.id, 'dismissed')}
+            className="text-[11px] text-text-muted hover:text-red-400"
+          >
+            Dismiss
+          </button>
+          <button
+            onClick={() => onReview(item.id, 'accepted')}
+            className="rounded bg-focus/20 px-2 py-1 text-[11px] text-focus"
+          >
+            Accept
+          </button>
+        </div>
+      )}
+    </li>
+  )
+}
+
 function MeetingNotesView({
   notes,
   evaluatedDecisions,
-  isEvaluating
+  isEvaluating,
+  onReviewAction
 }: {
   notes: MeetingNotes
   evaluatedDecisions?: EvaluatedDecision[]
   isEvaluating?: boolean
+  onReviewAction?: (id: string, status: 'accepted' | 'dismissed') => void
 }): React.ReactElement {
   const [expandedDecision, setExpandedDecision] = useState<number | null>(null)
   const hasEvals = (evaluatedDecisions?.length ?? 0) > 0
+  const personalActionIds = new Set(notes.myActionItems.map((item) => item.id))
 
   return (
     <div className="space-y-3">
+      <div className="flex flex-wrap gap-1 text-[10px]">
+        <span className="rounded bg-surface-muted px-1.5 py-0.5 text-text-muted">
+          {notes.metadata.model}
+        </span>
+        <span className="rounded bg-blue-500/10 px-1.5 py-0.5 text-blue-400">
+          {notes.metadata.transcriptSource === 'teams' ? 'Teams transcript' : 'Local transcript'}
+        </span>
+      </div>
       {notes.summary && (
         <div>
           <h4 className="text-xs font-semibold text-text-secondary uppercase tracking-wide mb-1">
@@ -273,27 +308,46 @@ function MeetingNotesView({
             My Action Items
           </h4>
           <ul className="space-y-1">
-            {notes.myActionItems.map((item, i) => (
-              <li key={i} className="text-sm text-text-primary flex gap-1.5">
-                <span className="text-focus flex-shrink-0">☐</span>
-                <span>{item}</span>
-              </li>
-            ))}
+            {notes.myActionItems
+              .filter((item) => item.reviewStatus !== 'dismissed')
+              .map((item) => (
+                <SavedActionItemRow key={item.id} item={item} onReview={onReviewAction} />
+              ))}
           </ul>
         </div>
       )}
       {notes.actionItems.length > 0 && (
         <div>
           <h4 className="text-xs font-semibold text-text-secondary uppercase tracking-wide mb-1">
-            {notes.myActionItems && notes.myActionItems.length > 0 ? 'All Action Items' : 'Action Items'}
+            {notes.myActionItems && notes.myActionItems.length > 0
+              ? 'Other Action Items'
+              : 'Action Items'}
           </h4>
           <ul className="space-y-1">
-            {notes.actionItems.map((item, i) => (
-              <li key={i} className="text-sm text-text-primary flex gap-1.5">
-                <span className="text-amber-400 flex-shrink-0">☐</span>
-                <span>{item}</span>
-              </li>
-            ))}
+            {notes.actionItems
+              .filter(
+                (item) => item.reviewStatus !== 'dismissed' && !personalActionIds.has(item.id)
+              )
+              .map((item) => (
+                <SavedActionItemRow key={item.id} item={item} onReview={onReviewAction} />
+              ))}
+          </ul>
+        </div>
+      )}
+      {notes.suggestedFollowUps.some((item) => item.reviewStatus !== 'dismissed') && (
+        <div>
+          <h4 className="mb-1 text-xs font-semibold uppercase tracking-wide text-yellow-400">
+            Suggested follow-ups
+          </h4>
+          <p className="mb-1.5 text-[11px] text-text-muted">
+            Review these implied follow-ups before they are exported.
+          </p>
+          <ul className="space-y-1">
+            {notes.suggestedFollowUps
+              .filter((item) => item.reviewStatus !== 'dismissed')
+              .map((item) => (
+                <SavedActionItemRow key={item.id} item={item} onReview={onReviewAction} />
+              ))}
           </ul>
         </div>
       )}
@@ -392,6 +446,10 @@ function TranscriptDetailView({
   const [currentNotes, setCurrentNotes] = useState<MeetingNotes | null>(meeting.notes)
   const [evalResults, setEvalResults] = useState<EvaluatedDecision[]>([])
   const [isEvaluating, setIsEvaluating] = useState(false)
+  const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'error'>('idle')
+  const [reviewError, setReviewError] = useState<string | null>(null)
+  const syncTeamsTranscript = useMeetingStore((state) => state.syncTeamsTranscript)
+  const loadMeetings = useMeetingStore((state) => state.loadMeetings)
 
   const transcriptLines = useMemo(() => {
     if (!meeting.transcript) return []
@@ -410,11 +468,49 @@ function TranscriptDetailView({
     return transcriptLines.filter((line) => line.toLowerCase().includes(q)).length
   }, [transcriptLines, searchQuery])
 
+  const handleReviewAction = useCallback(
+    async (id: string, status: 'accepted' | 'dismissed'): Promise<void> => {
+      if (!currentNotes) return
+      const update = (items: MeetingActionItem[]): MeetingActionItem[] =>
+        items.map((item) => (item.id === id ? { ...item, reviewStatus: status } : item))
+      const actionItems = update(currentNotes.actionItems)
+      const nextNotes: MeetingNotes = {
+        ...currentNotes,
+        actionItems,
+        myActionItems: actionItems.filter(
+          (item) => item.isCurrentUser && item.reviewStatus === 'accepted'
+        ),
+        suggestedFollowUps: update(currentNotes.suggestedFollowUps)
+      }
+      setCurrentNotes(nextNotes)
+      setReviewError(null)
+      try {
+        const updated = await window.api.transcription.reviewAction(meeting.id, id, status)
+        setCurrentNotes(updated.notes)
+        await loadMeetings()
+      } catch (error) {
+        setCurrentNotes(currentNotes)
+        setReviewError(error instanceof Error ? error.message : String(error))
+      }
+    },
+    [currentNotes, loadMeetings, meeting]
+  )
+
+  const handleTeamsSync = useCallback(async (): Promise<void> => {
+    setSyncStatus('syncing')
+    try {
+      await syncTeamsTranscript(meeting.id)
+      setSyncStatus('idle')
+    } catch {
+      setSyncStatus('error')
+    }
+  }, [meeting.id, syncTeamsTranscript])
+
   const handleAddToWeeklyNotes = useCallback(async () => {
     if (!currentNotes) return
     setAddStatus('saving')
     try {
-      const block = formatNotesForWeekly({ ...meeting, notes: currentNotes })
+      const block = formatMeetingForWeekly({ ...meeting, notes: currentNotes })
       await window.api.obsidian.appendBlockToToday(block)
       setAddStatus('success')
       setTimeout(() => setAddStatus('idle'), 3000)
@@ -426,13 +522,26 @@ function TranscriptDetailView({
 
   const handleRegenerateAndEval = useCallback(async () => {
     if (!meeting.transcript) return
+    const transcriptArtifact = meeting.transcriptArtifacts[meeting.activeTranscriptSource]
+    if (!transcriptArtifact) {
+      setRegenStatus('error')
+      return
+    }
+    const updateContext = {
+      transcriptSource: meeting.activeTranscriptSource,
+      transcriptCapturedAt: transcriptArtifact.capturedAt,
+      baseNotesGeneratedAt: currentNotes?.metadata.generatedAt ?? null
+    }
     setRegenStatus('summarizing')
     try {
-      const notes = await window.api.transcription.summarizeMeeting(
-        meeting.transcript,
-        meeting.speakers
-      )
-      setCurrentNotes(notes)
+      const notes = await window.api.transcription.summarizeMeeting({
+        segments: meeting.segments,
+        participants: meeting.participants,
+        transcriptSource: meeting.activeTranscriptSource
+      })
+      const updated = await window.api.transcription.updateNotes(meeting.id, notes, updateContext)
+      setCurrentNotes(updated.notes)
+      await loadMeetings()
       setActiveTab('summary')
 
       if (notes.decisions && notes.decisions.length > 0) {
@@ -452,7 +561,9 @@ function TranscriptDetailView({
       setRegenStatus('error')
       setTimeout(() => setRegenStatus('idle'), 3000)
     }
-  }, [meeting])
+  }, [currentNotes?.metadata.generatedAt, loadMeetings, meeting])
+
+  const activeArtifact = meeting.transcriptArtifacts[meeting.activeTranscriptSource]
 
   return (
     <div className="flex flex-col h-full">
@@ -480,6 +591,52 @@ function TranscriptDetailView({
               <span>{meeting.speakers.join(', ')}</span>
             </>
           )}
+        </div>
+        <div className="mt-1.5 flex flex-wrap items-center gap-1 text-[10px]">
+          <span
+            className={
+              meeting.activeTranscriptSource === 'teams'
+                ? 'rounded bg-blue-500/10 px-1.5 py-0.5 text-blue-400'
+                : 'rounded bg-surface-muted px-1.5 py-0.5 text-text-muted'
+            }
+          >
+            {meeting.activeTranscriptSource === 'teams' ? 'Teams transcript' : 'Local microphone'}
+          </span>
+          <span
+            className={
+              activeArtifact?.attribution === 'verified'
+                ? 'rounded bg-green-500/10 px-1.5 py-0.5 text-green-400'
+                : 'rounded bg-yellow-500/10 px-1.5 py-0.5 text-yellow-400'
+            }
+          >
+            {activeArtifact?.attribution === 'verified'
+              ? 'Speaker names verified'
+              : 'Speaker names unverified'}
+          </span>
+          {meeting.notes && (
+            <span className="rounded bg-purple-500/10 px-1.5 py-0.5 text-purple-400">
+              {meeting.notes.metadata.model}
+            </span>
+          )}
+          {meeting.calendarContext?.onlineMeetingUrl &&
+            (meeting.activeTranscriptSource !== 'teams' ||
+              meeting.teamsSync.summaryStatus !== 'available') && (
+              <button
+                onClick={() => void handleTeamsSync()}
+                disabled={syncStatus === 'syncing'}
+                className="rounded bg-blue-500/10 px-1.5 py-0.5 text-blue-400 hover:bg-blue-500/20 disabled:opacity-50"
+              >
+                {syncStatus === 'syncing'
+                  ? meeting.activeTranscriptSource === 'teams'
+                    ? 'Finalizing summary…'
+                    : 'Checking Teams…'
+                  : syncStatus === 'error'
+                    ? 'Retry Teams sync'
+                    : meeting.activeTranscriptSource === 'teams'
+                      ? 'Retry final summary'
+                      : 'Check Teams transcript'}
+              </button>
+            )}
         </div>
       </div>
 
@@ -574,8 +731,13 @@ function TranscriptDetailView({
             notes={currentNotes}
             evaluatedDecisions={evalResults.length > 0 ? evalResults : undefined}
             isEvaluating={isEvaluating}
+            onReviewAction={(id, status) => void handleReviewAction(id, status)}
           />
         </div>
+      )}
+
+      {reviewError && (
+        <p className="mt-2 text-[11px] text-red-400">Could not save action review: {reviewError}</p>
       )}
 
       {/* Bottom actions */}
@@ -672,7 +834,11 @@ export function TranscriptsPanel(): React.ReactElement {
   if (selectedMeeting) {
     return (
       <section className="rounded-xl border border-surface-border/60 bg-surface-secondary/30 p-4 overflow-hidden">
-        <TranscriptDetailView meeting={selectedMeeting} onBack={() => setSelectedId(null)} />
+        <TranscriptDetailView
+          key={`${selectedMeeting.id}:${selectedMeeting.updatedAt}`}
+          meeting={selectedMeeting}
+          onBack={() => setSelectedId(null)}
+        />
       </section>
     )
   }

@@ -17,11 +17,13 @@ function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
 
-export const MeetingCard = memo(function MeetingCard({ event, isNext }: MeetingCardProps): React.ReactElement {
-  const isPast = new Date(event.end).getTime() < Date.now()
-  const isNow =
-    new Date(event.start).getTime() <= Date.now() &&
-    new Date(event.end).getTime() > Date.now()
+export const MeetingCard = memo(function MeetingCard({
+  event,
+  isNext
+}: MeetingCardProps): React.ReactElement {
+  const [now] = useState(Date.now)
+  const isPast = new Date(event.end).getTime() < now
+  const isNow = new Date(event.start).getTime() <= now && new Date(event.end).getTime() > now
 
   const openRecorder = useMeetingStore((s) => s.openRecorder)
   const appendMeetingNote = useObsidianStore((s) => s.appendMeetingNote)
@@ -36,8 +38,14 @@ export const MeetingCard = memo(function MeetingCard({ event, isNext }: MeetingC
   const handleRecord = (): void => {
     openRecorder({
       title: event.title,
-      participants: event.attendees ?? [],
+      participants: (event.attendees ?? []).map((attendee) => ({
+        displayName: attendee.displayName,
+        email: attendee.email,
+        source: 'calendar' as const,
+        verified: false
+      })),
       calendarEventId: event.id,
+      onlineMeetingUrl: event.onlineMeetingUrl,
       startTime: event.start,
       endTime: event.end
     })
@@ -96,15 +104,11 @@ export const MeetingCard = memo(function MeetingCard({ event, isNext }: MeetingC
           </div>
 
           {/* Title */}
-          <div className="text-text-primary mt-0.5 truncate text-sm font-medium">
-            {event.title}
-          </div>
+          <div className="text-text-primary mt-0.5 truncate text-sm font-medium">{event.title}</div>
 
           {/* Location */}
           {event.location && (
-            <div className="text-text-tertiary mt-0.5 truncate text-xs">
-              {event.location}
-            </div>
+            <div className="text-text-tertiary mt-0.5 truncate text-xs">{event.location}</div>
           )}
 
           {/* Attendees count */}

@@ -1,7 +1,21 @@
 import { ElectronAPI } from '@electron-toolkit/preload'
-import type { TodaySection, VaultStatus, WeeklyNote, SlashCommandResult, SlashCommandInfo, WeeklyNoteSummary, WeeklySectionResult } from '../shared/types/obsidian'
+import type {
+  TodaySection,
+  VaultStatus,
+  WeeklyNote,
+  SlashCommandResult,
+  SlashCommandInfo,
+  WeeklyNoteSummary,
+  WeeklySectionResult
+} from '../shared/types/obsidian'
 import type { CalendarEvent } from '../shared/types/calendar'
-import type { GitHubNotification, GitHubPullRequest, NotificationTriageData, TriageStatus, TriagePriority } from '../shared/types/github'
+import type {
+  GitHubNotification,
+  GitHubPullRequest,
+  NotificationTriageData,
+  TriageStatus,
+  TriagePriority
+} from '../shared/types/github'
 import type { ParsedSlackThread } from '../shared/types/slack'
 import type { AppSettings } from '../shared/types/settings'
 import type { DailyLog, Streak, StreakType, WeeklyRitualMetrics } from '../shared/types/ritual'
@@ -15,10 +29,26 @@ import type {
   GoalCategory,
   GoalStatus,
   KanbanTask,
-  KanbanStatus,
+  KanbanStatus
 } from '../shared/types/goal'
-import type { TranscriptionResult, TranscriptionAndSummaryResult, MeetingSegment, MeetingNotes, SavedMeeting, EvaluatedDecision } from '../shared/types/transcription'
-import type { ChatConversation, ChatMessage, ChatStreamChunk, NudgeConfig } from '../shared/types/chat'
+import type {
+  TranscriptionResult,
+  TranscriptionAndSummaryResult,
+  MeetingSegment,
+  MeetingNotes,
+  MeetingNotesUpdateContext,
+  MeetingSummaryInput,
+  MeetingTranscriptionChunkOptions,
+  SavedMeeting,
+  MeetingDraft,
+  EvaluatedDecision
+} from '../shared/types/transcription'
+import type {
+  ChatConversation,
+  ChatMessage,
+  ChatStreamChunk,
+  NudgeConfig
+} from '../shared/types/chat'
 
 interface ObsidianApi {
   findVault(): Promise<string>
@@ -41,13 +71,18 @@ interface ObsidianApi {
   executeSlashCommand(text: string): Promise<SlashCommandResult>
   getSlashCommands(): Promise<SlashCommandInfo[]>
   onFileChanged(callback: (data: { filePath: string }) => void): () => void
-  onSyncUpdate(callback: (data: { todaySection: TodaySection | null; currentFocus: string | null }) => void): () => void
+  onSyncUpdate(
+    callback: (data: { todaySection: TodaySection | null; currentFocus: string | null }) => void
+  ): () => void
 }
 
 interface AuthApi {
   loginMicrosoft(): Promise<{ success: boolean; error?: string }>
   isAuthenticated(): Promise<boolean>
   logout(): Promise<{ success: boolean; error?: string }>
+  isOpenAIConfigured(): Promise<boolean>
+  setOpenAIKey(apiKey: string): Promise<{ success: boolean }>
+  deleteOpenAIKey(): Promise<{ success: boolean }>
 }
 
 interface CalendarApi {
@@ -68,7 +103,10 @@ interface GitHubApi {
   onSyncUpdate(callback: (notifications: GitHubNotification[]) => void): () => void
   getAllTriageData(): Promise<Record<string, NotificationTriageData>>
   setTriageStatus(notificationId: string, status: TriageStatus): Promise<NotificationTriageData>
-  setTriagePriority(notificationId: string, priority: TriagePriority): Promise<NotificationTriageData>
+  setTriagePriority(
+    notificationId: string,
+    priority: TriagePriority
+  ): Promise<NotificationTriageData>
   setTriageNotes(notificationId: string, notes: string): Promise<NotificationTriageData>
   getTriageSortOrder(): Promise<string[]>
   setTriageSortOrder(order: string[]): Promise<void>
@@ -76,7 +114,10 @@ interface GitHubApi {
 
 interface SlackApi {
   parseThread(rawText: string): Promise<ParsedSlackThread>
-  saveToObsidian(thread: ParsedSlackThread, customTitle?: string): Promise<{ success: boolean; path: string }>
+  saveToObsidian(
+    thread: ParsedSlackThread,
+    customTitle?: string
+  ): Promise<{ success: boolean; path: string }>
 }
 
 interface SettingsApi {
@@ -98,7 +139,9 @@ interface RitualApi {
   updateStreak(type: StreakType): Promise<Streak>
   checkFullDayStreak(): Promise<Streak | null>
   getWeeklyMetrics(weekStart?: string): Promise<WeeklyRitualMetrics>
-  onSyncUpdate(callback: (data: { todayLog: DailyLog; streaks: Record<StreakType, Streak> }) => void): () => void
+  onSyncUpdate(
+    callback: (data: { todayLog: DailyLog; streaks: Record<StreakType, Streak> }) => void
+  ): () => void
 }
 
 interface GoalApi {
@@ -120,8 +163,18 @@ interface GoalApi {
   getAllTaskLinks(): Promise<GoalTaskLink[]>
   updateTaskCompletion(taskText: string, completed: boolean): Promise<GoalTaskLink[]>
   recalculateProgress(goalId: string): Promise<number>
-  getSummary(): Promise<{ totalActive: number; byLevel: Record<GoalLevel, number>; byCategory: Record<GoalCategory, number>; completedThisWeek: number }>
-  onSyncUpdate(callback: (data: { goals: Goal[]; summary: { totalActive: number; completedThisWeek: number } }) => void): () => void
+  getSummary(): Promise<{
+    totalActive: number
+    byLevel: Record<GoalLevel, number>
+    byCategory: Record<GoalCategory, number>
+    completedThisWeek: number
+  }>
+  onSyncUpdate(
+    callback: (data: {
+      goals: Goal[]
+      summary: { totalActive: number; completedThisWeek: number }
+    }) => void
+  ): () => void
 }
 
 interface KanbanApi {
@@ -130,7 +183,7 @@ interface KanbanApi {
     text: string,
     source?: string,
     sourceNotificationId?: string,
-    sourceUrl?: string,
+    sourceUrl?: string
   ): Promise<KanbanTask>
   moveTask(taskId: string, newStatus: KanbanStatus, newPosition: number): Promise<KanbanTask | null>
   reorderTask(taskId: string, newPosition: number): Promise<KanbanTask | null>
@@ -141,13 +194,35 @@ interface KanbanApi {
 
 interface TranscriptionApi {
   transcribe(audioBuffer: ArrayBuffer, durationSeconds: number): Promise<TranscriptionResult>
-  transcribeAndSummarize(audioBuffer: ArrayBuffer, durationSeconds: number): Promise<TranscriptionAndSummaryResult>
-  transcribeChunk(audioBuffer: ArrayBuffer, options: { language?: string; speakerDiarization?: boolean }): Promise<MeetingSegment[]>
-  summarizeMeeting(transcript: string, participants?: string[]): Promise<MeetingNotes>
+  transcribeAndSummarize(
+    audioBuffer: ArrayBuffer,
+    durationSeconds: number
+  ): Promise<TranscriptionAndSummaryResult>
+  transcribeChunk(
+    audioBuffer: ArrayBuffer,
+    options: MeetingTranscriptionChunkOptions
+  ): Promise<MeetingSegment[]>
+  summarizeMeeting(input: MeetingSummaryInput): Promise<MeetingNotes>
   saveMeeting(meeting: SavedMeeting): Promise<SavedMeeting>
+  reviewAction(
+    meetingId: string,
+    actionId: string,
+    reviewStatus: 'accepted' | 'dismissed'
+  ): Promise<SavedMeeting>
+  updateNotes(
+    meetingId: string,
+    notes: MeetingNotes,
+    context: MeetingNotesUpdateContext
+  ): Promise<SavedMeeting>
   getMeetings(): Promise<SavedMeeting[]>
+  getMeeting(meetingId: string): Promise<SavedMeeting | null>
+  syncTeamsTranscript(meetingId: string): Promise<SavedMeeting>
+  saveDraft(meeting: SavedMeeting): Promise<MeetingDraft>
+  getDraft(): Promise<MeetingDraft | null>
+  deleteDraft(meetingId?: string): Promise<boolean>
   deleteMeeting(meetingId: string): Promise<boolean>
   saveTranscriptToVault(meeting: SavedMeeting): Promise<{ filename: string; path: string }>
+  onMeetingUpdate(callback: (meeting: SavedMeeting) => void): () => void
 }
 
 interface AppApi {

@@ -36,7 +36,6 @@ export interface AppSettings {
   meetingFilterPatterns: string[]
   katyaNudgeConfig: NudgeConfig
   dashboardLayout: DashboardLayout
-  openaiApiKey: string
   meetingSummaryModel: string
   decisionEvalModel: string
 }

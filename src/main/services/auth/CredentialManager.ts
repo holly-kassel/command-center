@@ -16,7 +16,8 @@ const store = new (ElectronStore.default || ElectronStore)({
   defaults: {
     microsoftToken: '',
     githubPAT: '',
-  },
+    openAIKey: ''
+  }
 })
 
 function encrypt(value: string): string {
@@ -25,6 +26,20 @@ function encrypt(value: string): string {
     return Buffer.from(value, 'utf-8').toString('base64')
   }
   return safeStorage.encryptString(value).toString('base64')
+}
+
+function encryptRequired(value: string): string {
+  if (!safeStorage.isEncryptionAvailable()) {
+    throw new Error('Secure credential storage is unavailable on this device.')
+  }
+  return safeStorage.encryptString(value).toString('base64')
+}
+
+function decryptRequired(encoded: string): string {
+  if (!safeStorage.isEncryptionAvailable()) {
+    throw new Error('Secure credential storage is unavailable on this device.')
+  }
+  return safeStorage.decryptString(Buffer.from(encoded, 'base64'))
 }
 
 function decrypt(encoded: string): string {
@@ -79,4 +94,25 @@ export const credentialManager = {
       return null
     }
   },
+
+  storeOpenAIKey(apiKey: string): void {
+    store.set('openAIKey', encryptRequired(apiKey))
+    log.info('[CredentialManager] OpenAI API key stored')
+  },
+
+  getOpenAIKey(): string | null {
+    const encrypted = store.get('openAIKey') as string
+    if (!encrypted) return null
+    try {
+      return decryptRequired(encrypted)
+    } catch (error) {
+      log.error('[CredentialManager] Failed to decrypt OpenAI API key:', error)
+      return null
+    }
+  },
+
+  deleteOpenAIKey(): void {
+    store.set('openAIKey', '')
+    log.info('[CredentialManager] OpenAI API key deleted')
+  }
 }

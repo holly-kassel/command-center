@@ -8,7 +8,7 @@
 import log from 'electron-log'
 import { getWorkIqClient, friendlyWorkIqError } from './WorkIqClient'
 import { settings } from '../../config/settings'
-import type { CalendarEvent } from '../../../shared/types/calendar'
+import type { CalendarAttendee, CalendarEvent } from '../../../shared/types/calendar'
 
 const CACHE_TTL = 5 * 60 * 1000 // 5 minutes
 
@@ -158,9 +158,7 @@ export class CalendarService {
       const rawLocation = this.toLocation(item.location)
       const rawJoinUrl =
         typeof item.onlineMeetingUrl === 'string' ? item.onlineMeetingUrl.trim() : ''
-      const attendees = Array.isArray(item.attendees)
-        ? item.attendees.map((a) => String(a)).filter((a) => a.length > 0)
-        : []
+      const attendees = this.toAttendees(item.attendees)
 
       return {
         id: this.makeId(title, startISO),
@@ -192,6 +190,26 @@ export class CalendarService {
     if (!raw) return new Date().toISOString()
     const d = new Date(raw)
     return Number.isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString()
+  }
+
+  private toAttendees(value: unknown): CalendarAttendee[] {
+    if (!Array.isArray(value)) return []
+    return value.flatMap((attendee) => {
+      if (typeof attendee === 'string' && attendee.trim()) {
+        return [{ displayName: attendee.trim() }]
+      }
+      if (!attendee || typeof attendee !== 'object') return []
+      const record = attendee as Record<string, unknown>
+      const displayName =
+        typeof record.displayName === 'string'
+          ? record.displayName.trim()
+          : typeof record.name === 'string'
+            ? record.name.trim()
+            : ''
+      if (!displayName) return []
+      const email = typeof record.email === 'string' ? record.email.trim() : ''
+      return [{ displayName, ...(email ? { email } : {}) }]
+    })
   }
 
   /** Accept a string location or a Graph-style `{ displayName }` object. */

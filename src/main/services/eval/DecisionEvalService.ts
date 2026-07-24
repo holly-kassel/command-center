@@ -10,6 +10,7 @@
 import log from 'electron-log'
 import { credentialManager } from '../auth/CredentialManager'
 import { settings } from '../../config/settings'
+import { chatCompletion } from '../llm'
 import type { EvaluatedDecision, DecisionConfidence } from '../../../shared/types/transcription'
 
 const GITHUB_API = 'https://api.github.com'
@@ -271,34 +272,15 @@ ${truncatedDecisions || '(none available)'}`
   const userPrompt = `Evaluate these decisions from a meeting summary:\n\n${decisions.map((d, i) => `${i + 1}. ${d}`).join('\n')}`
 
   try {
-    const apiKey = settings.get('openaiApiKey')
-    const evalModel = settings.get('decisionEvalModel') || 'gpt-4o-mini'
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: evalModel,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
-        ],
-        temperature: 0.2
-      })
-    })
-
-    if (!response.ok) {
-      const errText = await response.text()
-      log.error(`[DecisionEval] OpenAI API error: ${response.status} ${errText}`)
-      throw new Error(`OpenAI eval failed: ${response.status}`)
-    }
-
-    const data = (await response.json()) as {
-      choices: Array<{ message: { content: string } }>
-    }
-    const rawContent = data.choices?.[0]?.message?.content || '[]'
+    const evalModel = settings.get('decisionEvalModel') || 'openai/gpt-4o-mini'
+    const response = await chatCompletion(
+      [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ],
+      { model: evalModel, temperature: 0.2, maxTokens: 2048 }
+    )
+    const rawContent = response.content || '[]'
     const content = rawContent
       .replace(/^```(?:json)?\s*\n?/i, '')
       .replace(/\n?```\s*$/i, '')

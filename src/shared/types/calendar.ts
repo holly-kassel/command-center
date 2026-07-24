@@ -3,6 +3,11 @@
  * Used across main + renderer via preload bridge
  */
 
+export interface CalendarAttendee {
+  displayName: string
+  email?: string
+}
+
 /** A calendar event from Microsoft Graph */
 export interface CalendarEvent {
   id: string
@@ -10,7 +15,7 @@ export interface CalendarEvent {
   start: string // ISO datetime
   end: string // ISO datetime
   location?: string
-  attendees?: string[]
+  attendees?: CalendarAttendee[]
   isOnlineMeeting: boolean
   onlineMeetingUrl?: string
   isAllDay: boolean

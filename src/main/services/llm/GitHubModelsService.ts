@@ -16,10 +16,23 @@ export interface ChatMessage {
   content: string
 }
 
+export type ChatResponseFormat =
+  | { type: 'json_object' }
+  | {
+      type: 'json_schema'
+      json_schema: {
+        name: string
+        strict: boolean
+        schema: Record<string, unknown>
+      }
+    }
+
 export interface ChatCompletionOptions {
   model?: string
   temperature?: number
   maxTokens?: number
+  responseFormat?: ChatResponseFormat
+  reasoningEffort?: 'minimal' | 'low' | 'medium' | 'high'
 }
 
 export interface ChatCompletionResult {
@@ -42,12 +55,15 @@ export async function chatCompletion(
   }
 
   const model = options.model ?? DEFAULT_MODEL
-  const body = {
-    model,
-    messages,
-    temperature: options.temperature ?? 0.3,
-    max_tokens: options.maxTokens ?? 2048
+  const reasoningModel = /^openai\/(?:gpt-5(?:-|$)|o\d)/.test(model)
+  const body: Record<string, unknown> = { model, messages }
+  body[reasoningModel ? 'max_completion_tokens' : 'max_tokens'] = options.maxTokens ?? 2048
+  if (reasoningModel) {
+    body.reasoning_effort = options.reasoningEffort ?? 'high'
+  } else {
+    body.temperature = options.temperature ?? 0.3
   }
+  if (options.responseFormat) body.response_format = options.responseFormat
 
   log.info(`[LLM] Sending chat completion request (model: ${model}, messages: ${messages.length})`)
 
@@ -106,15 +122,19 @@ export async function* chatCompletionStream(
   }
 
   const model = options.model ?? DEFAULT_MODEL
-  const body = {
-    model,
-    messages,
-    temperature: options.temperature ?? 0.3,
-    max_tokens: options.maxTokens ?? 2048,
-    stream: true
+  const reasoningModel = /^openai\/(?:gpt-5(?:-|$)|o\d)/.test(model)
+  const body: Record<string, unknown> = { model, messages, stream: true }
+  body[reasoningModel ? 'max_completion_tokens' : 'max_tokens'] = options.maxTokens ?? 2048
+  if (reasoningModel) {
+    body.reasoning_effort = options.reasoningEffort ?? 'high'
+  } else {
+    body.temperature = options.temperature ?? 0.3
   }
+  if (options.responseFormat) body.response_format = options.responseFormat
 
-  log.info(`[LLM] Sending streaming chat completion (model: ${model}, messages: ${messages.length})`)
+  log.info(
+    `[LLM] Sending streaming chat completion (model: ${model}, messages: ${messages.length})`
+  )
 
   const response = await fetch(GITHUB_MODELS_URL, {
     method: 'POST',

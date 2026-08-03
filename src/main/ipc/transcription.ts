@@ -119,7 +119,7 @@ export function registerTranscriptionIpc(): void {
     'transcription:summarizeMeeting',
     async (_event, input: MeetingSummaryInput): Promise<MeetingNotes> => {
       try {
-        const model = settings.get('meetingSummaryModel') || 'openai/gpt-5'
+        const model = settings.get('meetingSummaryModel') || 'gpt-5'
         const userName = settings.get('userName') || ''
         return await summarizeMeeting(input, model, userName)
       } catch (error) {

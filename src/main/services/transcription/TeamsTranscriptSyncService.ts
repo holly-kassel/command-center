@@ -284,7 +284,7 @@ export class TeamsTranscriptSyncService {
           participants: generating.participants,
           transcriptSource: 'teams'
         },
-        settings.get('meetingSummaryModel') || 'openai/gpt-5',
+        settings.get('meetingSummaryModel') || 'gpt-5',
         settings.get('userName') || ''
       )
       const current = repository.getById(meetingId)

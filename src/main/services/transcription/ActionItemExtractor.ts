@@ -5,7 +5,7 @@ import type {
   MeetingSegment,
   SpeakerIdentity
 } from '../../../shared/types/transcription'
-import { callStructured } from './StructuredGitHubModels'
+import { callStructured } from './StructuredCompletion'
 
 const candidateSchema = z
   .object({

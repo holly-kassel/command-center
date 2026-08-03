@@ -1,7 +1,7 @@
 import { DEFAULT_NUDGE_CONFIG } from '../../shared/types/chat'
 import type { NudgeConfig } from '../../shared/types/chat'
-import { DEFAULT_DASHBOARD_LAYOUT } from '../../shared/types/settings'
-import type { DashboardLayout } from '../../shared/types/settings'
+import { DEFAULT_DASHBOARD_LAYOUT, DEFAULT_LLM_PROVIDER } from '../../shared/types/settings'
+import type { DashboardLayout, LLMProviderId } from '../../shared/types/settings'
 
 /**
  * Persistent settings store using electron-store
@@ -23,6 +23,9 @@ export interface AppSettings {
   dashboardLayout: DashboardLayout
   meetingSummaryModel: string
   decisionEvalModel: string
+  llmProvider: LLMProviderId
+  llmChatModel: string
+  llmBaseUrl: string
 }
 
 export const DEFAULT_SETTINGS: Omit<AppSettings, 'windowBounds' | 'lastSyncTime'> = {
@@ -34,8 +37,11 @@ export const DEFAULT_SETTINGS: Omit<AppSettings, 'windowBounds' | 'lastSyncTime'
   meetingFilterPatterns: ['Lunch', 'Focus Time', 'OOO', 'No Meetings'],
   katyaNudgeConfig: DEFAULT_NUDGE_CONFIG,
   dashboardLayout: DEFAULT_DASHBOARD_LAYOUT,
-  meetingSummaryModel: 'openai/gpt-5',
-  decisionEvalModel: 'openai/gpt-4o-mini'
+  meetingSummaryModel: 'gpt-5',
+  decisionEvalModel: 'gpt-4o-mini',
+  llmProvider: DEFAULT_LLM_PROVIDER,
+  llmChatModel: 'gpt-4.1',
+  llmBaseUrl: ''
 }
 
 const store = new (ElectronStore.default || ElectronStore)({
@@ -46,21 +52,26 @@ const store = new (ElectronStore.default || ElectronStore)({
   }
 })
 
-const storedSummaryModel = store.get('meetingSummaryModel') as string
-if (storedSummaryModel === 'gpt-4.1') {
-  store.set('meetingSummaryModel', 'openai/gpt-4.1')
-} else if (storedSummaryModel === 'gpt-4o-mini') {
-  store.set(
-    'meetingSummaryModel',
-    store.get('meetingSummaryModelExplicit') ? 'openai/gpt-4o-mini' : 'openai/gpt-4.1'
-  )
-}
-if (store.get('decisionEvalModel') === 'gpt-4o-mini') {
-  store.set('decisionEvalModel', 'openai/gpt-4o-mini')
-}
 if (store.get('meetingSummaryModelDefaultVersion') !== 2) {
-  store.set('meetingSummaryModel', 'openai/gpt-5')
+  store.set('meetingSummaryModel', 'gpt-5')
   store.set('meetingSummaryModelDefaultVersion', 2)
+}
+
+/**
+ * GitHub Models was retired on 2026-07-30 and its endpoint now returns HTTP 410.
+ * It used namespaced model ids (`openai/gpt-5`); every direct OpenAI-compatible
+ * provider uses bare ids (`gpt-5`). Strip the namespace once, and move the stored
+ * provider onto the new default.
+ */
+if (store.get('llmProviderVersion') !== 1) {
+  for (const key of ['meetingSummaryModel', 'decisionEvalModel', 'llmChatModel'] as const) {
+    const value = store.get(key) as string
+    if (typeof value === 'string' && value.includes('/')) {
+      store.set(key, value.slice(value.lastIndexOf('/') + 1))
+    }
+  }
+  if (!store.get('llmProvider')) store.set('llmProvider', DEFAULT_LLM_PROVIDER)
+  store.set('llmProviderVersion', 1)
 }
 
 export const settings = {
@@ -90,8 +101,11 @@ export const settings = {
       katyaNudgeConfig: (store.get('katyaNudgeConfig') as NudgeConfig) || DEFAULT_NUDGE_CONFIG,
       dashboardLayout:
         (store.get('dashboardLayout') as DashboardLayout) || DEFAULT_DASHBOARD_LAYOUT,
-      meetingSummaryModel: (store.get('meetingSummaryModel') as string) || 'openai/gpt-5',
-      decisionEvalModel: (store.get('decisionEvalModel') as string) || 'openai/gpt-4o-mini'
+      meetingSummaryModel: (store.get('meetingSummaryModel') as string) || 'gpt-5',
+      decisionEvalModel: (store.get('decisionEvalModel') as string) || 'gpt-4o-mini',
+      llmProvider: (store.get('llmProvider') as LLMProviderId) || DEFAULT_LLM_PROVIDER,
+      llmChatModel: (store.get('llmChatModel') as string) || 'gpt-4.1',
+      llmBaseUrl: (store.get('llmBaseUrl') as string) || ''
     }
   },
 

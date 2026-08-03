@@ -67,7 +67,7 @@ A personal productivity dashboard built with Electron, React, and TypeScript. Pu
 | Frontend | React 19, TypeScript 5.9, Tailwind CSS 4 |
 | State | Zustand 5 |
 | Markdown | react-markdown + remark-gfm + rehype-raw |
-| LLM | GitHub Models API (GPT-4.1) |
+| LLM | Any OpenAI-compatible provider — OpenAI (default), Microsoft Foundry, or a local endpoint |
 | Transcription | Whisper (local, via @huggingface/transformers + onnxruntime-node) |
 | Auth | MSAL (Microsoft), GitHub PAT |
 | Storage | electron-store, Obsidian vault (markdown files) |
@@ -85,7 +85,7 @@ src/
 │   │   ├── github/     # GitHub API client
 │   │   ├── goal/       # Goal tracking service
 │   │   ├── hotkey/     # Global hotkey management
-│   │   ├── llm/        # GitHub Models API client
+│   │   ├── llm/        # Provider-agnostic chat completions client
 │   │   ├── obsidian/   # Vault operations + weekly note parsing
 │   │   ├── ritual/     # Ritual & streak tracking
 │   │   ├── slack/      # Slack thread parser
@@ -109,7 +109,8 @@ src/
 ### Prerequisites
 - Node.js 20+
 - An Obsidian vault at `~/Documents/obsidian-notes/` with weekly notes
-- GitHub PAT (for notifications + GitHub Models API)
+- GitHub PAT (for notifications)
+- OpenAI API key (for transcription + meeting summaries)
 - Microsoft 365 account (for calendar, optional)
 
 ### Install & Run
@@ -137,7 +138,7 @@ npm run build:linux
 Create a `.env` file in the project root:
 
 ```env
-# GitHub PAT — needed for notifications + LLM (GitHub Models)
+# GitHub PAT — needed for notifications
 GITHUB_TOKEN=ghp_...
 
 # Microsoft auth (optional, for calendar)

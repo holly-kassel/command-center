@@ -73,4 +73,21 @@ export function registerAuthIpc(): void {
     credentialManager.deleteOpenAIKey()
     return { success: true }
   })
+
+  // LLM provider key — used by the foundry/custom chat providers.
+  ipcMain.handle('auth:isLLMKeyConfigured', () => {
+    return Boolean(credentialManager.getLLMApiKey())
+  })
+
+  ipcMain.handle('auth:setLLMKey', (_event, apiKey: string) => {
+    const trimmed = apiKey.trim()
+    if (!trimmed) throw new Error('LLM provider API key cannot be empty.')
+    credentialManager.storeLLMApiKey(trimmed)
+    return { success: true }
+  })
+
+  ipcMain.handle('auth:deleteLLMKey', () => {
+    credentialManager.deleteLLMApiKey()
+    return { success: true }
+  })
 }

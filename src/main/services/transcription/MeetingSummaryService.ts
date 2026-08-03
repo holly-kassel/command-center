@@ -2,7 +2,7 @@ import { z } from 'zod'
 import type { MeetingNotes, MeetingSummaryInput } from '../../../shared/types/transcription'
 import { loadLLMContext } from '../llm/contextLoader'
 import { extractActionItems } from './ActionItemExtractor'
-import { callStructured } from './StructuredGitHubModels'
+import { callStructured } from './StructuredCompletion'
 
 const summarySchema = z
   .object({

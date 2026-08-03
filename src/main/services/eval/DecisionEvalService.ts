@@ -10,7 +10,7 @@
 import log from 'electron-log'
 import { credentialManager } from '../auth/CredentialManager'
 import { settings } from '../../config/settings'
-import { chatCompletion } from '../llm'
+import { chatCompletion, defaultChatModel } from '../llm'
 import type { EvaluatedDecision, DecisionConfidence } from '../../../shared/types/transcription'
 
 const GITHUB_API = 'https://api.github.com'
@@ -272,7 +272,13 @@ ${truncatedDecisions || '(none available)'}`
   const userPrompt = `Evaluate these decisions from a meeting summary:\n\n${decisions.map((d, i) => `${i + 1}. ${d}`).join('\n')}`
 
   try {
-    const evalModel = settings.get('decisionEvalModel') || 'openai/gpt-4o-mini'
+    // decisionEvalModel holds an OpenAI id and has no UI, so on any other
+    // provider it would be an id that doesn't exist. Fall back to the configured
+    // chat model, which is the same fast/cheap tier.
+    const evalModel =
+      settings.get('llmProvider') === 'openai'
+        ? settings.get('decisionEvalModel') || 'gpt-4o-mini'
+        : defaultChatModel()
     const response = await chatCompletion(
       [
         { role: 'system', content: systemPrompt },

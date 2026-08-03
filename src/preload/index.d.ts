@@ -83,6 +83,9 @@ interface AuthApi {
   isOpenAIConfigured(): Promise<boolean>
   setOpenAIKey(apiKey: string): Promise<{ success: boolean }>
   deleteOpenAIKey(): Promise<{ success: boolean }>
+  isLLMKeyConfigured(): Promise<boolean>
+  setLLMKey(apiKey: string): Promise<{ success: boolean }>
+  deleteLLMKey(): Promise<{ success: boolean }>
 }
 
 interface CalendarApi {

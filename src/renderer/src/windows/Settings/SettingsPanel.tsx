@@ -21,6 +21,8 @@ const HOTKEYS = [
   { label: "What's Next", shortcut: '⌘ + ⇧ + N' }
 ]
 
+const OPENAI_SUMMARY_MODELS = ['gpt-5', 'gpt-5-mini', 'gpt-4.1', 'gpt-4o-mini']
+
 export function SettingsPanel({ onClose }: { onClose: () => void }): React.ReactElement {
   const [settings, setSettings] = useState<AppSettings | null>(null)
   const [loading, setLoading] = useState(true)
@@ -28,6 +30,8 @@ export function SettingsPanel({ onClose }: { onClose: () => void }): React.React
   const [dirty, setDirty] = useState(false)
   const [openAIConfigured, setOpenAIConfigured] = useState(false)
   const [openAIKey, setOpenAIKey] = useState('')
+  const [llmKeyConfigured, setLlmKeyConfigured] = useState(false)
+  const [llmKey, setLlmKey] = useState('')
 
   // Microsoft auth state
   const [msftAuthed, setMsftAuthed] = useState(false)
@@ -43,16 +47,18 @@ export function SettingsPanel({ onClose }: { onClose: () => void }): React.React
   useEffect(() => {
     const load = async (): Promise<void> => {
       try {
-        const [s, authed, configured, aiConfigured] = await Promise.all([
+        const [s, authed, configured, aiConfigured, llmConfigured] = await Promise.all([
           window.api.settings.getAll(),
           window.api.auth.isAuthenticated(),
           window.api.github.isConfigured(),
-          window.api.auth.isOpenAIConfigured()
+          window.api.auth.isOpenAIConfigured(),
+          window.api.auth.isLLMKeyConfigured()
         ])
         setSettings(s)
         setMsftAuthed(authed)
         setGhConfigured(configured)
         setOpenAIConfigured(aiConfigured)
+        setLlmKeyConfigured(llmConfigured)
       } catch (err) {
         toast.error('Failed to load settings')
         console.error(err)
@@ -70,9 +76,26 @@ export function SettingsPanel({ onClose }: { onClose: () => void }): React.React
     setDirty(true)
   }
 
+  // Switching providers invalidates model ids: an OpenAI id is not a Foundry
+  // deployment, and vice versa. Reset anything the new provider can't serve so a
+  // stale value can't be saved silently.
+  const changeProvider = (next: AppSettings['llmProvider']): void => {
+    if (!settings || next === settings.llmProvider) return
+    const patch: Partial<AppSettings> = { llmProvider: next }
+    if (next === 'openai' && !OPENAI_SUMMARY_MODELS.includes(settings.meetingSummaryModel)) {
+      patch.meetingSummaryModel = 'gpt-5'
+    }
+    setSettings({ ...settings, ...patch })
+    setDirty(true)
+  }
+
   // Save changes
   const save = async (): Promise<void> => {
     if (!settings || !dirty) return
+    if (settings.llmProvider !== 'openai' && !settings.llmBaseUrl.trim()) {
+      toast.error('Add an endpoint base URL for the selected summary provider')
+      return
+    }
     setSaving(true)
     try {
       const saved = await window.api.settings.update({
@@ -82,12 +105,20 @@ export function SettingsPanel({ onClose }: { onClose: () => void }): React.React
         theme: settings.theme,
         userName: settings.userName,
         meetingFilterPatterns: settings.meetingFilterPatterns,
-        meetingSummaryModel: settings.meetingSummaryModel
+        meetingSummaryModel: settings.meetingSummaryModel,
+        llmProvider: settings.llmProvider,
+        llmChatModel: settings.llmChatModel,
+        llmBaseUrl: settings.llmBaseUrl
       })
       if (openAIKey.trim()) {
         await window.api.auth.setOpenAIKey(openAIKey)
         setOpenAIConfigured(true)
         setOpenAIKey('')
+      }
+      if (llmKey.trim()) {
+        await window.api.auth.setLLMKey(llmKey)
+        setLlmKeyConfigured(true)
+        setLlmKey('')
       }
       setSettings(saved)
       setDirty(false)
@@ -395,8 +426,8 @@ export function SettingsPanel({ onClose }: { onClose: () => void }): React.React
             )}
           </div>
           <p className="text-xs text-text-muted mt-1">
-            Used only for local audio transcription with speaker diarization. Summaries use GitHub
-            Models. Get your key from{' '}
+            Used for audio transcription with speaker diarization, and for summaries when the
+            provider below is set to OpenAI. Get your key from{' '}
             <a
               href="https://platform.openai.com/api-keys"
               target="_blank"
@@ -407,19 +438,115 @@ export function SettingsPanel({ onClose }: { onClose: () => void }): React.React
             </a>
           </p>
         </Label>
-        <Label text="Summary quality">
+
+        <Label text="Summary provider">
           <select
-            value={settings.meetingSummaryModel}
-            onChange={(e) => update('meetingSummaryModel', e.target.value)}
+            value={settings.llmProvider}
+            onChange={(e) => changeProvider(e.target.value as AppSettings['llmProvider'])}
             className="settings-select"
           >
-            <option value="openai/gpt-5">Highest quality, GPT-5 via GitHub Models</option>
-            <option value="openai/gpt-5-mini">Balanced, GPT-5 mini via GitHub Models</option>
-            <option value="openai/gpt-4.1">Fast, GPT-4.1 via GitHub Models</option>
-            <option value="openai/gpt-4o-mini">Economy, GPT-4o mini via GitHub Models</option>
+            <option value="openai">OpenAI — uses the key above</option>
+            <option value="foundry">Microsoft Foundry</option>
+            <option value="custom">Custom OpenAI-compatible endpoint</option>
           </select>
           <p className="text-xs text-text-muted mt-1">
-            Summaries use two passes for evidence-backed action items and meeting notes.
+            GitHub Models was retired on 30 July 2026, so summaries now run through one of these.
+            All three speak the same API.
+          </p>
+        </Label>
+
+        {settings.llmProvider !== 'openai' && (
+          <>
+            <Label text="Endpoint base URL">
+              <input
+                type="text"
+                value={settings.llmBaseUrl}
+                onChange={(e) => update('llmBaseUrl', e.target.value)}
+                placeholder={
+                  settings.llmProvider === 'foundry'
+                    ? 'https://<resource>.openai.azure.com/openai/v1'
+                    : 'http://localhost:11434/v1'
+                }
+                className="settings-input w-full"
+              />
+              <p className="text-xs text-text-muted mt-1">
+                {settings.llmProvider === 'foundry'
+                  ? 'The /openai/v1 route uses implicit versioning, so no api-version is needed. Set the model below to your deployment name.'
+                  : 'Any endpoint that implements the OpenAI chat-completions API, such as Ollama or LM Studio.'}
+              </p>
+            </Label>
+
+            <Label text={settings.llmProvider === 'foundry' ? 'Foundry API key' : 'API key'}>
+              <div className="flex gap-2">
+                <input
+                  type="password"
+                  value={llmKey}
+                  onChange={(e) => {
+                    setLlmKey(e.target.value)
+                    setDirty(true)
+                  }}
+                  placeholder={llmKeyConfigured ? 'Configured' : 'Paste key'}
+                  className="settings-input flex-1"
+                />
+                {llmKeyConfigured && (
+                  <button
+                    onClick={async () => {
+                      await window.api.auth.deleteLLMKey()
+                      setLlmKeyConfigured(false)
+                      toast.success('Provider key removed')
+                    }}
+                    className="settings-btn-secondary"
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
+              <p className="text-xs text-text-muted mt-1">
+                {settings.llmProvider === 'foundry'
+                  ? 'Found under Keys and Endpoint on your Foundry resource.'
+                  : 'Leave blank for a local endpoint that needs no authentication.'}
+              </p>
+            </Label>
+          </>
+        )}
+        <Label text="Summary model">
+          {settings.llmProvider === 'openai' ? (
+            <select
+              value={settings.meetingSummaryModel}
+              onChange={(e) => update('meetingSummaryModel', e.target.value)}
+              className="settings-select"
+            >
+              <option value="gpt-5">Highest quality, GPT-5</option>
+              <option value="gpt-5-mini">Balanced, GPT-5 mini</option>
+              <option value="gpt-4.1">Fast, GPT-4.1</option>
+              <option value="gpt-4o-mini">Economy, GPT-4o mini</option>
+            </select>
+          ) : (
+            <input
+              type="text"
+              value={settings.meetingSummaryModel}
+              onChange={(e) => update('meetingSummaryModel', e.target.value)}
+              placeholder={settings.llmProvider === 'foundry' ? 'my-gpt-5-deployment' : 'llama3.1'}
+              className="settings-input w-full"
+            />
+          )}
+          <p className="text-xs text-text-muted mt-1">
+            {settings.llmProvider === 'foundry'
+              ? 'Foundry addresses models by deployment name, not model name.'
+              : 'Summaries use two passes for evidence-backed action items and meeting notes.'}
+          </p>
+        </Label>
+
+        <Label text="Chat model">
+          <input
+            type="text"
+            value={settings.llmChatModel}
+            onChange={(e) => update('llmChatModel', e.target.value)}
+            placeholder={settings.llmProvider === 'foundry' ? 'my-gpt-4.1-deployment' : 'gpt-4.1'}
+            className="settings-input w-full"
+          />
+          <p className="text-xs text-text-muted mt-1">
+            The faster model behind Katya chat and slash commands.
           </p>
         </Label>
       </Section>

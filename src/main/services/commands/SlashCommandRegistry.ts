@@ -148,7 +148,7 @@ class SlashCommandRegistry {
         const context = await loadLLMContext(TRANSCRIPT_CONTEXT_FILES)
         const systemPrompt = TRANSCRIPT_SYSTEM_PROMPT + context
 
-        // Call GitHub Models to summarize
+        // Summarize via the configured LLM provider
         const result = await chatCompletion(
           [
             { role: 'system', content: systemPrompt },

@@ -16,7 +16,8 @@ const store = new (ElectronStore.default || ElectronStore)({
   defaults: {
     microsoftToken: '',
     githubPAT: '',
-    openAIKey: ''
+    openAIKey: '',
+    llmApiKey: ''
   }
 })
 
@@ -114,5 +115,31 @@ export const credentialManager = {
   deleteOpenAIKey(): void {
     store.set('openAIKey', '')
     log.info('[CredentialManager] OpenAI API key deleted')
+  },
+
+  // ─── LLM Provider Key ─────────────────────────────────────────
+  // Used by the `foundry` and `custom` chat providers. Kept separate from
+  // openAIKey so that changing the summary provider never disturbs the key
+  // audio transcription depends on.
+
+  storeLLMApiKey(apiKey: string): void {
+    store.set('llmApiKey', encryptRequired(apiKey))
+    log.info('[CredentialManager] LLM provider API key stored')
+  },
+
+  getLLMApiKey(): string | null {
+    const encrypted = store.get('llmApiKey') as string
+    if (!encrypted) return null
+    try {
+      return decryptRequired(encrypted)
+    } catch (error) {
+      log.error('[CredentialManager] Failed to decrypt LLM provider API key:', error)
+      return null
+    }
+  },
+
+  deleteLLMApiKey(): void {
+    store.set('llmApiKey', '')
+    log.info('[CredentialManager] LLM provider API key deleted')
   }
 }

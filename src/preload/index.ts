@@ -114,7 +114,11 @@ const authApi = {
   isOpenAIConfigured: (): Promise<boolean> => ipcRenderer.invoke('auth:isOpenAIConfigured'),
   setOpenAIKey: (apiKey: string): Promise<{ success: boolean }> =>
     ipcRenderer.invoke('auth:setOpenAIKey', apiKey),
-  deleteOpenAIKey: (): Promise<{ success: boolean }> => ipcRenderer.invoke('auth:deleteOpenAIKey')
+  deleteOpenAIKey: (): Promise<{ success: boolean }> => ipcRenderer.invoke('auth:deleteOpenAIKey'),
+  isLLMKeyConfigured: (): Promise<boolean> => ipcRenderer.invoke('auth:isLLMKeyConfigured'),
+  setLLMKey: (apiKey: string): Promise<{ success: boolean }> =>
+    ipcRenderer.invoke('auth:setLLMKey', apiKey),
+  deleteLLMKey: (): Promise<{ success: boolean }> => ipcRenderer.invoke('auth:deleteLLMKey')
 }
 
 // Calendar API exposed to renderer

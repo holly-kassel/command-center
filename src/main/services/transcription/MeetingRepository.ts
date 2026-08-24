@@ -14,12 +14,18 @@ import type {
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const ElectronStore = require('electron-store')
 
-const store = new (ElectronStore.default || ElectronStore)({
+const Store = ElectronStore.default || ElectronStore
+const store = new Store({
   name: 'meetings',
   defaults: {
     meetings: [] as unknown[],
     draft: null as MeetingDraft | null
   }
+})
+
+const draftStore = new Store({
+  name: 'meeting-draft',
+  defaults: { draft: null as MeetingDraft | null }
 })
 
 type UnknownRecord = Record<string, unknown>
@@ -388,12 +394,12 @@ export class MeetingRepository {
 
   saveDraft(meeting: SavedMeeting): MeetingDraft {
     const draft = { meeting: normalizeMeeting(meeting), updatedAt: new Date().toISOString() }
-    store.set('draft', draft)
+    draftStore.set('draft', draft)
     return draft
   }
 
   getDraft(): MeetingDraft | null {
-    const value = store.get('draft') as unknown
+    const value = (draftStore.get('draft') ?? store.get('draft')) as unknown
     if (!isRecord(value) || !value.meeting) return null
     return {
       meeting: normalizeMeeting(value.meeting),
@@ -405,11 +411,12 @@ export class MeetingRepository {
     if (meetingId) {
       const draft = this.getDraft()
       if (!draft || draft.meeting.id !== meetingId) return false
-    } else if (store.get('draft') == null) {
+    } else if (draftStore.get('draft') == null && store.get('draft') == null) {
       return false
     }
 
-    store.set('draft', null)
+    draftStore.set('draft', null)
+    if (store.get('draft') != null) store.set('draft', null)
     return true
   }
 }

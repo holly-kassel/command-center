@@ -11,17 +11,13 @@ import { DEFAULT_DASHBOARD_LAYOUT, type DashboardPanelId } from '@shared/types/s
 import { AnimatePresence } from 'framer-motion'
 import { useObsidianStore } from '../../store/obsidianStore'
 import { useCalendarStore } from '../../store/calendarStore'
-import { useGitHubStore } from '../../store/githubStore'
 import { useRitualStore } from '../../store/ritualStore'
 import { useAutoRefresh } from '../../hooks/useAutoRefresh'
 import { SortablePanel } from '../../components/ui/SortablePanel'
 import { AnimatedOverlay } from '../../components/ui/motion'
 import { QuickCaptureBox } from './QuickCaptureBox'
 import { CalendarSection } from './CalendarSection'
-import { NotificationsPanel } from './NotificationsPanel'
-import { PullRequestsPanel } from './PullRequestsPanel'
 import { TranscriptsPanel } from './TranscriptsPanel'
-import { FocusSection } from './FocusSection'
 import { NotesView } from '../../components/Notes/NotesView'
 import { SettingsPanel } from '../Settings/SettingsPanel'
 import { FocusModeOverlay } from '../FocusMode/FocusModeOverlay'
@@ -56,7 +52,7 @@ function getFormattedDate(): string {
   })
 }
 
-type RightColumnPanelId = Exclude<DashboardPanelId, 'notes' | 'goals'>
+type RightColumnPanelId = Extract<DashboardPanelId, 'rituals' | 'calendar' | 'transcripts'>
 
 const RIGHT_COLUMN_PANEL_IDS = [...DEFAULT_DASHBOARD_LAYOUT.rightColumn] as RightColumnPanelId[]
 
@@ -99,8 +95,6 @@ export function Dashboard(): React.ReactElement {
   const obsidianRefresh = useObsidianStore((s) => s.refreshAll)
   const calendarInit = useCalendarStore((s) => s.initialize)
   const calendarRefresh = useCalendarStore((s) => s.refreshAll)
-  const githubInit = useGitHubStore((s) => s.initialize)
-  const githubRefresh = useGitHubStore((s) => s.fetchNotifications)
   const ritualInit = useRitualStore((s) => s.initialize)
   const ritualRefresh = useRitualStore((s) => s.refreshAll)
   const activeRitual = useRitualStore((s) => s.activeRitual)
@@ -115,9 +109,6 @@ export function Dashboard(): React.ReactElement {
       />
     ),
     calendar: <CalendarSection />,
-    focus: <FocusSection />,
-    triage: <NotificationsPanel />,
-    pullRequests: <PullRequestsPanel />,
     transcripts: <TranscriptsPanel />
   }
   const kanbanInit = useKanbanStore((s) => s.initialize)
@@ -128,20 +119,18 @@ export function Dashboard(): React.ReactElement {
   const initAll = useCallback(() => {
     obsidianInit()
     calendarInit()
-    githubInit()
     ritualInit()
     kanbanInit()
     chatInit()
-  }, [obsidianInit, calendarInit, githubInit, ritualInit, kanbanInit, chatInit])
+  }, [obsidianInit, calendarInit, ritualInit, kanbanInit, chatInit])
 
   // Refresh data sources every 5 minutes
   const refreshAll = useCallback(() => {
     obsidianRefresh()
     calendarRefresh()
-    githubRefresh()
     ritualRefresh()
     kanbanRefresh()
-  }, [obsidianRefresh, calendarRefresh, githubRefresh, ritualRefresh, kanbanRefresh])
+  }, [obsidianRefresh, calendarRefresh, ritualRefresh, kanbanRefresh])
 
   // Auto-refresh sets up the interval (5 min)
   useAutoRefresh(initAll, 5 * 60 * 1000)
@@ -287,7 +276,6 @@ export function Dashboard(): React.ReactElement {
 
           {/* Main grid: 2 columns on lg */}
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-            {/* Today's notes — left, spans 2 cols */}
             <div className="min-w-0 lg:col-span-2">
               <NotesView />
             </div>

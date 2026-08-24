@@ -54,6 +54,7 @@ interface ObsidianApi {
   findVault(): Promise<string>
   setVaultPath(path: string): Promise<void>
   getVaultStatus(): Promise<VaultStatus>
+  openWeekNote(dateStr?: string): Promise<void>
   getTodaySection(): Promise<TodaySection | null>
   getDaySection(dateStr: string): Promise<TodaySection | null>
   getCurrentFocus(): Promise<string | null>

@@ -22,7 +22,7 @@ export interface DashboardLayout {
 }
 
 export const DEFAULT_DASHBOARD_LAYOUT: DashboardLayout = {
-  rightColumn: ['rituals', 'calendar', 'focus', 'triage', 'pullRequests', 'transcripts']
+  rightColumn: ['rituals', 'calendar', 'transcripts']
 }
 
 /** Which LLM provider backs chat completions */

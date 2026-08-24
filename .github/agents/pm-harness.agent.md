@@ -1,6 +1,7 @@
 ---
+name: PM Harness
 description: 'PM thought-partner harness. One harness, many skills: senses signal, shapes outcomes into specs, aligns stakeholders, and remembers context across an interrupted day. Backbone: spec-kit (SHAPE+ALIGN) wrapped with custom SENSE+REMEMBER.'
-tools: ['runInTerminal', 'terminalLastCommand', 'github/issue_read', 'github/search_issues', 'web_search', 'WorkIQ-WordServer-CreateDocument', 'WorkIQ-WordServer-GetDocumentContent', 'WorkIQ-OneDriveServer-findFileOrFolderInMyDrive', 'WorkIQ-OneDriveServer-readSmallTextFileFromMyOnedrive', 'WorkIQ-OneDriveServer-createSmallTextFileInMyOnedrive', 'WorkIQ-SharePointServer-findFileOrFolder', 'WorkIQ-SharePointServer-readSmallTextFile']
+tools: ['bash', 'read_bash', 'web_search', 'WorkIQ-WordServer-CreateDocument', 'WorkIQ-WordServer-GetDocumentContent', 'WorkIQ-OneDriveServer-findFileOrFolderInMyDrive', 'WorkIQ-OneDriveServer-readSmallTextFileFromMyOnedrive', 'WorkIQ-OneDriveServer-createSmallTextFileInMyOnedrive', 'WorkIQ-SharePointServer-findFileOrFolder', 'WorkIQ-SharePointServer-readSmallTextFile', 'slack_read_canvas', 'slack_read_channel', 'slack_read_thread', 'slack_read_user_profile', 'slack_search_channels', 'slack_search_public', 'slack_search_public_and_private', 'slack_search_users']
 ---
 
 # PM Harness

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useMeetingStore } from '../../store/meetingStore'
 
 const SPEAKER_COLORS = [
@@ -11,106 +11,6 @@ const SPEAKER_COLORS = [
   { bg: 'bg-yellow-500', text: 'text-yellow-400' },
   { bg: 'bg-red-500', text: 'text-red-400' }
 ]
-
-function SpeakerMapPanel(): React.ReactElement | null {
-  const { segments, renameSpeaker, settings, recordingContext } = useMeetingStore()
-  const [editingInputs, setEditingInputs] = useState<Record<string, string>>({})
-
-  const detectedSpeakers = useMemo(() => {
-    const found = new Map<
-      string,
-      { key: string; label: string; chunkId?: string; chunkNumber: number }
-    >()
-    const chunkNumbers = new Map<string, number>()
-    for (const segment of segments) {
-      if (segment.speakerIdentity?.verified) continue
-      const chunkId = segment.chunkId
-      if (chunkId && !chunkNumbers.has(chunkId)) chunkNumbers.set(chunkId, chunkNumbers.size + 1)
-      const key = chunkId ? `${chunkId}:${segment.speaker}` : segment.speaker
-      if (!found.has(key)) {
-        found.set(key, {
-          key,
-          label: segment.speaker,
-          chunkId,
-          chunkNumber: chunkId ? (chunkNumbers.get(chunkId) ?? 1) : 1
-        })
-      }
-    }
-    return [...found.values()]
-  }, [segments])
-
-  const participantNames = [
-    ...new Set([
-      ...settings.participants,
-      ...(recordingContext?.participants.map((participant) => participant.displayName) ?? [])
-    ])
-  ]
-
-  if (detectedSpeakers.length === 0) return null
-
-  const handleRename = (speaker: (typeof detectedSpeakers)[number]): void => {
-    const newName = editingInputs[speaker.key]?.trim()
-    if (!newName) return
-    renameSpeaker(speaker.label, newName, speaker.chunkId)
-    setEditingInputs((current) => {
-      const next = { ...current }
-      delete next[speaker.key]
-      return next
-    })
-  }
-
-  return (
-    <div className="mb-3 rounded-lg border border-yellow-500/20 bg-yellow-500/5 p-2.5">
-      <h4 className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-yellow-400">
-        Identify local speakers
-      </h4>
-      <p className="mb-2 text-[10px] leading-relaxed text-text-muted">
-        Local labels can change between chunks. Each correction applies only to that audio chunk.
-        Teams names replace these after sync.
-      </p>
-      <div className="space-y-1.5">
-        {detectedSpeakers.map((speaker) => (
-          <div key={speaker.key} className="flex items-center gap-2">
-            <span
-              className="w-24 flex-shrink-0 truncate text-[10px] text-text-muted"
-              title={speaker.label}
-            >
-              {speaker.label} · part {speaker.chunkNumber}
-            </span>
-            <input
-              type="text"
-              value={editingInputs[speaker.key] ?? ''}
-              onChange={(event) =>
-                setEditingInputs((current) => ({ ...current, [speaker.key]: event.target.value }))
-              }
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') {
-                  event.preventDefault()
-                  handleRename(speaker)
-                }
-              }}
-              placeholder="Enter or choose a name"
-              list="meeting-participant-names"
-              className="min-w-0 flex-1 rounded border border-surface-border bg-surface-muted/50 px-2 py-0.5 text-[11px] text-text-primary placeholder:text-text-muted focus:border-focus/50 focus:outline-none"
-            />
-            <button
-              onClick={() => handleRename(speaker)}
-              disabled={!editingInputs[speaker.key]?.trim()}
-              className="rounded bg-focus/20 px-1.5 py-0.5 text-[10px] font-medium text-focus disabled:opacity-30"
-            >
-              Save
-            </button>
-          </div>
-        ))}
-      </div>
-      <datalist id="meeting-participant-names">
-        {participantNames.map((name) => (
-          <option key={name} value={name} />
-        ))}
-      </datalist>
-    </div>
-  )
-}
 
 export function TranscriptView(): React.ReactElement {
   const { segments, isRecording, speakerFilter, searchQuery, setSpeakerFilter, setSearchQuery } =
@@ -145,7 +45,6 @@ export function TranscriptView(): React.ReactElement {
 
   return (
     <div className="flex h-full flex-col">
-      <SpeakerMapPanel />
       <div className="mb-3 flex gap-2">
         <input
           type="text"

@@ -3,21 +3,21 @@
  *
  * Type whatever you want. It is NEVER saved anywhere.
  * Hit "Scream" and the text vanishes into the void, accompanied
- * by a synthesized Howie scream (the TIE Fighter shriek).
+ * by a synthesized Wilhelm scream (the TIE Fighter shriek).
  *
  * Pure catharsis. Zero consequences.
  */
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
 
-// ─── Howie Scream Synth ───────────────────────────────────────
-// The Howie / TIE Fighter scream: try loading the real audio file,
+// ─── Wilhelm Scream Synth ───────────────────────────────────────
+// The Wilhelm / TIE Fighter scream: try loading the real audio file,
 // fall back to a synthesized approximation if not found.
 
-/** Try to play the real Howie scream from resources/sounds/ */
+/** Try to play the real Wilhelm scream from resources/sounds/ */
 async function playRealScream(): Promise<boolean> {
   try {
-    const buffer = await window.api.app.getSound('howie-scream.mp3')
+    const buffer = await window.api.app.getSound('wilhelm-scream.ogg')
     if (!buffer) return false
     const ctx = new AudioContext()
     const audioBuffer = await ctx.decodeAudioData(buffer)
@@ -32,7 +32,7 @@ async function playRealScream(): Promise<boolean> {
   }
 }
 
-/** Synthesized Howie scream fallback */
+/** Synthesized Wilhelm scream fallback */
 function playSynthScream(): void {
   const ctx = new AudioContext()
   const now = ctx.currentTime
@@ -133,8 +133,8 @@ function playSynthScream(): void {
   setTimeout(() => ctx.close(), (duration + 0.5) * 1000)
 }
 
-/** Play Howie scream — real file if available, synth fallback */
-async function playHowieScream(): Promise<void> {
+/** Play Wilhelm scream — real file if available, synth fallback */
+async function playWilhelmScream(): Promise<void> {
   const played = await playRealScream()
   if (!played) playSynthScream()
 }
@@ -170,8 +170,8 @@ export function ScreamIntoTheVoid({ onClose }: ScreamIntoTheVoidProps): React.JS
     setScreaming(true)
     setVoidPhase('dissolving')
 
-    // Play the Howie scream
-    playHowieScream()
+    // Play the Wilhelm scream
+    playWilhelmScream()
 
     // Text dissolves, then void phase
     setTimeout(() => {

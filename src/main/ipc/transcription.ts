@@ -223,7 +223,11 @@ export function registerTranscriptionIpc(): void {
 
   // Get all saved meetings
   ipcMain.handle('transcription:getMeetings', async (): Promise<SavedMeeting[]> => {
-    return repository.getAll()
+    return repository.getAll().map((meeting) => ({
+      ...meeting,
+      segments: [],
+      transcript: ''
+    }))
   })
 
   ipcMain.handle(

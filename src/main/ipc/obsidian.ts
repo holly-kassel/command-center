@@ -4,11 +4,12 @@
  * Registers ipcMain.handle() for all obsidian-related channels.
  * Called once at app startup from main/index.ts.
  */
-import { ipcMain } from 'electron'
+import { ipcMain, shell } from 'electron'
 import { getObsidianService } from '../services/obsidian/ObsidianService'
+import { getWeekFilePath } from '../services/obsidian/WeeklyNoteParser'
 import { getFileWatcher } from '../services/obsidian/FileWatcher'
 import { getSlashCommandRegistry } from '../services/commands/SlashCommandRegistry'
-import { join } from 'node:path'
+import { basename, join, relative } from 'node:path'
 import log from 'electron-log'
 
 export function registerObsidianIpc(): void {
@@ -47,6 +48,25 @@ export function registerObsidianIpc(): void {
   })
 
   // ─── Reading ───────────────────────────────────────────────────
+
+  ipcMain.handle('obsidian:openWeekNote', async (_event, dateStr?: string) => {
+    try {
+      const vaultPath = obsidian.getVaultPath()
+      if (!vaultPath) throw new Error('Obsidian vault is not configured.')
+      const date = dateStr ? new Date(`${dateStr}T12:00:00`) : new Date()
+      const filePath = dateStr
+        ? getWeekFilePath(vaultPath, date)
+        : await obsidian.ensureCurrentWeekNote()
+      const vaultName = basename(vaultPath)
+      const vaultFile = relative(vaultPath, filePath).replaceAll('\\', '/')
+      await shell.openExternal(
+        `obsidian://open?vault=${encodeURIComponent(vaultName)}&file=${encodeURIComponent(vaultFile)}`
+      )
+    } catch (error) {
+      log.error('[IPC] obsidian:openWeekNote error:', error)
+      throw error
+    }
+  })
 
   ipcMain.handle('obsidian:getTodaySection', async () => {
     try {
@@ -116,17 +136,14 @@ export function registerObsidianIpc(): void {
     }
   })
 
-  ipcMain.handle(
-    'obsidian:appendMeetingNote',
-    async (_event, heading: string, note: string) => {
-      try {
-        await obsidian.appendMeetingNoteToToday(heading, note)
-      } catch (error) {
-        log.error('[IPC] obsidian:appendMeetingNote error:', error)
-        throw error
-      }
+  ipcMain.handle('obsidian:appendMeetingNote', async (_event, heading: string, note: string) => {
+    try {
+      await obsidian.appendMeetingNoteToToday(heading, note)
+    } catch (error) {
+      log.error('[IPC] obsidian:appendMeetingNote error:', error)
+      throw error
     }
-  )
+  })
 
   ipcMain.handle('obsidian:updateTodayContent', async (_event, content: string) => {
     try {

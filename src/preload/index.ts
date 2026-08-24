@@ -56,6 +56,8 @@ const obsidianApi = {
   findVault: (): Promise<string> => ipcRenderer.invoke('obsidian:findVault'),
   setVaultPath: (path: string): Promise<void> => ipcRenderer.invoke('obsidian:setVaultPath', path),
   getVaultStatus: (): Promise<VaultStatus> => ipcRenderer.invoke('obsidian:getVaultStatus'),
+  openWeekNote: (dateStr?: string): Promise<void> =>
+    ipcRenderer.invoke('obsidian:openWeekNote', dateStr),
   getTodaySection: (): Promise<TodaySection | null> =>
     ipcRenderer.invoke('obsidian:getTodaySection'),
   getDaySection: (dateStr: string): Promise<TodaySection | null> =>

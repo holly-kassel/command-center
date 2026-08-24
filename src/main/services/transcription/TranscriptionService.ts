@@ -157,6 +157,53 @@ function encodeWav(pcmFloat32: Float32Array): Buffer {
   return buffer
 }
 
+const TRANSCRIPTION_RETRY_DELAYS_MS = [1000, 2500]
+const RETRYABLE_TRANSCRIPTION_STATUSES = new Set([408, 429, 500, 502, 503, 504])
+
+async function fetchTranscription(
+  body: ArrayBuffer,
+  boundary: string,
+  apiKey: string
+): Promise<Response> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': `multipart/form-data; boundary=${boundary}`
+        },
+        body
+      })
+      if (
+        !RETRYABLE_TRANSCRIPTION_STATUSES.has(response.status) ||
+        attempt >= TRANSCRIPTION_RETRY_DELAYS_MS.length
+      ) {
+        return response
+      }
+      await response.body?.cancel()
+      log.warn(
+        `[Transcription] OpenAI returned ${response.status}; retrying chunk (attempt ${attempt + 2})`
+      )
+    } catch (error) {
+      if (attempt >= TRANSCRIPTION_RETRY_DELAYS_MS.length) {
+        const detail = error instanceof Error ? error.message : String(error)
+        throw new Error(
+          `Could not reach OpenAI transcription after ${attempt + 1} attempts: ${detail}`,
+          {
+            cause: error
+          }
+        )
+      }
+      log.warn(
+        `[Transcription] OpenAI request failed; retrying chunk (attempt ${attempt + 2})`,
+        error
+      )
+    }
+    await new Promise((resolve) => setTimeout(resolve, TRANSCRIPTION_RETRY_DELAYS_MS[attempt]))
+  }
+}
+
 /**
  * Transcribe an audio chunk using OpenAI API with speaker diarization.
  * Receives raw PCM Float32 (16 kHz mono) from renderer, encodes as WAV for OpenAI.
@@ -227,14 +274,7 @@ export async function transcribeChunkWithOpenAI(
 
   const body = Buffer.concat(parts)
 
-  const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': `multipart/form-data; boundary=${boundary}`
-    },
-    body
-  })
+  const response = await fetchTranscription(Uint8Array.from(body).buffer, boundary, apiKey)
 
   if (!response.ok) {
     const errorText = await response.text()

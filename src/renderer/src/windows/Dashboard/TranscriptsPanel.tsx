@@ -800,17 +800,13 @@ function TranscriptDetailView({
 
 export function TranscriptsPanel(): React.ReactElement {
   const { savedMeetings, loadMeetings, deleteMeeting } = useMeetingStore()
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [selectedMeeting, setSelectedMeeting] = useState<SavedMeeting | null>(null)
+  const [isLoadingMeeting, setIsLoadingMeeting] = useState(false)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
   useEffect(() => {
     loadMeetings()
   }, [loadMeetings])
-
-  const selectedMeeting = useMemo(
-    () => savedMeetings.find((m) => m.id === selectedId) ?? null,
-    [savedMeetings, selectedId]
-  )
 
   // Sort newest first
   const sortedMeetings = useMemo(
@@ -824,10 +820,10 @@ export function TranscriptsPanel(): React.ReactElement {
   const handleDelete = useCallback(
     async (id: string) => {
       await deleteMeeting(id)
-      if (selectedId === id) setSelectedId(null)
+      if (selectedMeeting?.id === id) setSelectedMeeting(null)
       setConfirmDeleteId(null)
     },
-    [deleteMeeting, selectedId]
+    [deleteMeeting, selectedMeeting?.id]
   )
 
   // Detail view
@@ -837,7 +833,7 @@ export function TranscriptsPanel(): React.ReactElement {
         <TranscriptDetailView
           key={`${selectedMeeting.id}:${selectedMeeting.updatedAt}`}
           meeting={selectedMeeting}
-          onBack={() => setSelectedId(null)}
+          onBack={() => setSelectedMeeting(null)}
         />
       </section>
     )
@@ -867,6 +863,10 @@ export function TranscriptsPanel(): React.ReactElement {
         </button>
       </div>
 
+      {isLoadingMeeting && (
+        <div className="py-2 text-center text-xs text-text-muted">Loading transcript…</div>
+      )}
+
       {sortedMeetings.length === 0 ? (
         <div className="text-text-tertiary py-3 text-center text-sm">
           No transcripts yet — record a meeting to get started 🎙️
@@ -878,7 +878,13 @@ export function TranscriptsPanel(): React.ReactElement {
               <TranscriptListItem
                 meeting={meeting}
                 isSelected={false}
-                onClick={() => setSelectedId(meeting.id)}
+                onClick={() => {
+                  setIsLoadingMeeting(true)
+                  void window.api.transcription
+                    .getMeeting(meeting.id)
+                    .then((fullMeeting) => setSelectedMeeting(fullMeeting))
+                    .finally(() => setIsLoadingMeeting(false))
+                }}
               />
               {/* Delete button */}
               {confirmDeleteId === meeting.id ? (

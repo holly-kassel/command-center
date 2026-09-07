@@ -1,7 +1,6 @@
 import log from 'electron-log'
 import { settings } from '../../config/settings'
 import type { MeetingParticipant, SavedMeeting } from '../../../shared/types/transcription'
-import { credentialManager } from '../auth/CredentialManager'
 import { preserveActionReviews } from './ActionReviewMerge'
 import { getMeetingRepository } from './MeetingRepository'
 import type { MeetingTranscriptProvider } from './MeetingTranscriptProvider'
@@ -51,7 +50,6 @@ export class TeamsTranscriptSyncService {
   async syncPending(): Promise<SavedMeeting[]> {
     const repository = getMeetingRepository()
     const now = Date.now()
-    const canSummarize = Boolean(credentialManager.getGitHubPAT())
     const pending = repository.getAll().filter((meeting) => {
       const end = meeting.calendarContext?.endTime
       const ended = end ? new Date(end).getTime() <= now : false
@@ -71,7 +69,6 @@ export class TeamsTranscriptSyncService {
           isOlderThan(meeting.teamsSync.lastAttemptAt, STALE_OPERATION_MS, now))
 
       const summaryRetry =
-        canSummarize &&
         meeting.teamsSync.status === 'available' &&
         Boolean(meeting.transcriptArtifacts.teams) &&
         (((meeting.teamsSync.summaryStatus === 'pending' ||
@@ -236,19 +233,6 @@ export class TeamsTranscriptSyncService {
     const artifact = meeting.transcriptArtifacts.teams
     if (!artifact) return meeting
 
-    const githubPat = credentialManager.getGitHubPAT()
-    if (!githubPat) {
-      return (
-        repository.update(meetingId, (latest) => ({
-          ...latest,
-          teamsSync: {
-            ...latest.teamsSync,
-            summaryStatus: 'pending',
-            summaryOperationId: undefined
-          }
-        })) ?? meeting
-      )
-    }
     if (!force && meeting.teamsSync.summaryStatus === 'available') return meeting
     if (
       !force &&

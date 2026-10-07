@@ -210,16 +210,20 @@ export interface WildScenery {
 }
 
 /**
- * Meadow around the village. The canvas rarely matches the village's shape,
- * so the leftover space is split into cell-sized "wild" plots, each with a few
- * trees and flowers. Plots are seeded by grid position, so scenery stays put
- * between frames, and nothing is placed on the roads out of the town square.
+ * Meadow around and between the yards. The canvas rarely matches the
+ * village's shape, so every cell-sized plot without a yard or the square
+ * (beyond the grid or an unused slot in it) gets a few trees and flowers.
+ * Plots are seeded by grid position, so scenery stays put between frames, and
+ * nothing is placed on the roads out of the town square.
  * `area` is the visible region in world pixels.
  */
 export function wildScenery(layout: VillageLayout, area: Rect): WildScenery {
   const trees: { x: number; y: number }[] = []
   const flowers: { x: number; y: number }[] = []
   const sq = layout.square
+  const taken = new Set(
+    [sq, ...layout.yards.map((y) => y.cell)].map((c) => `${c.x / CELL_W},${c.y / CELL_H}`)
+  )
   const roadY = sq.y + sq.h / 2 - 4
   const roadX = sq.x + sq.w / 2 - 4
   const onRoad = (x: number, y: number, w: number, h: number): boolean =>
@@ -231,7 +235,7 @@ export function wildScenery(layout: VillageLayout, area: Rect): WildScenery {
   const r1 = Math.ceil((area.y + area.h) / CELL_H)
   for (let row = r0; row < r1; row++) {
     for (let col = c0; col < c1; col++) {
-      if (col >= 0 && col < layout.cols && row >= 0 && row < layout.rows) continue
+      if (taken.has(`${col},${row}`)) continue
       const rnd = mulberry(hash(`wild:${col},${row}`))
       const x0 = col * CELL_W
       const y0 = row * CELL_H

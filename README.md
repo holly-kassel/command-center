@@ -73,7 +73,7 @@ Legacy records are backed up before migration. Saved timestamps recover dates in
 - Reads only local data: `~/.copilot/session-store.db` plus each session's `workspace.yaml` / `events.jsonl` in `~/.copilot/session-state` — no network, no new dependencies
 - Collar colour = status: **working** (walking/doing a chore), **waiting** (sitting with a `?` bubble — needs your permission), **idle** (wandering/napping), **recent** (sitting on the porch, process gone), **done** (asleep on the porch)
 - Click a critter to jump to its session in the GitHub Copilot app (`ghapp://sessions/<id>`) and open a speech bubble with session name, branch, last activity, Open session, Reveal in Finder, and Copy session ID
-- Opens maximized and zooms in whole-pixel steps to fit the window, with meadow, wild trees, and roads filling the space around the village; if it still doesn't fit, scroll or drag to pan around
+- Opens maximized and zooms in whole-pixel steps to fit the window, with meadow, wild trees, and roads filling any space around or between the yards; if it still doesn't fit, scroll or drag to pan around
 - Click a cottage to zoom into its yard: larger close-up portraits of each critter, the cottage at its current upgrade tier with progress to the next one, and full session details (status, branch, client, cwd, session ID). Escape or "Back to village" returns to the map
 - Click Katya in the town square for her town report — pet her (drag over her) and she'll wag; click her and she barks
 - Idle critters pair up and play together — chasing around their yard (or meeting in the town square if they live in different repos) with hearts and music notes

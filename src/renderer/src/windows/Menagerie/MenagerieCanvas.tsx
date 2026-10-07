@@ -346,7 +346,7 @@ export function MenagerieCanvas({
         ctx.fillRect((layout.fountain.x + 3) * s, (layout.fountain.y - 1) * s, s, s)
       }
 
-      // Wild meadow beyond the village; recomputed only when the view changes
+      // Wild meadow around and between the yards; recomputed only when the view changes
       const wildKey = `${visible.x},${visible.y},${visible.w},${visible.h}`
       if (wild?.layout !== layout || wild.key !== wildKey) {
         wild = { layout, key: wildKey, scenery: wildScenery(layout, visible) }

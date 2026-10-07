@@ -447,10 +447,16 @@ test('villageScale uses whole-number zoom with no upper cap, never below 2x', ()
   assert.equal(village.villageScale(world, 0, 0), 2)
 })
 
-test('wildScenery fills the meadow outside the village, off the roads, and stays put', () => {
-  const yards = ['a/one', 'a/two', 'a/three'].map((repository) => ({ repository, critters: [] }))
+test('wildScenery plants plots around and between yards, off the roads, and stays put', () => {
+  // Four yards plus the square in a 3x2 grid leave slot (2,1) unused
+  const yards = ['a/one', 'a/two', 'a/three', 'a/four'].map((repository) => ({
+    repository,
+    critters: []
+  }))
   const layout = village.buildLayout(yards, 1.6)
+  assert.deepEqual([layout.cols, layout.rows], [3, 2])
   const { world, square: sq } = layout
+  const taken = [sq, ...layout.yards.map((y) => y.cell)]
   const area = { x: -150, y: -100, w: world.w + 300, h: world.h + 200 }
   const scenery = village.wildScenery(layout, area)
   assert.ok(scenery.trees.length > 0 && scenery.flowers.length > 0)
@@ -463,14 +469,19 @@ test('wildScenery fills the meadow outside the village, off the roads, and stays
   ]
   for (const it of items) {
     const at = `${it.x},${it.y}`
-    const inVillage = it.x + it.w > 0 && it.x < world.w && it.y + it.h > 0 && it.y < world.h
-    assert.ok(!inVillage, `scenery overlaps the village at ${at}`)
+    const hits = (c) =>
+      it.x + it.w > c.x && it.x < c.x + c.w && it.y + it.h > c.y && it.y < c.y + c.h
+    assert.ok(!taken.some(hits), `scenery overlaps a yard or the square at ${at}`)
     assert.ok(!(it.y < roadY + 8 && it.y + it.h > roadY), `scenery on the east-west road at ${at}`)
     assert.ok(
       !(it.x < roadX + 8 && it.x + it.w > roadX),
       `scenery on the north-south road at ${at}`
     )
   }
+
+  // The unused slot inside the grid is planted too
+  const unused = village.wildScenery(layout, { x: 224, y: 88, w: 112, h: 88 })
+  assert.ok(unused.trees.length + unused.flowers.length > 0)
 
   // Seeded by plot, so the same view gives the same scenery and a smaller view shows a subset
   assert.deepEqual(village.wildScenery(layout, area), scenery)
@@ -480,7 +491,7 @@ test('wildScenery fills the meadow outside the village, off the roads, and stays
     assert.ok(scenery.trees.some((u) => u.x === t.x && u.y === t.y))
   }
 
-  // A view entirely inside the village has no wild plots
+  // A view inside one yard has nothing to plant
   assert.deepEqual(village.wildScenery(layout, { x: 8, y: 8, w: 100, h: 80 }), {
     trees: [],
     flowers: []

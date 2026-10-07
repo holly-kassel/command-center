@@ -3,15 +3,17 @@ import { Toaster } from 'react-hot-toast'
 import { Dashboard } from './windows/Dashboard/Dashboard'
 import { QuickCaptureOverlay } from './windows/QuickCapture/QuickCaptureOverlay'
 import { WhatsNextOverlay } from './windows/WhatsNext/WhatsNextOverlay'
+import { MenagerieWindow } from './windows/Menagerie/MenagerieWindow'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { OfflineBanner } from './components/OfflineBanner'
 
-type AppRoute = 'dashboard' | 'quick-capture' | 'whats-next'
+type AppRoute = 'dashboard' | 'quick-capture' | 'whats-next' | 'menagerie'
 
 function getRoute(): AppRoute {
   const hash = window.location.hash.replace('#/', '').replace('#', '')
   if (hash === 'quick-capture') return 'quick-capture'
   if (hash === 'whats-next') return 'whats-next'
+  if (hash === 'menagerie') return 'menagerie'
   return 'dashboard'
 }
 
@@ -92,6 +94,12 @@ function App(): React.JSX.Element {
   // Overlays don't need ErrorBoundary/Toaster chrome
   if (route === 'quick-capture') return <QuickCaptureOverlay />
   if (route === 'whats-next') return <WhatsNextOverlay />
+  if (route === 'menagerie')
+    return (
+      <ErrorBoundary>
+        <MenagerieWindow />
+      </ErrorBoundary>
+    )
 
   return (
     <ErrorBoundary>

@@ -7,18 +7,18 @@
  * registration, client id, or MSAL flow.
  *
  * IMPORTANT — how the WorkIQ MCP server actually works:
- * The server exposes exactly two tools, `accept_eula` and `ask_work_iq`. There
- * is NO structured `ListCalendarView`/Graph tool. `ask_work_iq` is a natural-
- * language interface to Microsoft 365 Copilot. So we:
+ * There is NO structured `ListCalendarView`/Graph tool. The natural-language
+ * query tool's name has changed between WorkIQ versions (`ask_work_iq` vs
+ * `ask`), so we discover it from the running server's tool list. So we:
  *   1. Spawn the server (PATH-augmented so it works inside a packaged Electron
  *      app that doesn't inherit the shell PATH).
  *   2. Call `accept_eula` once per process — the MCP server requires the EULA to
  *      be accepted in-session; a prior CLI `accept-eula` does NOT carry over.
- *   3. Call `ask_work_iq` with a precise question that asks for the events as a
+ *   3. Call the discovered query tool with a precise question that asks for the events as a
  *      strict JSON array, then robustly extract that JSON (the model may wrap it
  *      in prose or ```json fences).
  *
- * Timezone note: `ask_work_iq` returns start/end as ISO 8601 strings that
+ * Timezone note: WorkIQ returns start/end as ISO 8601 strings that
  * already include the UTC offset (e.g. "2026-06-22T10:00:00-05:00"), so each
  * value is a fully-resolved absolute instant. The downstream parser simply
  * passes them through `new Date(...)` — it must NOT append "Z".
@@ -44,7 +44,7 @@ const CONNECT_TIMEOUT = 90_000 // cold `npx` download can be slow
 const CALL_TIMEOUT = 90_000 // natural-language calendar queries can take ~30s
 
 const EULA_URL = 'https://github.com/microsoft/work-iq-mcp'
-const ASK_TOOL = 'ask_work_iq'
+const ASK_TOOL_CANDIDATES = ['ask_work_iq', 'ask'] as const
 const EULA_TOOL = 'accept_eula'
 
 export interface WorkIqTranscriptSegment {
@@ -65,6 +65,8 @@ export interface WorkIqMeetingTranscript {
 export class WorkIqClient {
   private mcp = new McpClient()
   private eulaAccepted = false
+  private askTool: string | null = null
+  private hasEulaTool = true
 
   // ─── Public API ────────────────────────────────────────────────
 
@@ -113,9 +115,9 @@ export class WorkIqClient {
   }
 
   private async ask(question: string): Promise<unknown> {
-    await this.ensureConnected()
+    const askTool = await this.ensureConnected()
     const raw = await this.withTimeout(
-      this.mcp.callTool(ASK_TOOL, { question }),
+      this.mcp.callTool(askTool, { question }),
       CALL_TIMEOUT,
       'WORKIQ_CALL_TIMEOUT'
     )
@@ -130,6 +132,7 @@ export class WorkIqClient {
   /** Kill the subprocess but keep the connected flag (used on app quit). */
   async shutdown(): Promise<void> {
     this.eulaAccepted = false
+    this.askTool = null
     try {
       await this.mcp.disconnect()
     } catch (error) {
@@ -145,9 +148,10 @@ export class WorkIqClient {
 
   // ─── Connection / EULA ─────────────────────────────────────────
 
-  private async ensureConnected(): Promise<void> {
+  private async ensureConnected(): Promise<string> {
     if (!this.mcp.isConnected()) {
       this.eulaAccepted = false
+      this.askTool = null
       const { command, args } = this.resolveSpawn()
       log.info(`[WorkIqClient] Spawning WorkIQ MCP server: ${command} ${args.join(' ')}`)
       await this.withTimeout(
@@ -157,10 +161,24 @@ export class WorkIqClient {
       )
     }
 
-    // The MCP server requires the EULA to be accepted in-session before
-    // ask_work_iq returns data. The user initiates this by clicking "Connect
+    if (!this.askTool) {
+      const tools = await this.mcp.listTools()
+      const found = ASK_TOOL_CANDIDATES.find((name) => tools.includes(name))
+      if (!found) {
+        throw new Error(
+          `WorkIQ has no supported query tool (expected ${ASK_TOOL_CANDIDATES.join(' or ')}; ` +
+            `server offers: ${tools.join(', ') || 'none'})`
+        )
+      }
+      this.askTool = found
+      this.hasEulaTool = tools.includes(EULA_TOOL)
+      log.info(`[WorkIqClient] Using WorkIQ query tool: ${found}`)
+    }
+
+    // Older servers require the EULA to be accepted in-session before the
+    // query tool returns data. The user initiates this by clicking "Connect
     // Calendar", so acceptance is an explicit, user-driven action.
-    if (!this.eulaAccepted) {
+    if (!this.eulaAccepted && this.hasEulaTool) {
       await this.withTimeout(
         this.mcp.callTool(EULA_TOOL, { eulaUrl: EULA_URL }),
         CALL_TIMEOUT,
@@ -169,6 +187,8 @@ export class WorkIqClient {
       this.eulaAccepted = true
       log.info('[WorkIqClient] Accepted WorkIQ EULA for this session')
     }
+
+    return this.askTool
   }
 
   private buildCalendarQuestion(startISO: string, endISO: string): string {
@@ -267,7 +287,7 @@ export class WorkIqClient {
   // ─── Result parsing ────────────────────────────────────────────
 
   /**
-   * Extract the event array from an `ask_work_iq` result. The answer is natural
+   * Extract the event array from a WorkIQ query result. The answer is natural
    * language that should contain a JSON array, but may be wrapped in prose or
    * ```json fences, so a naive JSON.parse can fail — we scan for the first
    * balanced JSON value.

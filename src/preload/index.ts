@@ -6,10 +6,12 @@ import type {
   WeeklyNote,
   SlashCommandResult,
   SlashCommandInfo,
+  SlashCommandAttachment,
   WeeklyNoteSummary,
   WeeklySectionResult
 } from '../shared/types/obsidian'
 import type { CalendarEvent } from '../shared/types/calendar'
+import type { MenagerieSnapshot } from '../shared/types/menagerie'
 import type {
   GitHubNotification,
   GitHubPullRequest,
@@ -19,7 +21,15 @@ import type {
 } from '../shared/types/github'
 import type { ParsedSlackThread } from '../shared/types/slack'
 import type { AppSettings } from '../shared/types/settings'
-import type { DailyLog, Streak, StreakType, WeeklyRitualMetrics } from '../shared/types/ritual'
+import type {
+  DailyLog,
+  Streak,
+  StreakType,
+  WeeklyRitualMetrics,
+  RitualSnapshot,
+  RitualDraft,
+  RitualCompletion
+} from '../shared/types/ritual'
 import type {
   Goal,
   GoalWithChildren,
@@ -74,8 +84,11 @@ const obsidianApi = {
     ipcRenderer.invoke('obsidian:updateTodayContent', content),
   toggleCheckbox: (lineOffset: number): Promise<void> =>
     ipcRenderer.invoke('obsidian:toggleCheckbox', lineOffset),
-  executeSlashCommand: (text: string): Promise<SlashCommandResult> =>
-    ipcRenderer.invoke('obsidian:executeSlashCommand', text),
+  executeSlashCommand: (
+    text: string,
+    attachments: SlashCommandAttachment[] = []
+  ): Promise<SlashCommandResult> =>
+    ipcRenderer.invoke('obsidian:executeSlashCommand', text, attachments),
   getSlashCommands: (): Promise<SlashCommandInfo[]> =>
     ipcRenderer.invoke('obsidian:getSlashCommands'),
   onFileChanged: (callback: (data: { filePath: string }) => void): (() => void) => {
@@ -193,27 +206,24 @@ const slackApi = {
 
 // Ritual API exposed to renderer
 const ritualApi = {
+  getSnapshot: (): Promise<RitualSnapshot> => ipcRenderer.invoke('ritual:getSnapshot'),
+  saveDraft: (draft: RitualDraft): Promise<RitualSnapshot> =>
+    ipcRenderer.invoke('ritual:saveDraft', draft),
+  discardDraft: (id: string): Promise<RitualSnapshot> =>
+    ipcRenderer.invoke('ritual:discardDraft', id),
+  complete: (input: RitualCompletion): Promise<RitualSnapshot> =>
+    ipcRenderer.invoke('ritual:complete', input),
   getDailyLog: (date: string): Promise<DailyLog> => ipcRenderer.invoke('ritual:getDailyLog', date),
   getTodayLog: (): Promise<DailyLog> => ipcRenderer.invoke('ritual:getTodayLog'),
-  saveDailyLog: (date: string, partial: Partial<DailyLog>): Promise<DailyLog> =>
-    ipcRenderer.invoke('ritual:saveDailyLog', date, partial),
   getLogsInRange: (start: string, end: string): Promise<DailyLog[]> =>
     ipcRenderer.invoke('ritual:getLogsInRange', start, end),
   getStreak: (type: StreakType): Promise<Streak> => ipcRenderer.invoke('ritual:getStreak', type),
   getAllStreaks: (): Promise<Record<StreakType, Streak>> =>
     ipcRenderer.invoke('ritual:getAllStreaks'),
-  updateStreak: (type: StreakType): Promise<Streak> =>
-    ipcRenderer.invoke('ritual:updateStreak', type),
-  checkFullDayStreak: (): Promise<Streak | null> => ipcRenderer.invoke('ritual:checkFullDayStreak'),
   getWeeklyMetrics: (weekStart?: string): Promise<WeeklyRitualMetrics> =>
     ipcRenderer.invoke('ritual:getWeeklyMetrics', weekStart),
-  onSyncUpdate: (
-    callback: (data: { todayLog: DailyLog; streaks: Record<StreakType, Streak> }) => void
-  ): (() => void) => {
-    const handler = (
-      _e: Electron.IpcRendererEvent,
-      data: { todayLog: DailyLog; streaks: Record<StreakType, Streak> }
-    ): void => callback(data)
+  onSyncUpdate: (callback: (data: RitualSnapshot) => void): (() => void) => {
+    const handler = (_e: Electron.IpcRendererEvent, data: RitualSnapshot): void => callback(data)
     ipcRenderer.on('sync:ritual', handler)
     return () => ipcRenderer.removeListener('sync:ritual', handler)
   }
@@ -407,6 +417,29 @@ const chatApi = {
   }
 }
 
+// Katya's Menagerie API exposed to renderer
+const menagerieApi = {
+  getSnapshot: (): Promise<MenagerieSnapshot> => ipcRenderer.invoke('menagerie:get-snapshot'),
+  refresh: (): Promise<MenagerieSnapshot> => ipcRenderer.invoke('menagerie:refresh'),
+  reveal: (cwd: string): Promise<void> => ipcRenderer.invoke('menagerie:reveal', cwd),
+  copyId: (id: string): Promise<void> => ipcRenderer.invoke('menagerie:copy-id', id),
+  openSession: (id: string): Promise<boolean> => ipcRenderer.invoke('menagerie:open-session', id),
+  getNotifications: (): Promise<boolean> => ipcRenderer.invoke('menagerie:get-notifications'),
+  setNotifications: (enabled: boolean): Promise<boolean> =>
+    ipcRenderer.invoke('menagerie:set-notifications', enabled),
+  editNeighborhoods: (): Promise<void> => ipcRenderer.invoke('menagerie:edit-neighborhoods'),
+  onUpdate: (callback: (snapshot: MenagerieSnapshot) => void): (() => void) => {
+    const handler = (_e: Electron.IpcRendererEvent, snapshot: MenagerieSnapshot): void =>
+      callback(snapshot)
+    ipcRenderer.on('menagerie:update', handler)
+    void ipcRenderer.invoke('menagerie:subscribe')
+    return () => {
+      ipcRenderer.removeListener('menagerie:update', handler)
+      void ipcRenderer.invoke('menagerie:unsubscribe')
+    }
+  }
+}
+
 // Custom APIs for renderer
 const api = {
   obsidian: obsidianApi,
@@ -420,6 +453,7 @@ const api = {
   transcription: transcriptionApi,
   decisionEval: decisionEvalApi,
   chat: chatApi,
+  menagerie: menagerieApi,
   settings: settingsApi,
   app: appApi
 }

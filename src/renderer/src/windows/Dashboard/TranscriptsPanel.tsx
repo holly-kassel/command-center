@@ -799,7 +799,9 @@ function TranscriptDetailView({
 // ─── Main Component ───────────────────────────────────────────
 
 export function TranscriptsPanel(): React.ReactElement {
-  const { savedMeetings, loadMeetings, deleteMeeting } = useMeetingStore()
+  const savedMeetings = useMeetingStore((s) => s.savedMeetings)
+  const loadMeetings = useMeetingStore((s) => s.loadMeetings)
+  const deleteMeeting = useMeetingStore((s) => s.deleteMeeting)
   const [selectedMeeting, setSelectedMeeting] = useState<SavedMeeting | null>(null)
   const [isLoadingMeeting, setIsLoadingMeeting] = useState(false)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)

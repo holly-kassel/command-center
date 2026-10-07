@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { DecisionConfidence, MeetingActionItem } from '@shared/types/transcription'
+import { useShallow } from 'zustand/react/shallow'
 import { useMeetingStore } from '../../store/meetingStore'
 
 const CONFIDENCE_CONFIG: Record<
@@ -94,7 +95,16 @@ export function NotesView(): React.ReactElement {
     segments,
     evaluatedDecisions,
     isEvaluatingDecisions
-  } = useMeetingStore()
+  } = useMeetingStore(
+    useShallow((s) => ({
+      notes: s.notes,
+      isGeneratingNotes: s.isGeneratingNotes,
+      generateNotes: s.generateNotes,
+      segments: s.segments,
+      evaluatedDecisions: s.evaluatedDecisions,
+      isEvaluatingDecisions: s.isEvaluatingDecisions
+    }))
+  )
   const [expandedDecision, setExpandedDecision] = useState<number | null>(null)
 
   if (isGeneratingNotes) {

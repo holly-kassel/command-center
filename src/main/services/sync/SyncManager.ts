@@ -131,12 +131,10 @@ export class SyncManager {
   private async syncRitual(): Promise<void> {
     try {
       const ritual = getRitualService()
-      const todayLog = ritual.getTodayLog()
-      const streaks = ritual.getAllStreaks()
-      this.sendToRenderer('sync:ritual', { todayLog, streaks })
+      this.sendToRenderer('sync:ritual', ritual.getSnapshot())
       logger.debug('[SyncManager] Ritual synced')
-    } catch {
-      // Silent — ritual data is non-critical
+    } catch (error) {
+      logger.error('[SyncManager] Ritual sync failed:', error)
     }
   }
 

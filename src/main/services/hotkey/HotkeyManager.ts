@@ -5,6 +5,7 @@
  * Creates and manages lightweight overlay windows for:
  *  - Quick Capture  (Cmd+Shift+Space)
  *  - What's Next     (Cmd+Shift+N)
+ *  - Katya's Menagerie (Cmd+Shift+M) — a normal framed window, not an overlay
  */
 import { globalShortcut, BrowserWindow, screen, ipcMain, app } from 'electron'
 import { join } from 'path'
@@ -13,6 +14,7 @@ import { is } from '@electron-toolkit/utils'
 export class HotkeyManager {
   private quickCaptureWindow: BrowserWindow | null = null
   private whatsNextWindow: BrowserWindow | null = null
+  private menagerieWindow: BrowserWindow | null = null
   private mainWindow: BrowserWindow | null = null
 
   /**
@@ -31,6 +33,10 @@ export class HotkeyManager {
 
     globalShortcut.register('CommandOrControl+Shift+F', () => {
       this.toggleFocusMode()
+    })
+
+    globalShortcut.register('CommandOrControl+Shift+M', () => {
+      this.toggleMenagerie()
     })
 
     // Listen for overlay close requests from renderer
@@ -151,6 +157,49 @@ export class HotkeyManager {
     win.setPosition(x, y)
   }
 
+  // ── Katya's Menagerie ──────────────────────────────────────────
+
+  /**
+   * Toggle the pixel-village window. Unlike the overlays this is a
+   * regular resizable window: it isn't always-on-top and isn't hidden by hideAll().
+   */
+  toggleMenagerie(): void {
+    if (this.menagerieWindow && !this.menagerieWindow.isDestroyed()) {
+      if (this.menagerieWindow.isVisible() && this.menagerieWindow.isFocused()) {
+        this.menagerieWindow.hide()
+        return
+      }
+      this.menagerieWindow.show()
+      this.menagerieWindow.focus()
+      return
+    }
+
+    const win = new BrowserWindow({
+      width: 1280,
+      height: 800,
+      minWidth: 640,
+      minHeight: 420,
+      title: "Katya's Menagerie",
+      show: false,
+      backgroundColor: '#1b1a2e',
+      titleBarStyle: 'hiddenInset',
+      webPreferences: {
+        preload: join(__dirname, '../preload/index.js'),
+        sandbox: false
+      }
+    })
+    this.menagerieWindow = win
+    this.loadOverlayRoute(win, 'menagerie')
+
+    win.once('ready-to-show', () => {
+      win.show()
+      win.focus()
+    })
+    win.on('closed', () => {
+      this.menagerieWindow = null
+    })
+  }
+
   // ── Helpers ────────────────────────────────────────────────────
 
   private createOverlayWindow(width: number, height: number): BrowserWindow {
@@ -205,6 +254,9 @@ export class HotkeyManager {
     }
     if (this.whatsNextWindow && !this.whatsNextWindow.isDestroyed()) {
       this.whatsNextWindow.close()
+    }
+    if (this.menagerieWindow && !this.menagerieWindow.isDestroyed()) {
+      this.menagerieWindow.close()
     }
   }
 }

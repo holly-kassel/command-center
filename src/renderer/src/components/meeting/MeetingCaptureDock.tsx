@@ -1,11 +1,51 @@
 import { useEffect, useState } from 'react'
 import { formatMeetingForWeekly } from '@shared/formatMeetingMarkdown'
 import type { SavedMeeting } from '@shared/types/transcription'
+import { useShallow } from 'zustand/react/shallow'
 import { useMeetingRecorder } from '../../hooks/useMeetingRecorder'
 import { useMeetingStore } from '../../store/meetingStore'
 import { MeetingSettings } from './MeetingSettings'
 import { NotesView } from './NotesView'
 import { TranscriptView } from './TranscriptView'
+
+function CompactAudioLevelMeter(): React.ReactElement {
+  const audioLevel = useMeetingStore((s) => s.audioLevel)
+  return (
+    <span
+      className="flex h-3 items-end gap-px"
+      aria-label={`Audio level ${Math.round(audioLevel)} percent`}
+    >
+      {[25, 45, 65, 85].map((threshold) => (
+        <span
+          key={threshold}
+          className={`w-0.5 rounded-full ${audioLevel >= threshold ? 'bg-focus' : 'bg-surface-border'}`}
+          style={{ height: `${Math.max(3, threshold / 8)}px` }}
+        />
+      ))}
+    </span>
+  )
+}
+
+function AudioLevelMeter(): React.ReactElement {
+  const audioLevel = useMeetingStore((s) => s.audioLevel)
+  return (
+    <div
+      className="flex h-5 flex-1 items-end gap-1"
+      aria-label={`Audio level ${Math.round(audioLevel)} percent`}
+    >
+      {Array.from({ length: 18 }, (_, index) => {
+        const threshold = (index / 18) * 100
+        return (
+          <span
+            key={index}
+            className={`w-1 rounded-full transition-all ${audioLevel > threshold ? 'bg-focus' : 'bg-surface-border'}`}
+            style={{ height: `${4 + ((index * 7) % 14)}px` }}
+          />
+        )
+      })}
+    </div>
+  )
+}
 
 function formatTime(seconds: number): string {
   const hours = Math.floor(seconds / 3600)
@@ -31,7 +71,13 @@ function RecordingStatusBar({
   failedChunkCount,
   isStopping
 }: RecordingStatusBarProps): React.ReactElement {
-  const { meetingTitle, elapsedTime, isPaused, audioLevel } = useMeetingStore()
+  const { meetingTitle, elapsedTime, isPaused } = useMeetingStore(
+    useShallow((s) => ({
+      meetingTitle: s.meetingTitle,
+      elapsedTime: s.elapsedTime,
+      isPaused: s.isPaused
+    }))
+  )
   return (
     <div className="fixed bottom-4 right-4 z-50 flex max-w-[calc(100vw-2rem)] items-center gap-3 rounded-xl border border-surface-border bg-background/95 px-3 py-2 shadow-2xl backdrop-blur">
       <button
@@ -51,18 +97,7 @@ function RecordingStatusBar({
             {failedChunkCount} failed
           </span>
         )}
-        <span
-          className="flex h-3 items-end gap-px"
-          aria-label={`Audio level ${Math.round(audioLevel)} percent`}
-        >
-          {[25, 45, 65, 85].map((threshold) => (
-            <span
-              key={threshold}
-              className={`w-0.5 rounded-full ${audioLevel >= threshold ? 'bg-focus' : 'bg-surface-border'}`}
-              style={{ height: `${Math.max(3, threshold / 8)}px` }}
-            />
-          ))}
-        </span>
+        <CompactAudioLevelMeter />
       </button>
       <button
         onClick={onPause}
@@ -125,7 +160,6 @@ export function MeetingCaptureDock(): React.ReactElement {
     isDockCollapsed,
     setDockCollapsed,
     elapsedTime,
-    audioLevel,
     manualNotes,
     setManualNotes,
     activeView,
@@ -141,7 +175,32 @@ export function MeetingCaptureDock(): React.ReactElement {
     saveMeeting,
     closeRecorder,
     cancelMeeting
-  } = useMeetingStore()
+  } = useMeetingStore(
+    useShallow((s) => ({
+      meetingTitle: s.meetingTitle,
+      setMeetingTitle: s.setMeetingTitle,
+      isRecording: s.isRecording,
+      isPaused: s.isPaused,
+      isDockCollapsed: s.isDockCollapsed,
+      setDockCollapsed: s.setDockCollapsed,
+      elapsedTime: s.elapsedTime,
+      manualNotes: s.manualNotes,
+      setManualNotes: s.setManualNotes,
+      activeView: s.activeView,
+      setActiveView: s.setActiveView,
+      segments: s.segments,
+      notes: s.notes,
+      recordingContext: s.recordingContext,
+      error: s.error,
+      setError: s.setError,
+      draftStatus: s.draftStatus,
+      saveDraft: s.saveDraft,
+      generateNotes: s.generateNotes,
+      saveMeeting: s.saveMeeting,
+      closeRecorder: s.closeRecorder,
+      cancelMeeting: s.cancelMeeting
+    }))
+  )
   const {
     stop,
     cancel,
@@ -490,21 +549,7 @@ export function MeetingCaptureDock(): React.ReactElement {
           )}
 
           <div className="flex items-center gap-3 border-t border-surface-border px-4 py-3">
-            <div
-              className="flex h-5 flex-1 items-end gap-1"
-              aria-label={`Audio level ${Math.round(audioLevel)} percent`}
-            >
-              {Array.from({ length: 18 }, (_, index) => {
-                const threshold = (index / 18) * 100
-                return (
-                  <span
-                    key={index}
-                    className={`w-1 rounded-full transition-all ${audioLevel > threshold ? 'bg-focus' : 'bg-surface-border'}`}
-                    style={{ height: `${4 + ((index * 7) % 14)}px` }}
-                  />
-                )
-              })}
-            </div>
+            <AudioLevelMeter />
             <button
               onClick={togglePause}
               disabled={!isRecording || isStopping}

@@ -8,7 +8,11 @@ import { app, Menu, BrowserWindow, dialog, shell } from 'electron'
 
 const isMac = process.platform === 'darwin'
 
-export function buildAppMenu(): void {
+export interface AppMenuOptions {
+  onToggleMenagerie?: () => void
+}
+
+export function buildAppMenu(options: AppMenuOptions = {}): void {
   const template: Electron.MenuItemConstructorOptions[] = [
     // ── App menu (macOS only) ──
     ...(isMac
@@ -78,6 +82,16 @@ export function buildAppMenu(): void {
         { role: 'zoomOut' },
         { type: 'separator' },
         { role: 'togglefullscreen' },
+        ...(options.onToggleMenagerie
+          ? [
+              { type: 'separator' as const },
+              {
+                label: "Katya's Menagerie",
+                accelerator: isMac ? 'Cmd+Shift+M' : 'Ctrl+Shift+M',
+                click: (): void => options.onToggleMenagerie?.(),
+              },
+            ]
+          : []),
       ],
     },
 

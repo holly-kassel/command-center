@@ -45,9 +45,11 @@ async function getTranscriber(onProgress?: (info: any) => void): Promise<any> {
   loadPromise = (async () => {
     const { pipeline } = await loadTransformers()
 
+    // Cap threads so transcription during a live call doesn't starve Teams of CPU.
     const pipe = await pipeline('automatic-speech-recognition', MODEL_ID, {
       dtype: 'q8',
-      progress_callback: onProgress
+      progress_callback: onProgress,
+      session_options: { intraOpNumThreads: 2, interOpNumThreads: 1 }
     })
 
     log.info('[Transcription] Whisper pipeline ready')

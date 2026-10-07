@@ -18,11 +18,14 @@ import {
   registerTranscriptionIpc,
   registerChatIpc,
   registerDecisionEvalIpc,
+  registerMenagerieIpc,
 } from './ipc'
 import { HotkeyManager } from './services/hotkey/HotkeyManager'
 import { getSyncManager } from './services/sync/SyncManager'
 import { getChatService } from './services/chat'
 import { getCalendarService } from './services/calendar/CalendarService'
+import { getPasteTriageService } from './services/triage'
+import { getMenagerieService } from './services/menagerie/MenagerieService'
 import { buildAppMenu } from './menu'
 
 const hotkeyManager = new HotkeyManager()
@@ -111,6 +114,7 @@ app.whenReady().then(() => {
   registerKanbanIpc()
   registerTranscriptionIpc()
   registerDecisionEvalIpc()
+  registerMenagerieIpc()
   initObsidian()
 
   const mainWindow = createWindow()
@@ -119,7 +123,7 @@ app.whenReady().then(() => {
   registerChatIpc(mainWindow)
 
   // Build native app menu
-  buildAppMenu()
+  buildAppMenu({ onToggleMenagerie: () => hotkeyManager.toggleMenagerie() })
 
   // Register global hotkeys for overlay windows
   hotkeyManager.registerHotkeys(mainWindow)
@@ -155,6 +159,9 @@ app.on('will-quit', () => {
   getCalendarService()
     .shutdown()
     .catch(() => {})
+  // Stop /triage runs so their agent processes don't outlive the app
+  getPasteTriageService().shutdown()
+  getMenagerieService().stop()
 })
 
 // In this file you can include the rest of your app's specific main process

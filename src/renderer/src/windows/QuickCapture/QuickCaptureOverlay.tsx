@@ -8,6 +8,7 @@
  * Supports slash commands:
  *   /todo buy milk       — adds a checkbox
  *   /transcript [paste]  — expands to textarea, summarizes with AI
+ *   /triage [paste]      — expands to textarea, triages it in the background
  */
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { SamoyedMascot } from '../../components/SamoyedMascot'
@@ -73,7 +74,7 @@ export function QuickCaptureOverlay(): React.JSX.Element {
     if (!trimmed) return
 
     setStatus('saving')
-    setStatusMessage(isMultiline ? 'Summarizing...' : 'Saving…')
+    setStatusMessage(matchedCommand?.pendingLabel ?? (isMultiline ? 'Summarizing...' : 'Saving…'))
     try {
       if (isSlashCommand) {
         const result = await window.api.obsidian.executeSlashCommand(trimmed)
@@ -100,7 +101,7 @@ export function QuickCaptureOverlay(): React.JSX.Element {
     } catch {
       setStatus('idle')
     }
-  }, [text, isSlashCommand, isMultiline])
+  }, [text, isSlashCommand, isMultiline, matchedCommand])
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {

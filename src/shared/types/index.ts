@@ -3,6 +3,7 @@
 export * from './ritual'
 export * from './goal'
 export * from './chat'
+export * from './menagerie'
 
 /** IPC channel names — keep in sync between main & preload */
 export const IPC_CHANNELS = {

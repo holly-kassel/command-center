@@ -1,11 +1,7 @@
-/**
- * RitualMetrics Component
- *
- * Dashboard card showing today's ritual status, streak counts,
- * and weekly completion visualization.
- */
+import { useEffect, useState } from 'react'
+import { localDate } from '@shared/ritualLogic'
 import { useRitualStore } from '../../store/ritualStore'
-import type { StreakType } from '@shared/types/ritual'
+import { RitualHistory } from './RitualHistory'
 
 interface RitualMetricsProps {
   onStartMorning: () => void
@@ -13,174 +9,235 @@ interface RitualMetricsProps {
   onStartTouchGrass: () => void
 }
 
-const STREAK_LABELS: Record<StreakType, { label: string; icon: string }> = {
-  morning_ritual: { label: 'Morning', icon: '🌅' },
-  evening_ritual: { label: 'Evening', icon: '🌙' },
-  full_day: { label: 'Full Day', icon: '⭐' },
-  focus: { label: 'Focus', icon: '🎯' },
-}
-
-const DAY_LABELS = ['M', 'T', 'W', 'T', 'F']
-
-export function RitualMetrics({ onStartMorning, onStartEvening, onStartTouchGrass }: RitualMetricsProps): React.ReactElement {
-  const todayLog = useRitualStore((s) => s.todayLog)
-  const streaks = useRitualStore((s) => s.streaks)
-  const weeklyMetrics = useRitualStore((s) => s.weeklyMetrics)
-  const isLoading = useRitualStore((s) => s.isLoading)
-
-  const hour = new Date().getHours()
-  const isMorningTime = hour >= 5 && hour < 12
-  const isEveningTime = hour >= 15 && hour < 24
-
-  if (isLoading) {
-    return (
-      <div className="card">
-        <div className="animate-pulse space-y-3">
-          <div className="h-4 w-24 bg-surface-muted/40 rounded" />
-          <div className="h-8 bg-surface-muted/30 rounded" />
-          <div className="h-8 bg-surface-muted/30 rounded" />
-        </div>
-      </div>
-    )
-  }
-
+export function RitualMetrics({
+  onStartMorning,
+  onStartEvening,
+  onStartTouchGrass
+}: RitualMetricsProps): React.ReactElement {
+  const { todayLog, streaks, weeklyMetrics, isLoading, error, notice, drafts, legacyNotice } =
+    useRitualStore()
+  const [now, setNow] = useState(new Date())
+  const [history, setHistory] = useState(false)
+  useEffect(() => {
+    let date = localDate()
+    const tick = (): void => {
+      const next = localDate()
+      setNow(new Date())
+      if (date !== next) {
+        date = next
+        void useRitualStore.getState().refreshAll()
+      }
+    }
+    const refresh = (): void => {
+      if (document.visibilityState !== 'hidden') {
+        tick()
+        void useRitualStore.getState().refreshAll()
+      }
+    }
+    const timer = setInterval(tick, 30000)
+    window.addEventListener('focus', refresh)
+    document.addEventListener('visibilitychange', refresh)
+    return () => {
+      clearInterval(timer)
+      window.removeEventListener('focus', refresh)
+      document.removeEventListener('visibilitychange', refresh)
+    }
+  }, [])
+  const today = localDate(now)
+  const resumable = [...drafts].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+  const resume = resumable.find((draft) => draft.date === today) ?? resumable[0]
+  const primary = resume
+    ? {
+        label: `Resume ${resume.type === 'touch_grass' ? 'reset' : resume.type} · ${resume.date}`,
+        action: () =>
+          void useRitualStore.getState().startRitual(resume.type, resume.date, resume.id)
+      }
+    : now.getHours() < 15 && !todayLog?.morningRitualCompleted
+      ? { label: 'Start your morning', action: onStartMorning }
+      : now.getHours() >= 15 && !todayLog?.eveningRitualCompleted
+        ? { label: 'Close out your day', action: onStartEvening }
+        : { label: 'Take a reset', action: onStartTouchGrass }
+  const savedTime = (stamp: string | null | undefined): string =>
+    stamp ? new Date(stamp).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : ''
   return (
-    <div className="card space-y-3">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-text-primary tracking-wide flex items-center gap-1.5">
-          <span>✨</span>
-          Rituals
-        </h3>
-      </div>
-
-      {/* Today's status + action buttons */}
-      <div className="flex gap-2">
-        {/* Morning */}
-        <div className="flex-1">
-          {todayLog?.morningRitualCompleted ? (
-            <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-focus/10 border border-focus/20">
-              <span className="text-xs">🌅</span>
-              <span className="text-xs text-focus font-medium">Morning ✓</span>
-            </div>
-          ) : (
+    <>
+      <section className="card space-y-4" aria-label="Daily rituals">
+        <header className="flex items-center justify-between gap-3">
+          <div>
+            <h3 className="font-semibold text-sm">Rituals</h3>
+            <p className="text-xs text-text-secondary">{today}</p>
+          </div>
+          <button onClick={() => setHistory(true)} className="text-xs text-primary">
+            History
+          </button>
+        </header>
+        {notice && (
+          <p role="status" className="text-xs text-focus">
+            {notice}
+          </p>
+        )}
+        {error && (
+          <div role="alert" className="text-xs text-urgent">
+            {error}{' '}
             <button
-              onClick={onStartMorning}
-              disabled={!isMorningTime}
-              className={`w-full flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                isMorningTime
-                  ? 'bg-focus/15 text-focus hover:bg-focus/25 border border-focus/30'
-                  : 'bg-surface-muted/30 text-text-muted border border-transparent cursor-not-allowed'
-              }`}
-              title={isMorningTime ? 'Start morning ritual' : 'Available 5am-12pm'}
+              className="underline"
+              onClick={() => void useRitualStore.getState().refreshAll()}
             >
-              <span>🌅</span>
-              Morning
+              Retry
             </button>
-          )}
-        </div>
-
-        {/* Evening */}
-        <div className="flex-1">
-          {todayLog?.eveningRitualCompleted ? (
-            <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-accent/10 border border-accent/20">
-              <span className="text-xs">🌙</span>
-              <span className="text-xs text-accent font-medium">Evening ✓</span>
-            </div>
-          ) : (
+            {todayLog && <p>Showing the last loaded ritual data.</p>}
+          </div>
+        )}
+        {isLoading && !todayLog ? (
+          <p role="status" className="text-sm text-text-secondary">
+            Loading rituals…
+          </p>
+        ) : (
+          <>
             <button
-              onClick={onStartEvening}
-              disabled={!isEveningTime}
-              className={`w-full flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                isEveningTime
-                  ? 'bg-accent/15 text-accent hover:bg-accent/25 border border-accent/30'
-                  : 'bg-surface-muted/30 text-text-muted border border-transparent cursor-not-allowed'
-              }`}
-              title={isEveningTime ? 'Start evening ritual' : 'Available 3pm-12am'}
+              disabled={!todayLog}
+              onClick={primary.action}
+              className="w-full text-left px-3 py-3 rounded-lg bg-focus/15 text-focus text-sm font-medium border border-focus/30 disabled:opacity-40"
             >
-              <span>🌙</span>
-              Evening
+              {primary.label} →
             </button>
-          )}
-        </div>
-      </div>
-
-      {/* Intention (if set) */}
-      {todayLog?.intention && (
-        <div className="text-xs text-text-secondary bg-surface-muted/20 rounded-lg px-2.5 py-1.5 border border-surface-border/20">
-          <span className="text-text-muted">Intention:</span>{' '}
-          {todayLog.intention}
-        </div>
-      )}
-
-      {/* Touch Grass — always available */}
-      <button
-        onClick={onStartTouchGrass}
-        className="w-full flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-green-500/10 text-green-400 hover:bg-green-500/20 border border-green-500/20 transition-all"
-        title="Stop. Breathe. Drink water."
-      >
-        <span>🌿</span>
-        Touch Grass
-        {todayLog?.touchGrassCount ? (
-          <span className="text-[10px] text-green-400/60 ml-1">× {todayLog.touchGrassCount}</span>
-        ) : null}
-      </button>
-
-      {/* Streaks */}
-      {streaks && (
-        <div className="grid grid-cols-4 gap-1.5">
-          {(Object.entries(STREAK_LABELS) as [StreakType, { label: string; icon: string }][]).map(
-            ([type, { label, icon }]) => {
-              const streak = streaks[type]
-              const isActive = streak && streak.currentCount > 0
-              return (
-                <div
-                  key={type}
-                  className={`text-center py-1.5 rounded-lg ${
-                    isActive ? 'bg-surface-muted/40' : 'bg-surface-muted/15'
-                  }`}
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <button
+                disabled={!todayLog}
+                onClick={onStartMorning}
+                className="rounded-lg p-2 text-left bg-surface-muted/30 disabled:opacity-40"
+              >
+                <span className="block text-text-primary">
+                  {todayLog?.morningRitualCompleted ? 'Morning ✓ · View / Edit' : 'Morning'}
+                </span>
+                <span className="text-text-secondary">
+                  {todayLog?.morningRitualCompleted
+                    ? savedTime(todayLog.morningRitualTime)
+                    : 'Plan your day, anytime'}
+                </span>
+              </button>
+              <button
+                disabled={!todayLog}
+                onClick={onStartEvening}
+                className="rounded-lg p-2 text-left bg-surface-muted/30 disabled:opacity-40"
+              >
+                <span className="block text-text-primary">
+                  {todayLog?.eveningRitualCompleted ? 'Evening ✓ · View / Edit' : 'Evening'}
+                </span>
+                <span className="text-text-secondary">
+                  {todayLog?.eveningRitualCompleted
+                    ? savedTime(todayLog.eveningRitualTime)
+                    : 'Reflect when you are ready'}
+                </span>
+              </button>
+            </div>
+            {todayLog?.intention && (
+              <p className="text-xs text-text-secondary line-clamp-3 break-words">
+                <span className="text-text-primary">Intention: </span>
+                {todayLog.intention}
+              </p>
+            )}
+            <button
+              disabled={!todayLog}
+              onClick={onStartTouchGrass}
+              className="text-xs text-focus disabled:opacity-40"
+            >
+              🌿 Touch Grass · {todayLog?.touchGrassCount ?? 0} resets today
+            </button>
+          </>
+        )}
+        {resumable.length > 1 && (
+          <details className="text-xs text-text-secondary">
+            <summary>Other saved drafts ({resumable.length - 1})</summary>
+            {resumable
+              .filter((draft) => draft.id !== resume?.id)
+              .map((draft) => (
+                <button
+                  key={draft.id}
+                  className="block mt-2 text-primary"
+                  onClick={() =>
+                    void useRitualStore.getState().startRitual(draft.type, draft.date, draft.id)
+                  }
                 >
-                  <div className="text-xs">
-                    {isActive && streak.currentCount >= 3 ? '🔥' : icon}
-                  </div>
+                  Resume {draft.type.replace('_', ' ')} · {draft.date}
+                </button>
+              ))}
+          </details>
+        )}
+        {weeklyMetrics && (
+          <div className="space-y-2 border-t border-surface-border pt-3">
+            <div className="flex justify-between gap-2" aria-label="This workweek">
+              {weeklyMetrics.dailyStatuses.map((day) => {
+                const state =
+                  day.date > today
+                    ? 'Upcoming'
+                    : day.morning && day.evening
+                      ? 'Both complete'
+                      : day.morning
+                        ? 'Morning complete'
+                        : day.evening
+                          ? 'Evening complete'
+                          : day.date === today
+                            ? 'Not yet completed'
+                            : 'Not completed'
+                return (
                   <div
-                    className={`text-sm font-semibold ${
-                      isActive ? 'text-text-primary' : 'text-text-muted'
-                    }`}
+                    key={day.date}
+                    className="flex-1 text-center"
+                    title={`${day.date}: ${state}`}
+                    aria-label={`${day.date}: ${state}${day.date === today ? ', today' : ''}`}
                   >
-                    {streak?.currentCount || 0}
+                    <span
+                      aria-hidden="true"
+                      className={`inline-flex w-6 h-6 justify-center items-center rounded-full border text-xs ${day.date === today ? 'ring-1 ring-primary ring-offset-2 ring-offset-background' : ''} ${day.morning && day.evening ? 'bg-focus/25 border-focus/50 text-focus' : day.morning || day.evening ? 'bg-warning/20 border-warning/40 text-warning' : 'border-surface-border text-text-secondary'}`}
+                    >
+                      {day.morning && day.evening
+                        ? '✓'
+                        : day.morning || day.evening
+                          ? '½'
+                          : day.date > today
+                            ? '·'
+                            : '—'}
+                    </span>
+                    <span className="block text-[10px] text-text-secondary mt-1">
+                      {
+                        ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'][
+                          new Date(`${day.date}T12:00:00`).getDay() - 1
+                        ]
+                      }
+                    </span>
                   </div>
-                  <div className="text-[10px] text-text-muted">{label}</div>
+                )
+              })}
+            </div>
+            <p className="text-[10px] text-text-secondary">
+              ✓ Both rituals · ½ One ritual · — Not completed · · Upcoming
+            </p>
+          </div>
+        )}
+        {streaks && (
+          <details className="text-xs text-text-secondary">
+            <summary>Workweek streaks · weekends optional</summary>
+            <dl className="grid grid-cols-2 gap-2 pt-2">
+              {(['morning_ritual', 'evening_ritual', 'full_day', 'focus'] as const).map((type) => (
+                <div key={type}>
+                  <dt className="capitalize">{type.replaceAll('_', ' ')}</dt>
+                  <dd>
+                    {streaks[type].currentCount} current · {streaks[type].bestCount} best
+                  </dd>
                 </div>
-              )
-            }
-          )}
-        </div>
-      )}
-
-      {/* Weekly dots */}
-      {weeklyMetrics && (
-        <div className="flex items-center justify-center gap-2">
-          {weeklyMetrics.dailyStatuses.map((day, i) => {
-            const both = day.morning && day.evening
-            const one = day.morning || day.evening
-            return (
-              <div key={day.date} className="flex flex-col items-center gap-0.5">
-                <div
-                  className={`w-5 h-5 rounded-full border transition-colors ${
-                    both
-                      ? 'bg-focus/40 border-focus/60'
-                      : one
-                        ? 'bg-warning/30 border-warning/50'
-                        : 'bg-surface-muted/20 border-surface-border/30'
-                  }`}
-                />
-                <span className="text-[9px] text-text-muted">{DAY_LABELS[i]}</span>
-              </div>
-            )
-          })}
-        </div>
-      )}
-    </div>
+              ))}
+            </dl>
+          </details>
+        )}
+        {legacyNotice && (
+          <details className="text-xs text-text-secondary">
+            <summary>About imported records</summary>
+            <p className="mt-2">{legacyNotice}</p>
+          </details>
+        )}
+      </section>
+      {history && <RitualHistory onClose={() => setHistory(false)} />}
+    </>
   )
 }

@@ -58,7 +58,7 @@ export function useMeetingRecorder(): MeetingRecorderController {
   const streamRef = useRef<MediaStream | null>(null)
   const chunksRef = useRef<Blob[]>([])
   const audioContextRef = useRef<AudioContext | null>(null)
-  const animationFrameRef = useRef<number | null>(null)
+  const levelTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const chunkTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const elapsedRef = useRef(0)
@@ -192,8 +192,8 @@ export function useMeetingRecorder(): MeetingRecorderController {
   )
 
   const releaseMedia = useCallback(async () => {
-    if (animationFrameRef.current !== null) cancelAnimationFrame(animationFrameRef.current)
-    animationFrameRef.current = null
+    if (levelTimerRef.current !== null) clearInterval(levelTimerRef.current)
+    levelTimerRef.current = null
     streamRef.current?.getTracks().forEach((track) => track.stop())
     streamRef.current = null
     if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
@@ -327,14 +327,19 @@ export function useMeetingRecorder(): MeetingRecorderController {
         analyser.fftSize = 256
         source.connect(analyser)
         const data = new Uint8Array(analyser.frequencyBinCount)
-        const updateLevel = (): void => {
+        let lastLevel = -1
+        // Sample at 10 Hz and only publish visible changes; per-frame store
+        // updates re-rendered the whole meeting UI ~60x/sec during calls.
+        levelTimerRef.current = setInterval(() => {
           if (cancelled || !activeRef.current) return
           analyser.getByteFrequencyData(data)
           const average = data.reduce((sum, value) => sum + value, 0) / data.length
-          setAudioLevel(Math.min(100, (average / 128) * 100))
-          animationFrameRef.current = requestAnimationFrame(updateLevel)
-        }
-        updateLevel()
+          const level = Math.round(Math.min(100, (average / 128) * 100) / 5) * 5
+          if (level !== lastLevel) {
+            lastLevel = level
+            setAudioLevel(level)
+          }
+        }, 100)
         setIsRecording(true)
         setError(null)
       } catch (error) {

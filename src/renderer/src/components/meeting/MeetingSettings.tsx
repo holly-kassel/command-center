@@ -24,7 +24,8 @@ const CHUNK_INTERVALS = [
 ]
 
 export function MeetingSettings({ isOpen, onClose }: MeetingSettingsProps): React.ReactElement | null {
-  const { settings, updateSettings } = useMeetingStore()
+  const settings = useMeetingStore((s) => s.settings)
+  const updateSettings = useMeetingStore((s) => s.updateSettings)
   const [participantInput, setParticipantInput] = useState('')
 
   const addParticipant = (): void => {

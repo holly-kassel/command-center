@@ -10,6 +10,8 @@ import { getKanbanService } from '../kanban/KanbanService'
 import { chatCompletion } from '../llm'
 import { loadLLMContext } from '../llm/contextLoader'
 import { SlackParser } from '../slack/SlackParser'
+import { getPasteTriageService } from '../triage'
+import type { SlashCommandAttachment, SlashCommandInfo } from '../../../shared/types/obsidian'
 
 export interface SlashCommandResult {
   success: boolean
@@ -24,7 +26,15 @@ interface SlashCommandDefinition {
   argHint: string
   /** If true, the UI should show a textarea instead of a single-line input */
   multiline?: boolean
-  execute: (args: string) => Promise<SlashCommandResult>
+  /** Textarea placeholder for multiline commands */
+  placeholder?: string
+  /** Status text while the command runs */
+  pendingLabel?: string
+  /** Label for the submit action */
+  submitLabel?: string
+  /** True when the command accepts pasted images */
+  acceptsAttachments?: boolean
+  execute: (args: string, attachments: SlashCommandAttachment[]) => Promise<SlashCommandResult>
 }
 
 const TRANSCRIPT_SYSTEM_PROMPT = `You are a thorough meeting note summarizer for a product manager's weekly notes.
@@ -241,6 +251,28 @@ class SlashCommandRegistry {
         }
       }
     })
+
+    this.register({
+      name: 'triage',
+      description: 'Get a verdict on a paste, link, or screenshot, in the background',
+      argHint: 'paste a message or link...',
+      placeholder: 'Paste a message, link, or screenshot to triage...',
+      pendingLabel: 'Starting triage...',
+      submitLabel: 'Triage',
+      multiline: true,
+      acceptsAttachments: true,
+      execute: async (args, attachments): Promise<SlashCommandResult> => {
+        const result = await getPasteTriageService().submit(args, attachments)
+        if (!result.ok) return { success: false, command: 'triage', message: result.message }
+        return {
+          success: true,
+          command: 'triage',
+          message: result.queued
+            ? "Queued behind other triage runs. I'll notify you when it's done."
+            : "Triaging. I'll notify you when it's done."
+        }
+      }
+    })
   }
 
   register(definition: SlashCommandDefinition): void {
@@ -269,17 +301,35 @@ class SlashCommandRegistry {
   /**
    * Execute a slash command from raw input text.
    */
-  async execute(text: string): Promise<SlashCommandResult> {
+  async execute(text: string, attachments: unknown = []): Promise<SlashCommandResult> {
     const parsed = this.parseCommand(text)
     if (!parsed) {
       return { success: false, command: '', message: 'Not a recognized slash command' }
     }
 
     const definition = this.commands.get(parsed.command)!
-    log.info(`[SlashCommands] Executing /${parsed.command} with args: "${parsed.args}"`)
+    if (attachments != null && !Array.isArray(attachments)) {
+      return {
+        success: false,
+        command: parsed.command,
+        message: "The pasted images didn't come through. Paste them again."
+      }
+    }
+    const images = (attachments ?? []) as SlashCommandAttachment[]
+    if (images.length > 0 && !definition.acceptsAttachments) {
+      return {
+        success: false,
+        command: parsed.command,
+        message: `/${parsed.command} doesn't take images. Remove them, or use /triage.`
+      }
+    }
+
+    // Args can hold pasted customer messages, so log only their size
+    const imageNote = images.length > 0 ? `, ${images.length} image(s)` : ''
+    log.info(`[SlashCommands] Executing /${parsed.command} (${parsed.args.length} chars${imageNote})`)
 
     try {
-      return await definition.execute(parsed.args)
+      return await definition.execute(parsed.args, images)
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error)
       log.error(`[SlashCommands] /${parsed.command} failed:`, msg)
@@ -290,18 +340,28 @@ class SlashCommandRegistry {
   /**
    * Get all registered commands (for autocomplete / help).
    */
-  getCommands(): Array<{
-    name: string
-    description: string
-    argHint: string
-    multiline?: boolean
-  }> {
-    return Array.from(this.commands.values()).map(({ name, description, argHint, multiline }) => ({
-      name,
-      description,
-      argHint,
-      multiline
-    }))
+  getCommands(): SlashCommandInfo[] {
+    return Array.from(this.commands.values()).map(
+      ({
+        name,
+        description,
+        argHint,
+        multiline,
+        placeholder,
+        pendingLabel,
+        submitLabel,
+        acceptsAttachments
+      }) => ({
+        name,
+        description,
+        argHint,
+        multiline,
+        placeholder,
+        pendingLabel,
+        submitLabel,
+        acceptsAttachments
+      })
+    )
   }
 }
 

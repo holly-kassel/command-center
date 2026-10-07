@@ -64,6 +64,42 @@ body {
   min-height: 100vh;
 }
 
+.ritual-dialog {
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
+  margin: auto;
+}
+
+.ritual-dialog::backdrop {
+  background: rgb(0 0 0 / 70%);
+}
+
+.ritual-input {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid var(--color-surface-border);
+  border-radius: 0.5rem;
+  background: var(--color-surface-muted);
+  color: var(--color-text-primary);
+  resize: vertical;
+}
+
+.ritual-dialog :focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .breathing-ring,
+  .breathing-ready-orb,
+  .breathing-done-orb,
+  .breathing-text-in {
+    animation: none !important;
+    transition: none !important;
+    opacity: 1 !important;
+  }
+}
+
 /* Gradient background layer */
 .bg-background {
   background:

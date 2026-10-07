@@ -1,159 +1,228 @@
-/**
- * Ritual Zustand Store
- *
- * Manages ritual state in the renderer process.
- * Handles morning/evening ritual flows and streak tracking.
- */
 import { create } from 'zustand'
-import type { DailyLog, Streak, StreakType, WeeklyRitualMetrics } from '@shared/types/ritual'
+import { answersFromLog, emptyLog, localDate } from '@shared/ritualLogic'
+import type {
+  DailyLog,
+  RitualAnswers,
+  RitualDraft,
+  RitualSnapshot,
+  RitualType,
+  Streak,
+  StreakType,
+  WeeklyRitualMetrics
+} from '@shared/types/ritual'
 
 interface RitualState {
-  // State
   todayLog: DailyLog | null
   streaks: Record<StreakType, Streak> | null
   weeklyMetrics: WeeklyRitualMetrics | null
-  activeRitual: 'morning' | 'evening' | 'touch_grass' | null
+  drafts: RitualDraft[]
+  revision: number
+  legacyNotice: string | null
+  activeRitual: RitualType | null
+  draft: RitualDraft | null
   isLoading: boolean
+  isSaving: boolean
+  draftStatus: 'saved' | 'saving' | 'unsaved'
   error: string | null
-
-  // Actions
+  notice: string | null
   initialize: () => Promise<void>
-  loadToday: () => Promise<void>
-  loadStreaks: () => Promise<void>
-  loadWeeklyMetrics: () => Promise<void>
-  saveMorningRitual: (data: { intention: string; focusCommitted: boolean }) => Promise<void>
-  saveEveningRitual: (data: {
-    untrackedWins: string
-    wentWell: string
-    couldImprove: string
-    gratitude: string
-    energyLevel: number
-  }) => Promise<void>
-  saveTouchGrass: () => Promise<void>
-  startRitual: (type: 'morning' | 'evening' | 'touch_grass') => void
-  endRitual: () => void
   refreshAll: () => Promise<void>
+  startRitual: (type: RitualType, date?: string, draftId?: string) => Promise<void>
+  updateDraft: (change: { step?: number; answers?: Partial<RitualAnswers> }) => void
+  saveDraft: () => Promise<void>
+  pauseRitual: () => Promise<void>
+  discardDraft: () => Promise<void>
+  completeRitual: () => Promise<void>
+  applySnapshot: (snapshot: RitualSnapshot) => void
 }
 
-function formatDate(date: Date): string {
-  return date.toISOString().split('T')[0]
-}
+let saveTimer: ReturnType<typeof setTimeout> | undefined
+let pendingSave: Promise<void> = Promise.resolve()
 
 export const useRitualStore = create<RitualState>((set, get) => ({
   todayLog: null,
   streaks: null,
   weeklyMetrics: null,
+  drafts: [],
+  revision: -1,
+  legacyNotice: null,
   activeRitual: null,
+  draft: null,
   isLoading: false,
+  isSaving: false,
+  draftStatus: 'saved',
   error: null,
+  notice: null,
+
+  applySnapshot: (snapshot) => {
+    if (snapshot.revision < get().revision) return
+    set({
+      todayLog: snapshot.todayLog,
+      streaks: snapshot.streaks,
+      weeklyMetrics: snapshot.weeklyMetrics,
+      drafts: snapshot.drafts,
+      revision: snapshot.revision,
+      legacyNotice: snapshot.legacyNotice
+    })
+  },
 
   initialize: async () => {
-    set({ isLoading: true, error: null })
-    try {
-      await Promise.all([get().loadToday(), get().loadStreaks(), get().loadWeeklyMetrics()])
-    } catch (error) {
-      set({ error: error instanceof Error ? error.message : 'Failed to initialize rituals' })
-    } finally {
-      set({ isLoading: false })
-    }
+    if (!get().todayLog) set({ isLoading: true })
+    await get().refreshAll()
+    set({ isLoading: false })
   },
-
-  loadToday: async () => {
-    try {
-      const todayLog = await window.api.ritual.getTodayLog()
-      set({ todayLog })
-    } catch (error) {
-      console.error('[RitualStore] loadToday error:', error)
-    }
-  },
-
-  loadStreaks: async () => {
-    try {
-      const streaks = await window.api.ritual.getAllStreaks()
-      set({ streaks })
-    } catch (error) {
-      console.error('[RitualStore] loadStreaks error:', error)
-    }
-  },
-
-  loadWeeklyMetrics: async () => {
-    try {
-      const weeklyMetrics = await window.api.ritual.getWeeklyMetrics()
-      set({ weeklyMetrics })
-    } catch (error) {
-      console.error('[RitualStore] loadWeeklyMetrics error:', error)
-    }
-  },
-
-  saveMorningRitual: async ({ intention, focusCommitted }) => {
-    try {
-      const today = formatDate(new Date())
-      await window.api.ritual.saveDailyLog(today, {
-        morningRitualCompleted: true,
-        morningRitualTime: new Date().toISOString(),
-        intention,
-        focusAchieved: focusCommitted,
-      })
-      await window.api.ritual.updateStreak('morning_ritual')
-      await window.api.ritual.checkFullDayStreak()
-
-      // Reload state
-      await Promise.all([get().loadToday(), get().loadStreaks(), get().loadWeeklyMetrics()])
-      set({ activeRitual: null })
-    } catch (error) {
-      set({ error: error instanceof Error ? error.message : 'Failed to save morning ritual' })
-      throw error
-    }
-  },
-
-  saveEveningRitual: async ({ untrackedWins, wentWell, couldImprove, gratitude, energyLevel }) => {
-    try {
-      const today = formatDate(new Date())
-      await window.api.ritual.saveDailyLog(today, {
-        eveningRitualCompleted: true,
-        eveningRitualTime: new Date().toISOString(),
-        reflection: { wentWell, couldImprove },
-        gratitude,
-        untrackedWins,
-        energyLevel,
-      })
-      await window.api.ritual.updateStreak('evening_ritual')
-      await window.api.ritual.checkFullDayStreak()
-
-      // Reload state
-      await Promise.all([get().loadToday(), get().loadStreaks(), get().loadWeeklyMetrics()])
-      set({ activeRitual: null })
-    } catch (error) {
-      set({ error: error instanceof Error ? error.message : 'Failed to save evening ritual' })
-      throw error
-    }
-  },
-
-  saveTouchGrass: async () => {
-    try {
-      const today = formatDate(new Date())
-      const currentLog = get().todayLog
-      const currentCount = currentLog?.touchGrassCount ?? 0
-      await window.api.ritual.saveDailyLog(today, {
-        touchGrassCount: currentCount + 1,
-      })
-      await get().loadToday()
-      set({ activeRitual: null })
-    } catch (error) {
-      set({ error: error instanceof Error ? error.message : 'Failed to save touch grass' })
-      throw error
-    }
-  },
-
-  startRitual: (type) => set({ activeRitual: type }),
-  endRitual: () => set({ activeRitual: null }),
 
   refreshAll: async () => {
-    await Promise.all([get().loadToday(), get().loadStreaks(), get().loadWeeklyMetrics()])
+    try {
+      get().applySnapshot(await window.api.ritual.getSnapshot())
+      // Never clear an unsaved-draft error with an unrelated refresh.
+      if (!get().activeRitual) set({ error: null })
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : 'Could not load rituals.' })
+    }
   },
+
+  startRitual: async (type, date = localDate(), draftId) => {
+    if (get().activeRitual || get().isSaving) return
+    set({ isSaving: true })
+    try {
+      const saved = get().drafts.find((draft) =>
+        draftId ? draft.id === draftId : draft.type === type && draft.date === date
+      )
+      const log = saved ? emptyLog(saved.date) : await window.api.ritual.getDailyLog(date)
+      const draft: RitualDraft = saved ?? {
+        id: crypto.randomUUID(),
+        type,
+        date,
+        step: 0,
+        answers: answersFromLog(log),
+        updatedAt: new Date().toISOString()
+      }
+      set({
+        activeRitual: type,
+        draft,
+        error: null,
+        notice: null,
+        draftStatus: saved ? 'saved' : 'unsaved'
+      })
+      await get().saveDraft()
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : 'Could not start ritual.' })
+    } finally {
+      set({ isSaving: false })
+    }
+  },
+
+  updateDraft: (change) => {
+    const draft = get().draft
+    if (!draft || get().isSaving) return
+    set({
+      draft: {
+        ...draft,
+        step: change.step ?? draft.step,
+        answers: { ...draft.answers, ...change.answers },
+        updatedAt: new Date().toISOString()
+      },
+      draftStatus: 'unsaved'
+    })
+    clearTimeout(saveTimer)
+    saveTimer = setTimeout(() => {
+      void get()
+        .saveDraft()
+        .catch((error) => console.error('[Ritual] Draft save failed:', error))
+    }, 400)
+  },
+
+  saveDraft: async () => {
+    clearTimeout(saveTimer)
+    const draft = get().draft
+    if (!draft) return
+    set({ draftStatus: 'saving' })
+    const save = pendingSave
+      .catch(() => undefined)
+      .then(async () => {
+        get().applySnapshot(await window.api.ritual.saveDraft(draft))
+        if (get().draft === draft) set({ draftStatus: 'saved', error: null })
+      })
+    pendingSave = save
+    try {
+      await save
+    } catch (error) {
+      set({
+        draftStatus: 'unsaved',
+        error: error instanceof Error ? error.message : 'Draft was not saved.'
+      })
+      throw error
+    }
+  },
+
+  pauseRitual: async () => {
+    if (get().isSaving) return
+    set({ isSaving: true })
+    try {
+      await get().saveDraft()
+      set({ activeRitual: null, draft: null, notice: 'Ritual paused. Your draft is saved.' })
+    } catch (error) {
+      console.error('[Ritual] Could not pause:', error)
+    } finally {
+      set({ isSaving: false })
+    }
+  },
+
+  discardDraft: async () => {
+    const draft = get().draft
+    if (!draft || get().isSaving) return
+    clearTimeout(saveTimer)
+    set({ isSaving: true })
+    try {
+      await pendingSave.catch(() => undefined)
+      get().applySnapshot(await window.api.ritual.discardDraft(draft.id))
+      set({
+        activeRitual: null,
+        draft: null,
+        error: null,
+        notice: 'Draft discarded. Saved rituals are unchanged.'
+      })
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : 'Could not discard draft.' })
+    } finally {
+      set({ isSaving: false })
+    }
+  },
+
+  completeRitual: async () => {
+    const draft = get().draft
+    if (!draft || get().isSaving) return
+    clearTimeout(saveTimer)
+    set({ isSaving: true, error: null })
+    try {
+      await get().saveDraft()
+      get().applySnapshot(
+        await window.api.ritual.complete({ draft, operationId: `complete:${draft.id}` })
+      )
+      set({
+        activeRitual: null,
+        draft: null,
+        notice: `Saved for ${draft.date}.`,
+        draftStatus: 'saved'
+      })
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : 'Ritual was not saved. Try again.' })
+    } finally {
+      set({ isSaving: false })
+    }
+  }
 }))
 
-// Listen for push updates from SyncManager
-window.api.ritual.onSyncUpdate(({ todayLog, streaks }) => {
-  useRitualStore.setState({ todayLog, streaks })
+window.api.ritual.onSyncUpdate((snapshot) => useRitualStore.getState().applySnapshot(snapshot))
+
+window.addEventListener('beforeunload', (event) => {
+  const state = useRitualStore.getState()
+  if (state.draft && (state.draftStatus !== 'saved' || state.isSaving)) {
+    event.preventDefault()
+    event.returnValue = ''
+    void state
+      .saveDraft()
+      .catch((error) => console.error('[Ritual] Draft save before close failed:', error))
+  }
 })

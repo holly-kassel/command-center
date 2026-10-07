@@ -24,7 +24,7 @@ const PHASE_LABELS: Record<Phase, string> = {
   inhale: 'Breathe in slowly\u2026',
   hold: 'Gently hold\u2026',
   exhale: 'Slowly let go\u2026',
-  complete: 'You\u2019re centered',
+  complete: 'You\u2019re centered'
 }
 
 type ActivePhase = 'inhale' | 'hold' | 'exhale'
@@ -32,45 +32,63 @@ const PHASE_ORDER: ActivePhase[] = ['inhale', 'hold', 'exhale']
 const PHASE_SECONDS: Record<ActivePhase, number> = {
   inhale: INHALE,
   hold: HOLD,
-  exhale: EXHALE,
+  exhale: EXHALE
 }
 
 export function BreathingExercise({
   durationSeconds = 60,
-  onComplete,
+  onComplete
 }: BreathingExerciseProps): React.ReactElement {
   const [started, setStarted] = useState(false)
   const [phase, setPhase] = useState<Phase>('ready')
   const [cyclesCompleted, setCyclesCompleted] = useState(0)
+  const [paused, setPaused] = useState(false)
 
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const phaseIdxRef = useRef(0)
-  const remainingRef = useRef(0)
+  const remainingRef = useRef(INHALE)
   const cycleRef = useRef(0)
   const onCompleteRef = useRef(onComplete)
-  onCompleteRef.current = onComplete
+  const tickRef = useRef(0)
+  useEffect(() => {
+    onCompleteRef.current = onComplete
+  }, [onComplete])
 
   const totalCycles = Math.max(1, Math.round(durationSeconds / CYCLE_DURATION))
 
   // Completion wind-down → auto-advance after 3s
   useEffect(() => {
-    if (phase !== 'complete') return
+    if (phase !== 'complete' || paused) return
     const t = setTimeout(() => onCompleteRef.current(), 3000)
     return () => clearTimeout(t)
-  }, [phase])
+  }, [phase, paused])
+
+  useEffect(() => {
+    const pause = (): void => setPaused(true)
+    const visibility = (): void => {
+      if (document.visibilityState === 'hidden') pause()
+    }
+    window.addEventListener('blur', pause)
+    document.addEventListener('visibilitychange', visibility)
+    return () => {
+      window.removeEventListener('blur', pause)
+      document.removeEventListener('visibilitychange', visibility)
+    }
+  }, [])
 
   // Core breathing loop — cycle-count based, never truncates mid-breath
   useEffect(() => {
-    if (!started) return
+    if (!started || paused || cycleRef.current >= totalCycles) return
 
-    phaseIdxRef.current = 0
-    remainingRef.current = INHALE
-    cycleRef.current = 0
-
-    setPhase('inhale')
-    setCyclesCompleted(0)
+    tickRef.current = Date.now()
 
     intervalRef.current = setInterval(() => {
+      // A suspended app must not claim breathing continued while the user was away.
+      if (Date.now() - tickRef.current > 3000) {
+        setPaused(true)
+        return
+      }
+      tickRef.current = Date.now()
       remainingRef.current -= 1
 
       if (remainingRef.current <= 0) {
@@ -99,18 +117,14 @@ export function BreathingExercise({
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current)
     }
-  }, [started, totalCycles])
+  }, [started, totalCycles, paused])
 
   // ─── Transition-driven scale (synced to phase duration) ───
   const isExpanded = phase === 'inhale' || phase === 'hold'
   const targetScale = isExpanded ? 1 : 0.55
 
   const transDuration =
-    phase === 'inhale'
-      ? `${INHALE}s`
-      : phase === 'exhale'
-        ? `${EXHALE}s`
-        : '0.5s'
+    phase === 'inhale' ? `${INHALE}s` : phase === 'exhale' ? `${EXHALE}s` : '0.5s'
 
   const transEasing =
     phase === 'inhale'
@@ -127,8 +141,8 @@ export function BreathingExercise({
         `transform ${transDuration} ${transEasing}${delay}`,
         'border-color 1.2s ease',
         'background-color 1.2s ease',
-        'box-shadow 1.2s ease',
-      ].join(', '),
+        'box-shadow 1.2s ease'
+      ].join(', ')
     }
   }
 
@@ -154,7 +168,11 @@ export function BreathingExercise({
         </div>
         <div className="flex gap-3">
           <button
-            onClick={() => setStarted(true)}
+            onClick={() => {
+              setPaused(false)
+              setStarted(true)
+              setPhase('inhale')
+            }}
             className="px-5 py-2 rounded-lg bg-focus/20 text-focus font-medium text-sm hover:bg-focus/30 transition-colors"
           >
             Begin
@@ -185,10 +203,7 @@ export function BreathingExercise({
               className={`breathing-ring breathing-middle ${colorClass}`}
               style={ringStyle(150)}
             />
-            <div
-              className={`breathing-ring breathing-inner ${colorClass}`}
-              style={ringStyle(0)}
-            />
+            <div className={`breathing-ring breathing-inner ${colorClass}`} style={ringStyle(0)} />
           </>
         ) : (
           <div className="breathing-done-orb">
@@ -202,7 +217,7 @@ export function BreathingExercise({
             key={phase}
             className="block text-sm font-medium text-text-secondary breathing-text-in"
           >
-            {PHASE_LABELS[phase]}
+            {paused ? 'Paused. Resume when you are ready.' : PHASE_LABELS[phase]}
           </span>
         </div>
       </div>
@@ -231,6 +246,17 @@ export function BreathingExercise({
           {totalCycles} breaths complete
         </p>
       )}
+      <div className="flex gap-3 text-sm">
+        <button
+          onClick={() => setPaused(!paused)}
+          className="px-4 py-2 rounded-lg bg-surface-muted/30 text-text-secondary"
+        >
+          {paused ? 'Resume' : 'Pause'}
+        </button>
+        <button onClick={() => onCompleteRef.current()} className="px-4 py-2 text-text-secondary">
+          Skip breathing
+        </button>
+      </div>
     </div>
   )
 }

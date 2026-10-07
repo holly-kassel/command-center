@@ -31,8 +31,47 @@ export interface DailyLog {
   } | null
   gratitude: string | null
   untrackedWins: string | null
-  focusAchieved: boolean
+  focusCommitted?: boolean
+  focusAchieved: boolean | null
   energyLevel: number | null // 1-5
+  legacyData?: boolean
+}
+
+export type RitualType = 'morning' | 'evening' | 'touch_grass'
+
+export interface RitualAnswers {
+  intention: string
+  focusCommitted: boolean
+  focusAchieved: boolean | null
+  untrackedWins: string
+  wentWell: string
+  couldImprove: string
+  gratitude: string
+  energyLevel: number | null
+  waterConfirmed: boolean
+}
+
+export interface RitualDraft {
+  id: string
+  type: RitualType
+  date: string
+  step: number
+  answers: RitualAnswers
+  updatedAt: string
+}
+
+export interface RitualSnapshot {
+  revision: number
+  todayLog: DailyLog
+  streaks: Record<StreakType, Streak>
+  weeklyMetrics: WeeklyRitualMetrics
+  drafts: RitualDraft[]
+  legacyNotice: string | null
+}
+
+export interface RitualCompletion {
+  draft: RitualDraft
+  operationId: string
 }
 
 // ─── Ritual Steps ─────────────────────────────────────────────
@@ -49,46 +88,46 @@ export const MORNING_RITUAL_STEPS: RitualStep[] = [
     id: 'breathe',
     title: 'Breathe',
     description: 'Center yourself with a 4-7-8 breathing exercise',
-    durationSeconds: 60,
+    durationSeconds: 60
   },
   {
     id: 'review',
     title: 'Review',
-    description: 'Check your focus and upcoming meetings',
+    description: 'Check your focus and upcoming meetings'
   },
   {
     id: 'intention',
     title: 'Intention',
-    description: 'Set your intention for today',
+    description: 'Set your intention for today'
   },
   {
     id: 'focus',
     title: 'Commit',
-    description: 'Commit to your focus for the day',
-  },
+    description: 'Commit to your focus for the day'
+  }
 ]
 
 export const EVENING_RITUAL_STEPS: RitualStep[] = [
   {
     id: 'wins',
     title: 'Wins',
-    description: 'Celebrate what you accomplished today',
+    description: 'Celebrate what you accomplished today'
   },
   {
     id: 'reflect',
     title: 'Reflect',
-    description: 'What went well and what could improve',
+    description: 'What went well and what could improve'
   },
   {
     id: 'gratitude',
     title: 'Gratitude',
-    description: 'What are you grateful for today?',
+    description: 'What are you grateful for today?'
   },
   {
     id: 'tomorrow',
     title: 'Tomorrow',
-    description: "Preview tomorrow's schedule and tasks",
-  },
+    description: "Preview tomorrow's schedule and tasks"
+  }
 ]
 
 // ─── Ritual Data ──────────────────────────────────────────────
@@ -103,7 +142,7 @@ export interface EveningRitualResult {
   wentWell: string
   couldImprove: string
   gratitude: string
-  energyLevel: number
+  energyLevel: number | null
 }
 
 export const TOUCH_GRASS_STEPS: RitualStep[] = [
@@ -111,13 +150,13 @@ export const TOUCH_GRASS_STEPS: RitualStep[] = [
     id: 'breathe',
     title: 'Breathe',
     description: 'Stop. Close your eyes. 4-7-8.',
-    durationSeconds: 60,
+    durationSeconds: 60
   },
   {
     id: 'water',
     title: 'Hydrate',
-    description: 'Drink some water. Right now.',
-  },
+    description: 'Drink some water. Right now.'
+  }
 ]
 
 // ─── Weekly Metrics ───────────────────────────────────────────

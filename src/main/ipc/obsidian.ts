@@ -204,15 +204,18 @@ export function registerObsidianIpc(): void {
 
   // ─── Slash Commands ────────────────────────────────────────────
 
-  ipcMain.handle('obsidian:executeSlashCommand', async (_event, text: string) => {
-    try {
-      const registry = getSlashCommandRegistry()
-      return await registry.execute(text)
-    } catch (error) {
-      log.error('[IPC] obsidian:executeSlashCommand error:', error)
-      throw error
+  ipcMain.handle(
+    'obsidian:executeSlashCommand',
+    async (_event, text: string, attachments?: unknown) => {
+      try {
+        const registry = getSlashCommandRegistry()
+        return await registry.execute(text, attachments)
+      } catch (error) {
+        log.error('[IPC] obsidian:executeSlashCommand error:', error)
+        throw error
+      }
     }
-  })
+  )
 
   ipcMain.handle('obsidian:getSlashCommands', async () => {
     try {

@@ -60,12 +60,26 @@ export interface SlashCommandResult {
   message: string
 }
 
+/** Image pasted alongside a slash command. The main process re-checks the bytes. */
+export interface SlashCommandAttachment {
+  mimeType: string
+  data: Uint8Array
+}
+
 /** Metadata for a registered slash command */
 export interface SlashCommandInfo {
   name: string
   description: string
   argHint: string
   multiline?: boolean
+  /** Textarea placeholder for multiline commands */
+  placeholder?: string
+  /** Status text while the command runs */
+  pendingLabel?: string
+  /** Label for the submit action */
+  submitLabel?: string
+  /** True when the command accepts pasted images */
+  acceptsAttachments?: boolean
 }
 
 /** Summary of a weekly note file for the sidebar */

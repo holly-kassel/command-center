@@ -99,13 +99,12 @@ export function Dashboard(): React.ReactElement {
   const ritualRefresh = useRitualStore((s) => s.refreshAll)
   const activeRitual = useRitualStore((s) => s.activeRitual)
   const startRitual = useRitualStore((s) => s.startRitual)
-  const endRitual = useRitualStore((s) => s.endRitual)
   const panelComponents: Record<RightColumnPanelId, React.ReactNode> = {
     rituals: (
       <RitualMetrics
-        onStartMorning={() => startRitual('morning')}
-        onStartEvening={() => startRitual('evening')}
-        onStartTouchGrass={() => startRitual('touch_grass')}
+        onStartMorning={() => void startRitual('morning')}
+        onStartEvening={() => void startRitual('evening')}
+        onStartTouchGrass={() => void startRitual('touch_grass')}
       />
     ),
     calendar: <CalendarSection />,
@@ -119,10 +118,11 @@ export function Dashboard(): React.ReactElement {
   const initAll = useCallback(() => {
     obsidianInit()
     calendarInit()
-    ritualInit()
+    if (!useRitualStore.getState().todayLog) ritualInit()
+    else ritualRefresh()
     kanbanInit()
     chatInit()
-  }, [obsidianInit, calendarInit, ritualInit, kanbanInit, chatInit])
+  }, [obsidianInit, calendarInit, ritualInit, ritualRefresh, kanbanInit, chatInit])
 
   // Refresh data sources every 5 minutes
   const refreshAll = useCallback(() => {
@@ -306,15 +306,9 @@ export function Dashboard(): React.ReactElement {
       </div>
 
       {/* Ritual flow overlays */}
-      {activeRitual === 'morning' && (
-        <MorningRitualFlow onComplete={endRitual} onClose={endRitual} />
-      )}
-      {activeRitual === 'evening' && (
-        <EveningRitualFlow onComplete={endRitual} onClose={endRitual} />
-      )}
-      {activeRitual === 'touch_grass' && (
-        <TouchGrassFlow onComplete={endRitual} onClose={endRitual} />
-      )}
+      {activeRitual === 'morning' && <MorningRitualFlow />}
+      {activeRitual === 'evening' && <EveningRitualFlow />}
+      {activeRitual === 'touch_grass' && <TouchGrassFlow />}
 
       <AnimatePresence>
         {showFocusMode && <FocusModeOverlay key="focus" onExit={() => setShowFocusMode(false)} />}

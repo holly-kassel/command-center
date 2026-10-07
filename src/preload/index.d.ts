@@ -5,10 +5,12 @@ import type {
   WeeklyNote,
   SlashCommandResult,
   SlashCommandInfo,
+  SlashCommandAttachment,
   WeeklyNoteSummary,
   WeeklySectionResult
 } from '../shared/types/obsidian'
 import type { CalendarEvent } from '../shared/types/calendar'
+import type { MenagerieSnapshot } from '../shared/types/menagerie'
 import type {
   GitHubNotification,
   GitHubPullRequest,
@@ -18,7 +20,15 @@ import type {
 } from '../shared/types/github'
 import type { ParsedSlackThread } from '../shared/types/slack'
 import type { AppSettings } from '../shared/types/settings'
-import type { DailyLog, Streak, StreakType, WeeklyRitualMetrics } from '../shared/types/ritual'
+import type {
+  DailyLog,
+  Streak,
+  StreakType,
+  WeeklyRitualMetrics,
+  RitualSnapshot,
+  RitualDraft,
+  RitualCompletion
+} from '../shared/types/ritual'
 import type {
   Goal,
   GoalWithChildren,
@@ -69,7 +79,11 @@ interface ObsidianApi {
   updateDayContent(dateStr: string, content: string): Promise<void>
   getWeeklySection(dateStr: string, section: string): Promise<WeeklySectionResult | null>
   updateWeeklySection(dateStr: string, section: string, content: string): Promise<void>
-  executeSlashCommand(text: string): Promise<SlashCommandResult>
+  /** Images are only accepted by commands with acceptsAttachments, like /triage */
+  executeSlashCommand(
+    text: string,
+    attachments?: SlashCommandAttachment[]
+  ): Promise<SlashCommandResult>
   getSlashCommands(): Promise<SlashCommandInfo[]>
   onFileChanged(callback: (data: { filePath: string }) => void): () => void
   onSyncUpdate(
@@ -134,18 +148,17 @@ interface SettingsApi {
 }
 
 interface RitualApi {
+  getSnapshot(): Promise<RitualSnapshot>
+  saveDraft(draft: RitualDraft): Promise<RitualSnapshot>
+  discardDraft(id: string): Promise<RitualSnapshot>
+  complete(input: RitualCompletion): Promise<RitualSnapshot>
   getDailyLog(date: string): Promise<DailyLog>
   getTodayLog(): Promise<DailyLog>
-  saveDailyLog(date: string, partial: Partial<DailyLog>): Promise<DailyLog>
   getLogsInRange(start: string, end: string): Promise<DailyLog[]>
   getStreak(type: StreakType): Promise<Streak>
   getAllStreaks(): Promise<Record<StreakType, Streak>>
-  updateStreak(type: StreakType): Promise<Streak>
-  checkFullDayStreak(): Promise<Streak | null>
   getWeeklyMetrics(weekStart?: string): Promise<WeeklyRitualMetrics>
-  onSyncUpdate(
-    callback: (data: { todayLog: DailyLog; streaks: Record<StreakType, Streak> }) => void
-  ): () => void
+  onSyncUpdate(callback: (data: RitualSnapshot) => void): () => void
 }
 
 interface GoalApi {
@@ -249,6 +262,20 @@ interface ChatApi {
   onNudge(callback: (message: ChatMessage) => void): () => void
 }
 
+interface MenagerieApi {
+  getSnapshot(): Promise<MenagerieSnapshot>
+  refresh(): Promise<MenagerieSnapshot>
+  reveal(cwd: string): Promise<void>
+  copyId(id: string): Promise<void>
+  /** Opens the session in the GitHub Copilot app via ghapp:// deep link */
+  openSession(id: string): Promise<boolean>
+  /** Desktop notification + dock badge when a critter starts waiting on you */
+  getNotifications(): Promise<boolean>
+  setNotifications(enabled: boolean): Promise<boolean>
+  editNeighborhoods(): Promise<void>
+  onUpdate(callback: (snapshot: MenagerieSnapshot) => void): () => void
+}
+
 interface Api {
   obsidian: ObsidianApi
   auth: AuthApi
@@ -261,6 +288,7 @@ interface Api {
   transcription: TranscriptionApi
   decisionEval: DecisionEvalApi
   chat: ChatApi
+  menagerie: MenagerieApi
   settings: SettingsApi
   app: AppApi
 }

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react'
+import { useShallow } from 'zustand/react/shallow'
 import { useMeetingStore } from '../../store/meetingStore'
 
 const SPEAKER_COLORS = [
@@ -14,7 +15,16 @@ const SPEAKER_COLORS = [
 
 export function TranscriptView(): React.ReactElement {
   const { segments, isRecording, speakerFilter, searchQuery, setSpeakerFilter, setSearchQuery } =
-    useMeetingStore()
+    useMeetingStore(
+      useShallow((s) => ({
+        segments: s.segments,
+        isRecording: s.isRecording,
+        speakerFilter: s.speakerFilter,
+        searchQuery: s.searchQuery,
+        setSpeakerFilter: s.setSpeakerFilter,
+        setSearchQuery: s.setSearchQuery
+      }))
+    )
   const bottomRef = useRef<HTMLDivElement>(null)
 
   const speakerColorMap = useMemo(() => {

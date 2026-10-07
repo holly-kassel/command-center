@@ -7,6 +7,7 @@
  * Supports slash commands:
  *   /todo buy milk       — adds a checkbox
  *   /transcript [paste]  — summarizes and adds to notes (expands to textarea)
+ *   /triage [paste]      — triages it in the background (expands to textarea)
  */
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { useObsidianStore } from '../../store/obsidianStore'
@@ -44,7 +45,10 @@ export function QuickCaptureBox(): React.JSX.Element {
     if (!trimmed) return
 
     setStatus('saving')
-    setStatusMessage(isMultiline ? 'Summarizing transcript with AI...' : 'Saving...')
+    setStatusMessage(
+      matchedCommand?.pendingLabel ??
+        (isMultiline ? 'Summarizing transcript with AI...' : 'Saving...')
+    )
     try {
       if (isSlashCommand) {
         const result = await window.api.obsidian.executeSlashCommand(trimmed)
@@ -69,7 +73,7 @@ export function QuickCaptureBox(): React.JSX.Element {
       setStatus('error')
       setTimeout(() => setStatus('idle'), 3000)
     }
-  }, [text, isSlashCommand, isMultiline, appendToToday])
+  }, [text, isSlashCommand, isMultiline, matchedCommand, appendToToday])
 
   const handleKeyDown = (e: React.KeyboardEvent): void => {
     // Multiline: Cmd/Ctrl+Enter to submit, plain Enter for newlines
@@ -96,7 +100,7 @@ export function QuickCaptureBox(): React.JSX.Element {
 
   const placeholder = isSlashCommand && matchedCommand
     ? `/${matchedCommand.name} ${matchedCommand.argHint}`
-    : 'Quick capture — press Enter to save (try /todo, /transcript, or /slack)'
+    : 'Quick capture: press Enter to save (try /todo, /transcript, /slack, or /triage)'
 
   const inputClasses = `w-full px-4 py-2.5 rounded-lg bg-surface-muted border
                      text-text-primary placeholder:text-text-muted
@@ -151,11 +155,9 @@ export function QuickCaptureBox(): React.JSX.Element {
                      transition-colors"
           >
             {status === 'saving'
-              ? isMultiline
-                ? 'Summarizing...'
-                : '...'
+              ? (matchedCommand?.pendingLabel ?? (isMultiline ? 'Summarizing...' : '...'))
               : isSlashCommand
-                ? 'Run'
+                ? (matchedCommand?.submitLabel ?? 'Run')
                 : 'Capture'}
           </button>
         </div>

@@ -220,8 +220,7 @@ export function YardCloseUp({ yard, onClose }: Props): React.JSX.Element {
         ctx,
         timeOfDay().dark,
         [{ x: HOUSE_X, y: HOUSE_Y, level: layout.level }],
-        SCENE_W,
-        SCENE_H,
+        { x: -view.offX, y: -view.offY, w: cssW, h: cssH },
         s,
         frame
       )

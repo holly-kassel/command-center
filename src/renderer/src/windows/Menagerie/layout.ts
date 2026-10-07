@@ -99,6 +99,16 @@ export function gridFor(total: number, aspect = 1): { cols: number; rows: number
   return { cols, rows }
 }
 
+/**
+ * Largest whole-number zoom that fits the village in the canvas. Whole numbers
+ * keep the pixel art crisp, and there's no upper cap, so a big window gets a
+ * big village. Never below 2×; smaller canvases scroll instead.
+ */
+export function villageScale(world: { w: number; h: number }, cssW: number, cssH: number): number {
+  const s = Math.floor(Math.min(cssW / world.w, cssH / world.h))
+  return Math.max(2, s || 2)
+}
+
 export function buildLayout(yards: Yard[], aspect = 1): VillageLayout {
   const n = yards.length
   // Reserve one cell for the square.
@@ -188,4 +198,58 @@ export function buildLayout(yards: Yard[], aspect = 1): VillageLayout {
   }
 
   return { cols, rows, world, square, fountain, yards: layouts, neighborhoods }
+}
+
+/** Footprints of TREE and FLOWER in sprites.ts */
+const WILD_TREE = { w: 12, h: 16 }
+const WILD_FLOWER = { w: 5, h: 6 }
+
+export interface WildScenery {
+  trees: { x: number; y: number }[]
+  flowers: { x: number; y: number }[]
+}
+
+/**
+ * Meadow around the village. The canvas rarely matches the village's shape,
+ * so the leftover space is split into cell-sized "wild" plots, each with a few
+ * trees and flowers. Plots are seeded by grid position, so scenery stays put
+ * between frames, and nothing is placed on the roads out of the town square.
+ * `area` is the visible region in world pixels.
+ */
+export function wildScenery(layout: VillageLayout, area: Rect): WildScenery {
+  const trees: { x: number; y: number }[] = []
+  const flowers: { x: number; y: number }[] = []
+  const sq = layout.square
+  const roadY = sq.y + sq.h / 2 - 4
+  const roadX = sq.x + sq.w / 2 - 4
+  const onRoad = (x: number, y: number, w: number, h: number): boolean =>
+    (y < roadY + 10 && y + h > roadY - 2) || (x < roadX + 10 && x + w > roadX - 2)
+
+  const c0 = Math.floor(area.x / CELL_W)
+  const c1 = Math.ceil((area.x + area.w) / CELL_W)
+  const r0 = Math.floor(area.y / CELL_H)
+  const r1 = Math.ceil((area.y + area.h) / CELL_H)
+  for (let row = r0; row < r1; row++) {
+    for (let col = c0; col < c1; col++) {
+      if (col >= 0 && col < layout.cols && row >= 0 && row < layout.rows) continue
+      const rnd = mulberry(hash(`wild:${col},${row}`))
+      const x0 = col * CELL_W
+      const y0 = row * CELL_H
+      const treeCount = 1 + Math.floor(rnd() * 3)
+      for (let i = 0; i < treeCount; i++) {
+        const x = x0 + 4 + Math.floor(rnd() * (CELL_W - WILD_TREE.w - 8))
+        const y = y0 + 2 + Math.floor(rnd() * (CELL_H - WILD_TREE.h - 4))
+        if (!onRoad(x, y, WILD_TREE.w, WILD_TREE.h)) trees.push({ x, y })
+      }
+      const flowerCount = 2 + Math.floor(rnd() * 3)
+      for (let i = 0; i < flowerCount; i++) {
+        const x = x0 + 4 + Math.floor(rnd() * (CELL_W - WILD_FLOWER.w - 8))
+        const y = y0 + 4 + Math.floor(rnd() * (CELL_H - WILD_FLOWER.h - 8))
+        if (!onRoad(x, y, WILD_FLOWER.w, WILD_FLOWER.h)) flowers.push({ x, y })
+      }
+    }
+  }
+  // Lower trees draw last so they overlap the ones behind them.
+  trees.sort((a, b) => a.y - b.y)
+  return { trees, flowers }
 }

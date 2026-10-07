@@ -192,6 +192,8 @@ export class HotkeyManager {
     this.loadOverlayRoute(win, 'menagerie')
 
     win.once('ready-to-show', () => {
+      // Fill the screen's work area (not a separate fullscreen Space)
+      win.maximize()
       win.show()
       win.focus()
     })

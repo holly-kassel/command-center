@@ -242,7 +242,14 @@ export function KatyaCloseUp({ snapshot, onClose, onOpenSession }: Props): React
         }
       }
 
-      drawNight(ctx, timeOfDay().dark, [], SCENE_W, SCENE_H, s, frame)
+      drawNight(
+        ctx,
+        timeOfDay().dark,
+        [],
+        { x: -view.offX, y: -view.offY, w: cssW, h: cssH },
+        s,
+        frame
+      )
 
       ctx.restore()
       raf = requestAnimationFrame(draw)

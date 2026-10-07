@@ -434,3 +434,55 @@ test('assembleSnapshot groups neighborhood yards together and lists them', () =>
   assert.deepEqual(plain.neighborhoods, [])
   assert.equal(plain.yards[0].neighborhood, null)
 })
+
+const village = load('src/renderer/src/windows/Menagerie/layout.ts', {
+  '../../../../shared/types/menagerie': types
+})
+
+test('villageScale uses whole-number zoom with no upper cap, never below 2x', () => {
+  const world = { w: 224, h: 176 }
+  assert.equal(village.villageScale(world, 2560, 1600), 9)
+  assert.equal(village.villageScale(world, 700, 500), 2)
+  assert.equal(village.villageScale(world, 300, 200), 2)
+  assert.equal(village.villageScale(world, 0, 0), 2)
+})
+
+test('wildScenery fills the meadow outside the village, off the roads, and stays put', () => {
+  const yards = ['a/one', 'a/two', 'a/three'].map((repository) => ({ repository, critters: [] }))
+  const layout = village.buildLayout(yards, 1.6)
+  const { world, square: sq } = layout
+  const area = { x: -150, y: -100, w: world.w + 300, h: world.h + 200 }
+  const scenery = village.wildScenery(layout, area)
+  assert.ok(scenery.trees.length > 0 && scenery.flowers.length > 0)
+
+  const roadY = sq.y + sq.h / 2 - 4
+  const roadX = sq.x + sq.w / 2 - 4
+  const items = [
+    ...scenery.trees.map((p) => ({ ...p, w: 12, h: 16 })),
+    ...scenery.flowers.map((p) => ({ ...p, w: 5, h: 6 }))
+  ]
+  for (const it of items) {
+    const at = `${it.x},${it.y}`
+    const inVillage = it.x + it.w > 0 && it.x < world.w && it.y + it.h > 0 && it.y < world.h
+    assert.ok(!inVillage, `scenery overlaps the village at ${at}`)
+    assert.ok(!(it.y < roadY + 8 && it.y + it.h > roadY), `scenery on the east-west road at ${at}`)
+    assert.ok(
+      !(it.x < roadX + 8 && it.x + it.w > roadX),
+      `scenery on the north-south road at ${at}`
+    )
+  }
+
+  // Seeded by plot, so the same view gives the same scenery and a smaller view shows a subset
+  assert.deepEqual(village.wildScenery(layout, area), scenery)
+  const smaller = village.wildScenery(layout, { x: -40, y: 0, w: world.w + 40, h: world.h })
+  assert.ok(smaller.trees.length > 0)
+  for (const t of smaller.trees) {
+    assert.ok(scenery.trees.some((u) => u.x === t.x && u.y === t.y))
+  }
+
+  // A view entirely inside the village has no wild plots
+  assert.deepEqual(village.wildScenery(layout, { x: 8, y: 8, w: 100, h: 80 }), {
+    trees: [],
+    flowers: []
+  })
+})

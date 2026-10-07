@@ -115,21 +115,21 @@ export function drawStreakFlame(
 }
 
 /**
- * Night falls: a cool tint over the whole scene, then warm windows and the
+ * Night falls: a cool tint over the whole canvas, then warm windows and the
  * lantern (if built) drawn back on top so cottages glow.
  */
 export function drawNight(
   ctx: CanvasRenderingContext2D,
   dark: number,
   houses: { x: number; y: number; level: number }[],
-  worldW: number,
-  worldH: number,
+  /** Canvas-pixel area to tint, in the caller's current (translated) coordinates */
+  cover: { x: number; y: number; w: number; h: number },
   s: number,
   frame: number
 ): void {
   if (dark <= 0) return
   ctx.fillStyle = `rgba(18,20,58,${(0.5 * dark).toFixed(3)})`
-  ctx.fillRect(0, 0, worldW * s, worldH * s)
+  ctx.fillRect(cover.x, cover.y, cover.w, cover.h)
   const flicker = frame % 5 === 0 ? 0.8 : 1
   for (const h of houses) {
     ctx.fillStyle = `rgba(255,211,122,${(dark * flicker).toFixed(3)})`

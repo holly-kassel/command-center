@@ -1,6 +1,15 @@
 import { useEffect, useLayoutEffect, useRef } from 'react'
 import type { MenagerieSnapshot } from '../../../../shared/types/menagerie'
-import { buildLayout, HOUSE_H, HOUSE_W, NEIGHBORHOOD_TINTS, type VillageLayout } from './layout'
+import {
+  buildLayout,
+  HOUSE_H,
+  HOUSE_W,
+  NEIGHBORHOOD_TINTS,
+  villageScale,
+  wildScenery,
+  type VillageLayout,
+  type WildScenery
+} from './layout'
 import { drawHouseUpgrades, drawNight, drawStreakFlame, housePalette } from './houseUpgrades'
 import { timeOfDay, truncate } from './format'
 import { createSim, syncSim, tickSim, type Actor, type SimState } from './sim'
@@ -67,11 +76,6 @@ function paletteFor(actor: Actor): Palette {
   return { ...PROP_PALETTE, ...coat, c: COLLAR_COLORS[actor.critter.client] }
 }
 
-function computeScale(layout: VillageLayout, cssW: number, cssH: number): number {
-  const s = Math.floor(Math.min(cssW / layout.world.w, cssH / layout.world.h))
-  return Math.max(2, Math.min(5, s || 2))
-}
-
 export function MenagerieCanvas({
   snapshot,
   selectedId,
@@ -117,6 +121,7 @@ export function MenagerieCanvas({
     let raf = 0
     let last = performance.now()
     let hover: string | null = null
+    let wild: { layout: VillageLayout; key: string; scenery: WildScenery } | null = null
 
     // offX/offY are the applied offsets; panX/panY are the user's scroll
     // position, only used when the village is bigger than the canvas.
@@ -266,7 +271,7 @@ export function MenagerieCanvas({
 
       tickSim(sim, layout, dt)
 
-      view.scale = computeScale(layout, cssW, cssH)
+      view.scale = villageScale(layout.world, cssW, cssH)
       const worldW = layout.world.w * view.scale
       const worldH = layout.world.h * view.scale
       if (worldW <= cssW) {
@@ -288,13 +293,21 @@ export function MenagerieCanvas({
       ctx.save()
       ctx.translate(view.offX, view.offY)
 
+      // The whole canvas, in world pixels and in (translated) canvas pixels. The
+      // village rarely matches the canvas's shape, so ground and roads run to the edges.
+      const visible = { x: -view.offX / s, y: -view.offY / s, w: cssW / s, h: cssH / s }
+      const cover = { x: -view.offX, y: -view.offY, w: cssW, h: cssH }
+
       // Ground
       ctx.fillStyle = GRASS
-      ctx.fillRect(0, 0, layout.world.w * s, layout.world.h * s)
-      // Checker tufts for texture
+      ctx.fillRect(cover.x, cover.y, cover.w, cover.h)
+      // Checker tufts for texture, on the same 8px lattice inside and outside the village
       ctx.fillStyle = GRASS_DARK
-      for (let ty = 0; ty < layout.world.h; ty += 8) {
-        for (let tx = (ty / 8) % 2 === 0 ? 0 : 4; tx < layout.world.w; tx += 8) {
+      const tx0 = Math.floor(visible.x / 8) * 8 - 8
+      const ty0 = Math.floor(visible.y / 8) * 8 - 8
+      for (let ty = ty0; ty < visible.y + visible.h; ty += 8) {
+        const shift = Math.abs(ty / 8) % 2 === 0 ? 0 : 4
+        for (let tx = tx0 + shift; tx < visible.x + visible.w; tx += 8) {
           ctx.fillRect((tx + 3) * s, (ty + 3) * s, s, s)
         }
       }
@@ -317,11 +330,11 @@ export function MenagerieCanvas({
         }
       }
 
-      // Paths: horizontal/vertical through the square
+      // Paths: horizontal/vertical through the square, out to the canvas edges
       ctx.fillStyle = PATH
       const sq = layout.square
-      ctx.fillRect(0, (sq.y + sq.h / 2 - 4) * s, layout.world.w * s, 8 * s)
-      ctx.fillRect((sq.x + sq.w / 2 - 4) * s, 0, 8 * s, layout.world.h * s)
+      ctx.fillRect(cover.x, (sq.y + sq.h / 2 - 4) * s, cover.w, 8 * s)
+      ctx.fillRect((sq.x + sq.w / 2 - 4) * s, cover.y, 8 * s, cover.h)
 
       // Town square
       ctx.fillStyle = SQUARE
@@ -332,6 +345,14 @@ export function MenagerieCanvas({
         ctx.fillStyle = '#e8f7ff'
         ctx.fillRect((layout.fountain.x + 3) * s, (layout.fountain.y - 1) * s, s, s)
       }
+
+      // Wild meadow beyond the village; recomputed only when the view changes
+      const wildKey = `${visible.x},${visible.y},${visible.w},${visible.h}`
+      if (wild?.layout !== layout || wild.key !== wildKey) {
+        wild = { layout, key: wildKey, scenery: wildScenery(layout, visible) }
+      }
+      for (const f of wild.scenery.flowers) drawGrid(ctx, FLOWER, PROP_PALETTE, f.x * s, f.y * s, s)
+      for (const t of wild.scenery.trees) drawGrid(ctx, TREE, PROP_PALETTE, t.x * s, t.y * s, s)
 
       // Yards
       ctx.font = `${Math.max(9, 3 * s)}px ui-monospace, Menlo, monospace`
@@ -495,8 +516,7 @@ export function MenagerieCanvas({
         ctx,
         timeOfDay().dark,
         layout.yards.map((y) => ({ x: y.house.x, y: y.house.y, level: y.level })),
-        layout.world.w,
-        layout.world.h,
+        cover,
         s,
         sim.frame
       )

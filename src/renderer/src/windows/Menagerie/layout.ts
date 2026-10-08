@@ -32,7 +32,7 @@ const CAT_TREE_SIZE = gridSize(CAT_TREE)
 const NAP_GROUND = 33
 const CAT_TREE_X = 64
 const DOG_HOUSE_X = 79
-const ROAM_TOP = 37
+const ROAM_TOP = 41
 const TREE_X = 98
 
 /**
@@ -252,13 +252,17 @@ export function buildLayout(yards: Yard[], aspect = 1): VillageLayout {
   return { cols, rows, world, square, fountain, decorations, yards: layouts, neighborhoods }
 }
 
-/** Where a critter heading off to nap disappears: the dog house door or the foot of the cat tree */
+/**
+ * Where a critter heading off to nap stops (then disappears): on the grass in
+ * front of the dog house door, where the sleeping puppy is drawn, or at the
+ * foot of the cat tree. Top-left of a 12×12 critter sprite.
+ */
 export function napEntrance(yard: YardLayout, species: CritterSpecies): Point {
   if (species === 'puppy') {
     const d = yard.nap.dogHouse
     return {
       x: d.x + (DOG_HOUSE_SIZE.w - CRITTER_SIZE.w) / 2,
-      y: d.y + DOG_HOUSE_SIZE.h - CRITTER_SIZE.h
+      y: d.y + DOG_HOUSE_SIZE.h - CRITTER_SIZE.h + 7
     }
   }
   const c = yard.nap.catTree

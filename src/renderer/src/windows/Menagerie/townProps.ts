@@ -6,6 +6,7 @@
 import type { Automation, Critter, MenagerieSnapshot } from '../../../../shared/types/menagerie'
 import { automationState, isNapping } from '../../../../shared/types/menagerie'
 import type { Point, Rect, YardLayout } from './layout'
+import { napEntrance } from './layout'
 import {
   BANG,
   BANG_PALETTE,
@@ -61,8 +62,8 @@ function napGeometry(yard: YardLayout): Record<'pup' | 'pupZ' | 'kit' | 'kitZ', 
   const d = yard.nap.dogHouse
   const c = yard.nap.catTree
   return {
-    // Lies across the doorway, nose poking out onto the grass
-    pup: { x: d.x + 2, y: d.y + 4 },
+    // Asleep on the grass in front of the door, where puppies walk home to
+    pup: napEntrance(yard, 'puppy'),
     pupZ: { x: d.x + 11, y: d.y - 7 },
     // Curled up on the top perch
     kit: { x: c.x, y: c.y - 11 },
@@ -148,7 +149,7 @@ export function napHitRects(yard: YardLayout, residents: NapResidents): Rect[] {
   const c = yard.nap.catTree
   const d = yard.nap.dogHouse
   if (residents.kittens.length) rects.push({ x: c.x, y: c.y - 12, w: CAT.w, h: CAT.h + 12 })
-  if (residents.puppies.length) rects.push({ x: d.x, y: d.y - 7, w: DOG.w, h: DOG.h + 11 })
+  if (residents.puppies.length) rects.push({ x: d.x, y: d.y - 7, w: DOG.w, h: DOG.h + 15 })
   return rects
 }
 

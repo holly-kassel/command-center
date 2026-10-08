@@ -38,7 +38,7 @@ const DOG_POS = { x: 74, y: GROUND - DOG.h }
 /** Sleeping sprites are 12×12 with their body in rows 5–11 */
 const SLEEPER = 12
 const GRASS_COLS = 4
-const GRASS_ROWS = [42, 53, 64]
+const GRASS_ROWS = [45, 56, 66]
 
 const GROUPS: { status: CritterStatus; title: string }[] = [
   { status: 'idle', title: 'Idle · waiting on your next message' },
@@ -46,18 +46,30 @@ const GROUPS: { status: CritterStatus; title: string }[] = [
   { status: 'done', title: 'Finished' }
 ]
 
-/** Where the i-th napping kitten or puppy sleeps: the perch / doorway first, then the grass */
-function sleeperSpot(species: Critter['species'], i: number): { x: number; y: number } | null {
+interface Spot {
+  x: number
+  y: number
+  /** Where its z floats */
+  z: { x: number; y: number }
+}
+
+/**
+ * Where the i-th napping kitten or puppy sleeps: the first on the cat tree's
+ * top perch / in front of the dog house door (z over the roof), the rest on
+ * the grass below.
+ */
+function sleeperSpot(species: Critter['species'], i: number): Spot | null {
   if (i === 0) {
     return species === 'kitten'
-      ? { x: CAT_POS.x, y: CAT_POS.y - 11 }
-      : { x: DOG_POS.x + 2, y: DOG_POS.y + 4 }
+      ? { x: CAT_POS.x, y: CAT_POS.y - 11, z: { x: CAT_POS.x + 8, y: CAT_POS.y - 12 } }
+      : { x: DOG_POS.x + 2, y: DOG_POS.y + 8, z: { x: DOG_POS.x + 11, y: DOG_POS.y - 7 } }
   }
   const slot = i - 1
   const row = Math.floor(slot / GRASS_COLS)
   if (row >= GRASS_ROWS.length) return null
-  const x0 = species === 'kitten' ? 4 : 62
-  return { x: x0 + (slot % GRASS_COLS) * 14, y: GRASS_ROWS[row] }
+  const x = (species === 'kitten' ? 4 : 62) + (slot % GRASS_COLS) * 14
+  const y = GRASS_ROWS[row]
+  return { x, y, z: { x: x + 8, y: y - 1 } }
 }
 
 export function NapCloseUp({ yard, onClose }: Props): React.JSX.Element {
@@ -194,7 +206,7 @@ export function NapCloseUp({ yard, onClose }: Props): React.JSX.Element {
         }
         const sprite = c.species === 'puppy' ? PUPPY.sleep[0] : KITTEN.sleep[0]
         drawGrid(ctx, sprite, critterPalette(c), spot.x * s, spot.y * s, s, i % 2 === 1)
-        zs.push({ x: spot.x + 8, y: spot.y - 1, i })
+        zs.push({ ...spot.z, i })
         slots.push({
           id: c.id,
           x: view.offX + (spot.x + 1) * s,
@@ -208,11 +220,12 @@ export function NapCloseUp({ yard, onClose }: Props): React.JSX.Element {
         const bob = (frame + z.i) % 4 < 2 ? 0 : 1
         drawGrid(ctx, ZZZ, PROP_PALETTE, z.x * s, (z.y - bob) * s, s)
       }
+      // Beyond what fits on the grass, a note over each side says how many more
       ctx.font = `700 ${Math.max(10, 3 * s)}px ${FONT}`
       ctx.textBaseline = 'top'
       ctx.fillStyle = '#fff4d6'
-      if (overflow.kitten) ctx.fillText(`+${overflow.kitten} more`, 4 * s, (SCENE_H - 4) * s)
-      if (overflow.puppy) ctx.fillText(`+${overflow.puppy} more`, 62 * s, (SCENE_H - 4) * s)
+      if (overflow.kitten) ctx.fillText(`+${overflow.kitten} more`, 4 * s, 36 * s)
+      if (overflow.puppy) ctx.fillText(`+${overflow.puppy} more`, (SCENE_W - 22) * s, 36 * s)
 
       drawNight(
         ctx,

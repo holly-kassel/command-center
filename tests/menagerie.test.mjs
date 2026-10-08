@@ -766,7 +766,10 @@ test('layout: nap spots sit beside the cottage, clear of the house, tree, and ro
     }
     assert.ok(!overlaps(dogRect, catRect))
     assert.equal(dogRect.y + dog.h, catRect.y + cat.h, 'one ground line')
-    assert.ok(y.roam.y >= dogRect.y + dog.h + 3, 'critters roam below the sleepers')
+    // The puppy sleeps on the grass in front of the door; nobody roams over it
+    const pupBed = village.napEntrance(y, 'puppy')
+    assert.ok(pupBed.y + 12 > dogRect.y + dog.h, 'puppy lies in front of the door')
+    assert.ok(y.roam.y >= pupBed.y + 12, 'critters roam below the sleepers')
     for (const t of y.trees) assert.ok(t.x + tree.w <= y.cell.x + y.cell.w)
     for (const f of y.flowers) assert.ok(f.y >= y.roam.y)
     const pupDoor = village.napEntrance(y, 'puppy')

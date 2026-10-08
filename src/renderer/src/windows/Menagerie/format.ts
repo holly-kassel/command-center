@@ -1,6 +1,7 @@
 import type {
   Automation,
   AutomationState,
+  Critter,
   CritterStatus,
   PendingPermission,
   PermissionKind
@@ -140,4 +141,12 @@ export function shortDetail(p: PendingPermission, max = 60): string | null {
     d = parts.slice(-2).join('/')
   }
   return d.length > max ? d.slice(0, max - 1) + '…' : d
+}
+
+/** Longest-waiting first: a manager herds you to whoever has been patient the longest */
+export function byLongestWait(a: Critter, b: Critter): number {
+  return (
+    Date.parse(a.pendingPermission?.requestedAt ?? a.lastActivityAt) -
+    Date.parse(b.pendingPermission?.requestedAt ?? b.lastActivityAt)
+  )
 }

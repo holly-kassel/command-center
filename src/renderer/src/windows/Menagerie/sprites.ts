@@ -446,6 +446,179 @@ function happyEyes(grid: Grid): Grid {
 export const KATYA_PORTRAIT: Grid[] = [KATYA_PORTRAIT_1, KATYA_PORTRAIT_2]
 export const KATYA_PORTRAIT_HAPPY: Grid[] = KATYA_PORTRAIT.map(happyEyes)
 
+// ── Lulu (black long-haired cat, 16×14) — manager of the cats ────
+
+export const LULU_SIZE = { w: 16, h: 14 } as const
+
+/**
+ * Lulu: D outline, b black fur, l/s long-hair sheen, w white mittens and
+ * whiskers, e amber eyes, n nose, p ears, c collar, q/G bell
+ */
+export const LULU_PALETTE: Palette = {
+  D: '#0b0a10',
+  b: '#2b2833',
+  l: '#5b5570',
+  s: '#8d86a6',
+  w: '#f7f5fa',
+  e: '#f5c443',
+  n: '#f09ab0',
+  p: '#c9708a',
+  c: '#b58cff',
+  q: '#ffd84d',
+  G: '#f0a030'
+}
+
+// Standing: big shiny eyes, whiskers out, fluffy bib under the collar bell, plume up the right
+const LULU_STAND: Grid = [
+  '...D.......D....',
+  '..DpD.....DpD...',
+  '..DppDDDDDppD...',
+  '.DbbbbbbbbbbbD..',
+  '.DbbwebbbwebbD..',
+  '.DbbeebbbeebbD..',
+  'wwlbbbbnbbbblww.',
+  'DllbbblblbbbllDD',
+  '.DllcccqcccllDlD',
+  '.DblllbbbllllDlD',
+  '.DbbbllbllbbbDlD',
+  '..DbbbblbbbbDlD.',
+  '...DwwDDDwwDDD..',
+  '...DDDD.DDDD....'
+]
+
+// Mid-stride: paws apart, tail tip flicked up
+const LULU_STEP: Grid = [
+  '...D.......D....',
+  '..DpD.....DpD...',
+  '..DppDDDDDppD...',
+  '.DbbbbbbbbbbbD..',
+  '.DbbwebbbwebbD..',
+  '.DbbeebbbeebbD..',
+  'wwlbbbbnbbbblwwD',
+  'DllbbblblbbbllDl',
+  '.DllcccqcccllDlD',
+  '.DblllbbbllllDlD',
+  '.DbbbllbllbbbDlD',
+  '..DbbbblbbbbDDD.',
+  '..DwwDDDDDwwD...',
+  '..DDDD...DDDD...'
+]
+
+// Sitting with her tail wrapped round the front paws
+const LULU_SIT: Grid = [
+  '...D.......D....',
+  '..DpD.....DpD...',
+  '..DppDDDDDppD...',
+  '.DbbbbbbbbbbbD..',
+  '.DbbwebbbwebbD..',
+  '.DbbeebbbeebbD..',
+  'wwlbbbbnbbbblww.',
+  'DllbbblblbbbllDD',
+  '.DllcccqcccllD..',
+  '.DblllbbbllllD..',
+  'DbbbbllbllbbbbD.',
+  'DbbbbbblbbbbbbDD',
+  'DbbDwwDbDwwDbDlD',
+  '.DDDDDDDDllllDD.'
+]
+
+// A loaf from the front: eyes shut, mittens tucked, tail round the side
+const LULU_SLEEP: Grid = [
+  '................',
+  '................',
+  '................',
+  '...D.......D....',
+  '..DpD.....DpD...',
+  '..DppDDDDDppD...',
+  '.DbbbbbbbbbbbD..',
+  '.DbssbbbbbssbD..',
+  'wwlbbbbnbbbblww.',
+  'DllbbbbbbbbbllDD',
+  'DlllbbbbbbbllDlD',
+  'DbbbbbbbbbbbbDlD',
+  'DbDwwDbbbDwwDllD',
+  '.DDDDDDDDDDDDDD.'
+]
+
+export const LULU: SpriteSet = {
+  idle: [LULU_STAND, LULU_STAND, LULU_STAND, LULU_STEP],
+  walk: [LULU_STAND, LULU_STEP],
+  chore: [LULU_STAND, LULU_STEP],
+  sit: [LULU_SIT],
+  sleep: [LULU_SLEEP]
+}
+
+// ── Lulu portrait (28×24) for her cat report close-up ───────────
+
+export const LULU_PORTRAIT_SIZE = { w: 28, h: 24 } as const
+
+// Tail plume up
+const LULU_PORTRAIT_1: Grid = [
+  '....l..................l....',
+  '....D..................D....',
+  '...DpD................DpD...',
+  '...DppD..............DppD...',
+  '..DpppDDDDDDDDDDDDDDDDpppD..',
+  '..DbppbbbbbbbbbbbbbbbbppbD..',
+  '.DbbbbbbblbbbbbbbblbbbbbbbD.',
+  '.DbbbbbbbbbbbbbbbbbbbbbbbbD.',
+  '.DbbbbbeebbbbbbbbbbeebbbbbD.',
+  'DbbbbbewDebbbbbbbbewDebbbbbD',
+  'DbbbbbeDDebbbbbbbbeDDebbbbbD',
+  'DbbbbbeDDebbbbbbbbeDDebbbbbD',
+  'DbbbbbbeebbbbbbbbbbeebbbbbbD',
+  'wwwwwbbbbbbbnnnnbbbbbbbwwwww',
+  'DbbbbbbbbbbbbnnbbbbbbbbbbbbD',
+  '.wwwwbbbbbbblbblbbbbbbbwwww.',
+  '.DlbbbbbbbbbbbbbbbbbbbbbbDD.',
+  '..DbbbbbbccccqqccccbbbbDlsD.',
+  '.DlbbbbbbblssGGsslbbbbDlssD.',
+  '.DblbbbbbbssssssssbbbbDllsD.',
+  '..DDbbbbbblsssssslbbbbDlllD.',
+  '....DbbDwwwwDssDwwwwDDlllD..',
+  '....DbbDwwwwDDDDwwwwDDDDD...',
+  '.....DDDDDDDD..DDDDDDDD.....'
+]
+
+// Tail plume down (swish)
+const LULU_PORTRAIT_2: Grid = [
+  '....l..................l....',
+  '....D..................D....',
+  '...DpD................DpD...',
+  '...DppD..............DppD...',
+  '..DpppDDDDDDDDDDDDDDDDpppD..',
+  '..DbppbbbbbbbbbbbbbbbbppbD..',
+  '.DbbbbbbblbbbbbbbblbbbbbbbD.',
+  '.DbbbbbbbbbbbbbbbbbbbbbbbbD.',
+  '.DbbbbbeebbbbbbbbbbeebbbbbD.',
+  'DbbbbbewDebbbbbbbbewDebbbbbD',
+  'DbbbbbeDDebbbbbbbbeDDebbbbbD',
+  'DbbbbbeDDebbbbbbbbeDDebbbbbD',
+  'DbbbbbbeebbbbbbbbbbeebbbbbbD',
+  'wwwwwbbbbbbbnnnnbbbbbbbwwwww',
+  'DbbbbbbbbbbbbnnbbbbbbbbbbbbD',
+  '.wwwwbbbbbbblbblbbbbbbbwwww.',
+  '.DlbbbbbbbbbbbbbbbbbbbbbblD.',
+  '..DbbbbbbccccqqccccbbbbbbD..',
+  '.DlbbbbbbblssGGsslbbbbbbDDD.',
+  '.DblbbbbbbssssssssbbbbbDlsD.',
+  '..DDbbbbbblsssssslbbbbDllsD.',
+  '....DbbDwwwwDssDwwwwDDllsD..',
+  '....DbbDwwwwDDDDwwwwDDDDD...',
+  '.....DDDDDDDD..DDDDDDDD.....'
+]
+
+/** Content squint (^ ^) for when she is being petted: eyes become little arcs */
+function contentEyes(grid: Grid): Grid {
+  const arcs: Record<number, string> = { 8: 'bbbb', 9: 'bbbb', 10: 'bssb', 11: 'sbbs', 12: 'bbbb' }
+  return grid.map((row, i) =>
+    arcs[i] ? row.slice(0, 6) + arcs[i] + row.slice(10, 18) + arcs[i] + row.slice(22) : row
+  )
+}
+
+export const LULU_PORTRAIT: Grid[] = [LULU_PORTRAIT_1, LULU_PORTRAIT_2]
+export const LULU_PORTRAIT_HAPPY: Grid[] = LULU_PORTRAIT.map(contentEyes)
+
 // ── Props ────────────────────────────────────────────────────────
 
 /** 32×28 cottage; palette: r roof, R roof dark, l wall, L wall dark, o door, g glass, s step */
@@ -502,6 +675,9 @@ export const TREE: Grid = [
 
 /** 5×6 flower; palette: f petal, y center, t stem */
 export const FLOWER: Grid = ['.f.f.', 'fyfyf', '.f.f.', '..t..', '..t..', '.ttt.']
+
+/** 6×5 ball of pink yarn with a loose thread; palette: f yarn, h shading */
+export const YARN: Grid = ['.fff..', 'fhfhf.', 'ffhff.', 'fhfhff', '.fff.f']
 
 /** 7×7 question mark; palette: q */
 export const QUESTION: Grid = [

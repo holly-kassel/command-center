@@ -39,11 +39,15 @@ import {
   KATYA_PALETTE,
   KATYA_SIZE,
   KITTEN,
+  LULU,
+  LULU_PALETTE,
+  LULU_SIZE,
   MINI_KITTEN,
   PROP_PALETTE,
   PUPPY,
   QUESTION,
   TREE,
+  ZZZ,
   type Grid
 } from './sprites'
 
@@ -65,6 +69,8 @@ interface Props {
   onZoom?: (repository: string) => void
   /** Called when Katya herself is clicked */
   onKatya?: () => void
+  /** Called when Lulu, manager of the cats, is clicked */
+  onLulu?: () => void
   /** Fired when a yard's dog house or cat tree is clicked; opens its nap list */
   onNap?: (repository: string) => void
   /** Automation whose decoration is selected (shows its bubble) */
@@ -101,6 +107,7 @@ export function MenagerieCanvas({
   onAnchor,
   onZoom,
   onKatya,
+  onLulu,
   onNap,
   selectedAutomationId = null,
   onSelectAutomation,
@@ -115,6 +122,7 @@ export function MenagerieCanvas({
   const onOpenRef = useRef(onOpen)
   const onZoomRef = useRef(onZoom)
   const onKatyaRef = useRef(onKatya)
+  const onLuluRef = useRef(onLulu)
   const onNapRef = useRef(onNap)
   const onSelectAutomationRef = useRef(onSelectAutomation)
   const onAutomationAnchorRef = useRef(onAutomationAnchor)
@@ -125,6 +133,7 @@ export function MenagerieCanvas({
     onOpenRef.current = onOpen
     onZoomRef.current = onZoom
     onKatyaRef.current = onKatya
+    onLuluRef.current = onLulu
     onNapRef.current = onNap
     onSelectAutomationRef.current = onSelectAutomation
     onAutomationAnchorRef.current = onAutomationAnchor
@@ -154,6 +163,7 @@ export function MenagerieCanvas({
     let hover: string | null = null
     let hoverAutomation: string | null = null
     let hoverNap: string | null = null
+    let hoverManager: 'katya' | 'lulu' | null = null
     let wild: { layout: VillageLayout; key: string; scenery: WildScenery } | null = null
 
     // offX/offY are the applied offsets; panX/panY are the user's scroll
@@ -203,6 +213,14 @@ export function MenagerieCanvas({
       const p = worldToScreen(k.x, k.y)
       const w = KATYA_SIZE.w * view.scale
       const h = KATYA_SIZE.h * view.scale
+      return cssX >= p.x && cssX <= p.x + w && cssY >= p.y && cssY <= p.y + h
+    }
+
+    const hitLulu = (cssX: number, cssY: number): boolean => {
+      const l = simRef.current.lulu
+      const p = worldToScreen(l.x, l.y)
+      const w = LULU_SIZE.w * view.scale
+      const h = LULU_SIZE.h * view.scale
       return cssX >= p.x && cssX <= p.x + w && cssY >= p.y && cssY <= p.y + h
     }
 
@@ -283,6 +301,11 @@ export function MenagerieCanvas({
         onKatyaRef.current?.()
         return
       }
+      if (hitLulu(cx, cy)) {
+        e.stopPropagation()
+        onLuluRef.current?.()
+        return
+      }
       const automation = hitAutomation(cx, cy)
       if (automation) {
         e.stopPropagation()
@@ -321,10 +344,11 @@ export function MenagerieCanvas({
       const cx = e.clientX - rect.left
       const cy = e.clientY - rect.top
       hover = hitTest(cx, cy)
-      hoverAutomation = hover ? null : hitAutomation(cx, cy)
-      hoverNap = hover || hoverAutomation ? null : hitNap(cx, cy)
+      hoverManager = hover ? null : hitKatya(cx, cy) ? 'katya' : hitLulu(cx, cy) ? 'lulu' : null
+      hoverAutomation = hover || hoverManager ? null : hitAutomation(cx, cy)
+      hoverNap = hover || hoverManager || hoverAutomation ? null : hitNap(cx, cy)
       canvas.style.cursor =
-        hover || hoverAutomation || hoverNap || hitKatya(cx, cy) || hitHouse(cx, cy)
+        hover || hoverManager || hoverAutomation || hoverNap || hitHouse(cx, cy)
           ? 'pointer'
           : 'default'
     }
@@ -332,6 +356,7 @@ export function MenagerieCanvas({
       hover = null
       hoverAutomation = null
       hoverNap = null
+      hoverManager = null
     }
     canvas.addEventListener('click', onClick)
     canvas.addEventListener('mousemove', onMove)
@@ -578,21 +603,31 @@ export function MenagerieCanvas({
         }
       }
 
-      // Katya
-      const k = sim.katya
-      const kGrid = frameOf(KATYA[k.action], sim.frame)
-      const kx = Math.round(k.x) * s
-      const ky = Math.round(k.y) * s
-      drawShadow(ctx, kx, ky, KATYA_SIZE.w, KATYA_SIZE.h, s)
-      drawGrid(
-        ctx,
-        kGrid,
-        { ...PROP_PALETTE, ...KATYA_PALETTE, c: '#f2a7b5' },
-        kx,
-        ky,
-        s,
-        k.facingLeft
-      )
+      // The managers, lower one in front: Katya the mayor, and Lulu who looks after the cats
+      const managers = [
+        {
+          m: sim.katya,
+          sprites: KATYA,
+          palette: { ...PROP_PALETTE, ...KATYA_PALETTE, c: '#f2a7b5' },
+          size: KATYA_SIZE
+        },
+        {
+          m: sim.lulu,
+          sprites: LULU,
+          palette: { ...PROP_PALETTE, ...LULU_PALETTE },
+          size: LULU_SIZE
+        }
+      ].sort((a, b) => a.m.y - b.m.y)
+      for (const { m, sprites, palette, size } of managers) {
+        const mx = Math.round(m.x) * s
+        const my = Math.round(m.y) * s
+        drawShadow(ctx, mx, my, size.w, size.h, s)
+        drawGrid(ctx, frameOf(sprites[m.action], sim.frame), palette, mx, my, s, m.facingLeft)
+        if (m.action === 'sleep' && sim.frame % 6 < 4) {
+          const bob = sim.frame % 4 < 2 ? 0 : 1
+          drawGrid(ctx, ZZZ, PROP_PALETTE, mx + (size.w - 4) * s, my - (2 + bob) * s, s)
+        }
+      }
 
       const dark = timeOfDay().dark
       drawNight(
@@ -609,6 +644,14 @@ export function MenagerieCanvas({
           drawLampGlow(ctx, layout.decorations[i], a, i, s, sim.frame, true)
         )
       }
+      // …and so do Lulu's eyes, unless she's asleep
+      const lulu = sim.lulu
+      if (dark > 0.3 && lulu.action !== 'sleep') {
+        const eyes = { e: LULU_PALETTE.e }
+        const grid = frameOf(LULU[lulu.action], sim.frame)
+        const lx = Math.round(lulu.x) * s
+        drawGrid(ctx, grid, eyes, lx, Math.round(lulu.y) * s, s, lulu.facingLeft)
+      }
 
       // Hover labels last so nothing covers them
       const hoveredIndex = automations.findIndex((a) => a.id === hoverAutomation)
@@ -621,6 +664,15 @@ export function MenagerieCanvas({
           slot.y - 9,
           s
         )
+      }
+      if (hoverManager) {
+        const m = hoverManager === 'katya' ? sim.katya : sim.lulu
+        const size = hoverManager === 'katya' ? KATYA_SIZE : LULU_SIZE
+        const text =
+          hoverManager === 'katya'
+            ? 'Katya · mayor · click for her town report'
+            : 'Lulu · manager of the cats · click for her report'
+        drawLabel(ctx, text, Math.round(m.x) + size.w / 2, Math.round(m.y) - 1, s)
       }
       const napYard = hoverNap ? layout.yards.find((y) => y.repository === hoverNap) : null
       const napCrowd = hoverNap ? napsRef.current.get(hoverNap) : null

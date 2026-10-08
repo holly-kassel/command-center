@@ -947,3 +947,139 @@ test('sprites: critters keep their size, every coat colours every pixel, and out
     })
   }
 })
+
+test('sprites: Lulu is drawn like Katya, a black long-haired cat with white mittens and whiskers', () => {
+  const palette = { ...sprites.PROP_PALETTE, ...sprites.LULU_PALETTE }
+  const luminance = (hex) => {
+    const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b
+  }
+  assert.ok(luminance(sprites.LULU_PALETTE.b) < 0.2, 'black fur')
+  assert.ok(luminance(sprites.LULU_PALETTE.w) > 0.9, 'white mittens and whiskers')
+  const check = (g, size, name) => {
+    assert.deepEqual(sprites.gridSize(g), { ...size }, `${name} size`)
+    for (const row of g) assert.equal(row.length, g[0].length, `${name}: ragged row`)
+    for (const ch of g.join(''))
+      if (ch !== '.') assert.ok(palette[ch], `${name}: no colour for '${ch}'`)
+    const width = g[0].length
+    assert.ok(
+      g.slice(-3).some((r) => r.includes('w')),
+      `${name}: white mittens`
+    )
+    assert.ok(
+      g.some((r) => r[0] === 'w' && (r[width - 1] === 'w' || r[width - 2] === 'w')),
+      `${name}: whiskers out both sides`
+    )
+  }
+  for (const [action, frames] of Object.entries(sprites.LULU)) {
+    frames.forEach((g, i) => check(g, sprites.LULU_SIZE, `LULU.${action}[${i}]`))
+  }
+  sprites.LULU_PORTRAIT.forEach((g, i) => {
+    check(g, sprites.LULU_PORTRAIT_SIZE, `portrait ${i}`)
+    assert.ok(g.join('').includes('e'), 'eyes open')
+  })
+  sprites.LULU_PORTRAIT_HAPPY.forEach((g, i) => {
+    check(g, sprites.LULU_PORTRAIT_SIZE, `happy portrait ${i}`)
+    assert.ok(!g.join('').includes('e'), 'petting squeezes her eyes shut')
+  })
+})
+
+const lulusCritter = (id, status, species, extra = {}) => ({
+  id,
+  name: id,
+  repository: 'a/one',
+  branch: null,
+  cwd: null,
+  status,
+  client: 'cli',
+  species,
+  coat: 0,
+  lastActivityAt: iso(1),
+  lastActivity: null,
+  pid: null,
+  currentTool: null,
+  subagents: 0,
+  pendingPermission: null,
+  ...extra
+})
+const lulusYard = (repository, critters) => ({
+  repository,
+  critters: critters.map((c) => ({ ...c, repository })),
+  completedTasks: 0,
+  activity: {},
+  streak: 0,
+  neighborhood: null
+})
+
+test('sim: Lulu keeps count of the cats and sits with the kitten that has waited longest', () => {
+  const asked = (hoursAgo) => ({ pendingPermission: { requestedAt: iso(hoursAgo) } })
+  const snap = {
+    yards: [
+      lulusYard('a/one', [
+        lulusCritter('k-new', 'waiting', 'kitten', asked(0.5)),
+        lulusCritter('k-old', 'waiting', 'kitten', asked(2)),
+        lulusCritter('pup', 'working', 'puppy')
+      ]),
+      lulusYard('b/two', [
+        lulusCritter('nap-1', 'idle', 'kitten'),
+        lulusCritter('nap-2', 'done', 'kitten'),
+        lulusCritter('dog', 'idle', 'puppy')
+      ])
+    ],
+    automations: []
+  }
+  const layout = village.buildLayout(snap.yards, 1.6)
+  const state = sim.createSim()
+  sim.syncSim(state, snap, layout)
+  assert.equal(state.waitingKitten, 'k-old')
+  assert.deepEqual(
+    state.cats.map((c) => [c.yard.repository, c.napping, c.awake]),
+    [
+      ['a/one', 0, 2],
+      ['b/two', 2, 0]
+    ]
+  )
+
+  for (let t = 0; t < 600 && state.lulu.action !== 'sit'; t++) sim.tickSim(state, layout, 0.1)
+  assert.equal(state.lulu.action, 'sit')
+  const kitten = state.actors.get('k-old')
+  const cell = kitten.yard.cell
+  assert.ok(Math.abs(state.lulu.x - kitten.x) <= 18, 'right beside the kitten')
+  assert.equal(state.lulu.y + sprites.LULU_SIZE.h, kitten.y + sprites.CRITTER_SIZE.h, 'feet level')
+  assert.ok(state.lulu.x >= cell.x && state.lulu.x + sprites.LULU_SIZE.w <= cell.x + cell.w)
+})
+
+test('sim: with every cat asleep, Lulu curls up in the town square', () => {
+  const snap = {
+    yards: [
+      lulusYard('a/one', [
+        lulusCritter('nap', 'idle', 'kitten'),
+        lulusCritter('dog', 'done', 'puppy')
+      ])
+    ],
+    automations: []
+  }
+  const layout = village.buildLayout(snap.yards, 1.6)
+  const state = sim.createSim()
+  sim.syncSim(state, snap, layout)
+  assert.equal(state.actors.size, 0)
+
+  // Skip the rounds, choose a nap, then middling picks for where and how long
+  const picks = [0.9, 0.1]
+  const real = Math.random
+  Math.random = () => (picks.length ? picks.shift() : 0.5)
+  try {
+    for (let t = 0; t < 400 && state.lulu.action !== 'sleep'; t++) sim.tickSim(state, layout, 0.1)
+  } finally {
+    Math.random = real
+  }
+  assert.equal(state.lulu.action, 'sleep')
+  const sq = layout.square
+  const { x, y } = state.lulu
+  assert.ok(
+    x >= sq.x &&
+      x + sprites.LULU_SIZE.w <= sq.x + sq.w &&
+      y >= sq.y &&
+      y + sprites.LULU_SIZE.h <= sq.y + sq.h
+  )
+})

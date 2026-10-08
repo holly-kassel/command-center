@@ -16,6 +16,8 @@ interface MenagerieState {
   napRepo: string | null
   /** Whether Katya's town-square close-up is open */
   katyaOpen: boolean
+  /** Whether Lulu's cat report is open */
+  luluOpen: boolean
   setSnapshot: (snapshot: MenagerieSnapshot) => void
   setError: (error: string | null) => void
   /** Select a critter (or nothing); clears any automation bubble */
@@ -24,6 +26,7 @@ interface MenagerieState {
   zoom: (repo: string | null) => void
   openNap: (repo: string | null) => void
   openKatya: (open: boolean) => void
+  openLulu: (open: boolean) => void
   /** Load the initial snapshot and subscribe to pushes. Returns an unsubscribe fn. */
   connect: () => () => void
   refresh: () => Promise<void>
@@ -34,7 +37,8 @@ const NO_OVERLAYS = {
   focusedAutomationId: null,
   zoomedRepo: null,
   napRepo: null,
-  katyaOpen: false
+  katyaOpen: false,
+  luluOpen: false
 }
 
 export const useMenagerieStore = create<MenagerieState>((set, get) => ({
@@ -66,6 +70,7 @@ export const useMenagerieStore = create<MenagerieState>((set, get) => ({
   zoom: (repo) => set({ ...NO_OVERLAYS, zoomedRepo: repo }),
   openNap: (repo) => set({ ...NO_OVERLAYS, napRepo: repo }),
   openKatya: (open) => set({ ...NO_OVERLAYS, katyaOpen: open }),
+  openLulu: (open) => set({ ...NO_OVERLAYS, luluOpen: open }),
 
   connect: () => {
     const unsubscribe = window.api.menagerie.onUpdate((s) => get().setSnapshot(s))

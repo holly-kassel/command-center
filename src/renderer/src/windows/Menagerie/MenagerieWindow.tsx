@@ -11,6 +11,7 @@ import { AutomationBubble } from './AutomationBubble'
 import { YardCloseUp } from './YardCloseUp'
 import { NapCloseUp } from './NapCloseUp'
 import { KatyaCloseUp } from './KatyaCloseUp'
+import { LuluCloseUp } from './LuluCloseUp'
 import { COLLAR_COLORS } from './sprites'
 
 const FONT = 'ui-monospace, Menlo, monospace'
@@ -42,6 +43,8 @@ export function MenagerieWindow(): React.JSX.Element {
   const openNap = useMenagerieStore((s) => s.openNap)
   const katyaOpen = useMenagerieStore((s) => s.katyaOpen)
   const openKatya = useMenagerieStore((s) => s.openKatya)
+  const luluOpen = useMenagerieStore((s) => s.luluOpen)
+  const openLulu = useMenagerieStore((s) => s.openLulu)
   const connect = useMenagerieStore((s) => s.connect)
   const refresh = useMenagerieStore((s) => s.refresh)
 
@@ -55,13 +58,14 @@ export function MenagerieWindow(): React.JSX.Element {
       if (e.key !== 'Escape') return
       const st = useMenagerieStore.getState()
       if (st.katyaOpen) openKatya(false)
+      else if (st.luluOpen) openLulu(false)
       else if (st.napRepo) openNap(null)
       else if (st.zoomedRepo) zoom(null)
       else select(null)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [select, zoom, openNap, openKatya])
+  }, [select, zoom, openNap, openKatya, openLulu])
 
   const onAnchor = useCallback((a: ScreenAnchor | null) => followAnchor(bubbleRef.current, a), [])
   const onAutomationAnchor = useCallback(
@@ -149,6 +153,7 @@ export function MenagerieWindow(): React.JSX.Element {
           onAnchor={onAnchor}
           onZoom={zoom}
           onKatya={() => openKatya(true)}
+          onLulu={() => openLulu(true)}
           onNap={openNap}
           selectedAutomationId={focusedAutomationId}
           onSelectAutomation={focusAutomation}
@@ -183,6 +188,14 @@ export function MenagerieWindow(): React.JSX.Element {
             onOpenSession={(id) => void window.api.menagerie.openSession(id)}
           />
         )}
+        {luluOpen && snapshot && (
+          <LuluCloseUp
+            snapshot={snapshot}
+            onClose={() => openLulu(false)}
+            onOpenSession={(id) => void window.api.menagerie.openSession(id)}
+            onOpenNap={openNap}
+          />
+        )}
 
         {loading && !snapshot && <Overlay>Waking up the puppies and kittens…</Overlay>}
         {error && <Overlay tone="error">{error}</Overlay>}
@@ -213,7 +226,8 @@ export function MenagerieWindow(): React.JSX.Element {
         <span style={{ opacity: 0.6 }}>
           🐶 digs / 🐱 yarn = working · ? = waiting · z on a cat tree or dog house = napping (click
           for the list) · lamps, bells, flags & pinwheels in the square = automations · click a
-          critter, cottage or Katya to open it · finished tasks upgrade the cottage
+          critter, a cottage, Katya (the mayor) or Lulu (manager of the cats) to open it · finished
+          tasks upgrade the cottage
         </span>
         <div style={{ flex: 1 }} />
         <NotificationsToggle />

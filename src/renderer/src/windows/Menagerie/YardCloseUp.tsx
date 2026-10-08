@@ -5,14 +5,15 @@ import {
   dayKey,
   HOUSE_UPGRADE_THRESHOLDS,
   houseLevel,
+  isNapping,
   shiftDay,
   STREAK_FLAME_DAYS
 } from '../../../../shared/types/menagerie'
 import { drawHouseUpgrades, drawNight, drawStreakFlame, housePalette } from './houseUpgrades'
 import { HOUSE_H, HOUSE_W, type YardLayout } from './layout'
-import { FONT, INK, PAPER, STATUS_COLOR, STATUS_LABEL, relativeTime, timeOfDay } from './format'
-import { Btn, Row, Section } from './panel'
-import { PermissionCard } from './PermissionCard'
+import { FONT, INK, PAPER, STATUS_COLOR, timeOfDay } from './format'
+import { Section } from './panel'
+import { CritterDetails } from './CritterDetails'
 import {
   COLLAR_COLORS,
   drawGrid,
@@ -69,6 +70,7 @@ function sceneLayout(yard: Yard): YardLayout {
       { x: SCENE_W - 28, y: 62 },
       { x: HOUSE_X - 10, y: 40 }
     ],
+    nap: { dogHouse: { x: SCENE_W - 34, y: 20 }, catTree: { x: SCENE_W - 50, y: 13 } },
     neighborhood: yard.neighborhood ?? null,
     tint: -1,
     level: houseLevel(yard.completedTasks),
@@ -202,7 +204,7 @@ export function YardCloseUp({ yard, onClose }: Props): React.JSX.Element {
         if (c.status === 'waiting' && frame % 4 < 3) {
           const q = gridSize(QUESTION)
           drawGrid(ctx, QUESTION, PROP_PALETTE, sx + ((pw - q.w) / 2) * s, sy - (q.h + 1) * s, s)
-        } else if ((c.status === 'idle' || c.status === 'done') && frame % 6 < 4) {
+        } else if (isNapping(c.status) && frame % 6 < 4) {
           const zz = gridSize(ZZZ)
           drawGrid(ctx, ZZZ, PROP_PALETTE, sx + (pw - zz.w + 2) * s, sy - (zz.h + 1) * s, s)
         }
@@ -396,82 +398,6 @@ export function YardCloseUp({ yard, onClose }: Props): React.JSX.Element {
         {focused && <CritterDetails critter={focused} />}
       </aside>
     </div>
-  )
-}
-
-function CritterDetails({ critter }: { critter: Critter }): React.JSX.Element {
-  const [copied, setCopied] = useState(false)
-  const copy = async (): Promise<void> => {
-    await window.api.menagerie.copyId(critter.id)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 1200)
-  }
-  return (
-    <Section title="Session">
-      <div style={{ fontWeight: 700, fontSize: 12 }}>{critter.name}</div>
-      <Row label="Status">
-        <span
-          style={{
-            display: 'inline-block',
-            width: 8,
-            height: 8,
-            background: STATUS_COLOR[critter.status],
-            border: `1px solid ${INK}`,
-            marginRight: 4
-          }}
-        />
-        {STATUS_LABEL[critter.status]}
-      </Row>
-      <Row label="Last seen">
-        {relativeTime(critter.lastActivityAt)} · {new Date(critter.lastActivityAt).toLocaleString()}
-      </Row>
-      {critter.branch && <Row label="Branch">🌿 {critter.branch}</Row>}
-      <Row label="Client">
-        {critter.client}
-        {critter.pid ? ` (pid ${critter.pid})` : ''}
-      </Row>
-      {critter.cwd && (
-        <Row label="Folder">
-          <span style={{ wordBreak: 'break-all' }}>{critter.cwd}</span>
-        </Row>
-      )}
-      <Row label="Session id">
-        <span style={{ wordBreak: 'break-all', opacity: 0.7 }}>{critter.id}</span>
-      </Row>
-      {critter.pendingPermission && (
-        <PermissionCard
-          permission={critter.pendingPermission}
-          onOpen={() => void window.api.menagerie.openSession(critter.id)}
-        />
-      )}
-      {critter.currentTool && (
-        <Row label="Doing now">
-          <span>{critter.currentTool}</span>
-        </Row>
-      )}
-      {critter.subagents > 0 && (
-        <Row label="Sub-agents">
-          <span>
-            {'🐱'.repeat(Math.min(critter.subagents, 6))} {critter.subagents} running
-          </span>
-        </Row>
-      )}
-      {critter.lastActivity && !critter.currentTool && (
-        <div style={{ marginTop: 6, fontStyle: 'italic', opacity: 0.8 }}>
-          “{critter.lastActivity}”
-        </div>
-      )}
-      <div style={{ marginTop: 10, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-        <Btn onClick={() => void window.api.menagerie.openSession(critter.id)}>Open session</Btn>
-        <Btn
-          onClick={() => critter.cwd && void window.api.menagerie.reveal(critter.cwd)}
-          disabled={!critter.cwd}
-        >
-          Reveal in Finder
-        </Btn>
-        <Btn onClick={() => void copy()}>{copied ? 'Copied!' : 'Copy session ID'}</Btn>
-      </div>
-    </Section>
   )
 }
 

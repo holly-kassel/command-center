@@ -19,7 +19,7 @@ import { join } from 'node:path'
 import { promises as fs } from 'node:fs'
 import logger from '../../utils/logger'
 import type { Critter, MenagerieSnapshot } from '../../../shared/types/menagerie'
-import { dayKey, pruneActivity } from '../../../shared/types/menagerie'
+import { allCritters, dayKey, pruneActivity } from '../../../shared/types/menagerie'
 import {
   assembleSnapshot,
   buildCritter,
@@ -27,6 +27,9 @@ import {
   isWithinRetention,
   parseEventsTail,
   parseWorkspaceYaml,
+  type AutomationInput,
+  type AutomationRow,
+  type AutomationRunRow,
   type NeighborhoodInput,
   type SessionEvent,
   type SessionRow,
@@ -76,6 +79,8 @@ export class MenagerieService {
   /** Optional user-editable repo groupings; sits next to the progress file */
   private readonly neighborhoodsPath: string | null
   private neighborhoods: NeighborhoodInput = { byRepo: {}, sources: {}, configPath: null }
+  /** Automations and their recent runs from the Copilot app (~/.copilot/data.db) */
+  private automations: AutomationInput = { workflows: [], runs: [] }
 
   constructor(
     copilotDir = join(homedir(), '.copilot'),
@@ -144,7 +149,12 @@ export class MenagerieService {
     this.refreshing = true
     try {
       if (full || this.rows.size === 0)
-        await Promise.all([this.loadRows(), this.loadArchived(), this.loadNeighborhoods()])
+        await Promise.all([
+          this.loadRows(),
+          this.loadArchived(),
+          this.loadNeighborhoods(),
+          this.loadAutomations()
+        ])
       const progress = await this.loadProgress()
 
       const now = new Date()
@@ -177,10 +187,13 @@ export class MenagerieService {
         [...this.warnings],
         progress.repos,
         progress.days,
-        this.neighborhoods
+        this.neighborhoods,
+        this.automations
       )
       const hash = createHash('sha1')
-        .update(JSON.stringify({ y: snapshot.yards, w: snapshot.warnings }))
+        .update(
+          JSON.stringify({ y: snapshot.yards, a: snapshot.automations, w: snapshot.warnings })
+        )
         .digest('hex')
       if (hash !== this.lastHash) {
         if (progress.notifications) this.nudge(this.lastSnapshot, snapshot)
@@ -381,6 +394,34 @@ export class MenagerieService {
     await shell.openPath(this.neighborhoodsPath)
   }
 
+  /**
+   * Automations from the Copilot app's Automations view, plus their recent
+   * runs, so run sessions can decorate the town square instead of a yard.
+   * Best-effort: older app builds have no such tables, and a transient read
+   * failure keeps the last good copy so decorations don't flicker away.
+   */
+  private async loadAutomations(): Promise<void> {
+    const dbPath = join(this.copilotDir, 'data.db')
+    try {
+      await fs.access(dbPath)
+    } catch {
+      this.automations = { workflows: [], runs: [] }
+      return
+    }
+    try {
+      const [workflows, runs] = await Promise.all([
+        runSqlite(dbPath, AUTOMATIONS_SQL),
+        runSqlite(dbPath, AUTOMATION_RUNS_SQL)
+      ])
+      this.automations = {
+        workflows: JSON.parse(workflows || '[]') as AutomationRow[],
+        runs: JSON.parse(runs || '[]') as AutomationRunRow[]
+      }
+    } catch (error) {
+      logger.warn('[Menagerie] could not read automations from data.db:', error)
+    }
+  }
+
   // ── House-upgrade progress ────────────────────────────────────
 
   /**
@@ -414,15 +455,14 @@ export class MenagerieService {
   /**
    * Notify once per critter when it transitions into `waiting`, and keep the
    * dock badge equal to how many critters are waiting on you right now.
+   * Automation runs count too, even though they live in the town square.
    */
   private nudge(prev: MenagerieSnapshot | null, next: MenagerieSnapshot): void {
     const was = new Map<string, Critter>()
-    for (const y of prev?.yards ?? []) for (const c of y.critters) was.set(c.id, c)
-    for (const y of next.yards) {
-      for (const c of y.critters) {
-        if (c.status !== 'waiting' || was.get(c.id)?.status === 'waiting') continue
-        this.notifyWaiting(c)
-      }
+    if (prev) for (const c of allCritters(prev)) was.set(c.id, c)
+    for (const c of allCritters(next)) {
+      if (c.status !== 'waiting' || was.get(c.id)?.status === 'waiting') continue
+      this.notifyWaiting(c)
     }
     this.setBadge(next.counts.waiting)
   }
@@ -540,6 +580,19 @@ const COLLECTIONS_SQL = `
   SELECT p.name AS name, m.repo_full_name AS repo, m.repo_path AS path
   FROM collection_members m JOIN projects p ON p.id = m.project_id
   WHERE p.container_kind = 'collection';`
+
+// Automations (the Copilot app calls them workflows) and the project they run in.
+const AUTOMATIONS_SQL = `
+  SELECT w.id, w.name, w.enabled, w.interval, w.schedule_hour, w.schedule_minute,
+         w.schedule_day, w.cron_expression, w.created_at, w.next_run_at, p.name AS project
+  FROM workflows w LEFT JOIN projects p ON p.id = w.project_id;`
+
+// Runs from the last 8 days, plus each automation's newest run however old.
+const AUTOMATION_RUNS_SQL = `
+  SELECT r.task_id, r.status, r.session_id, r.started_at, r.error_message, r.taken_over_at
+  FROM workflow_runs r
+  WHERE r.started_at >= strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-8 days')
+     OR r.started_at = (SELECT MAX(x.started_at) FROM workflow_runs x WHERE x.task_id = r.task_id);`
 
 function runSqlite(dbPath: string, sql = ROWS_SQL): Promise<string> {
   return new Promise((resolve, reject) => {

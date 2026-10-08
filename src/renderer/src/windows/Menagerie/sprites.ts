@@ -640,7 +640,6 @@ export const STAR: Grid = [
   '.......'
 ]
 
-/** 7×6 heart that floats above playing critters; palette: h */
 /** 6×5 trailing sub-agent kitten; palette: b body, B dark, e eye */
 export const MINI_KITTEN: Grid[] = [
   ['b.b...', 'bbbb..', 'bebe.b', 'bbbbbb', 'b..b..'],
@@ -653,10 +652,233 @@ export const FLAME: Grid[] = [
   ['.F...', '..F..', '.FOF.', 'FOOF.', 'FOyOF', 'FOyOF', '.FFF.']
 ]
 
+/** 7×6 heart that floats up when Katya is petted; palette: h */
 export const HEART: Grid = ['.hh.hh.', 'hhhhhhh', 'hhhhhhh', '.hhhhh.', '..hhh..', '...h...']
 
-/** 4×5 music note; palette: h */
-export const NOTE: Grid = ['..hh', '..h.', '..h.', 'hhh.', 'hhh.']
+// ── Nap spots: where idle and finished critters sleep in each yard ──
+
+/** 16×13 dog house for napping puppies; palette: r/R roof, x wood, k dark wood, l name plate, e doorway */
+export const DOG_HOUSE: Grid = [
+  '.......RR.......',
+  '......RrrR......',
+  '.....RrrrrR.....',
+  '....RrrrrrrR....',
+  '...RrrrrrrrrR...',
+  '..RrrrrrrrrrrR..',
+  '.RRRRRRRRRRRRRR.',
+  '..xxxxllllxxxx..',
+  '..xkxxxeexxxkx..',
+  '..xkxxeeeexxkx..',
+  '..xkxxeeeexxkx..',
+  '..xkxxeeeexxkx..',
+  '.kkkkkkkkkkkkkk.'
+]
+
+/** 12×20 carpeted cat tree for napping kittens; palette: a/A carpet, j/J sisal post, k string, f pom-pom, e cubby */
+export const CAT_TREE: Grid = [
+  '..aaaaaaaa..',
+  '.aaaaaaaaaa.',
+  '.AAAAAAAAAA.',
+  '.....jJ...k.',
+  '.....Jj...k.',
+  '.....jJ..fff',
+  '.....Jj...f.',
+  '.aaaajJ.....',
+  '.AAAAJj.....',
+  '.....jJ.....',
+  '.....Jj.....',
+  '.aaaaaaaaaa.',
+  '.aaaaaaaaaa.',
+  '.aaaeeeeaaa.',
+  '.aaeeeeeeaa.',
+  '.aaeeeeeeaa.',
+  '.aaaeeeeaaa.',
+  '.aaaaaaaaaa.',
+  '.AAAAAAAAAA.',
+  'aaaaaaaaaaaa'
+]
+
+export const CAT_TREE_PALETTE: Palette = {
+  a: '#cbbfe0',
+  A: '#9286ad',
+  j: '#d8b27a',
+  J: '#a8814e'
+}
+
+// ── Town-square decorations: one per automation ─────────────────
+
+export const DECORATION_SIZE = { w: 9, h: 16 } as const
+
+export interface DecorationSprite {
+  /** Shown in the automation bubble and Katya's report */
+  icon: string
+  /** Drawn while no run is working */
+  idle: Grid
+  /** Cycled while a run is working */
+  running: Grid[]
+  /** Centre of a light that glows while running (offset in sprite pixels) */
+  glow?: { x: number; y: number }
+}
+
+/** Lamp post; palette: k iron, u lamp glass (lit while running), v/V pennant, s stone base */
+const LAMP: Grid = [
+  '...kkk...',
+  '..kkkkk..',
+  '..kuuuk..',
+  '..kuuuk..',
+  '..kuuuk..',
+  '..kkkkk..',
+  '....k....',
+  '....kvvv.',
+  '....kvV..',
+  '....kv...',
+  '....k....',
+  '....k....',
+  '....k....',
+  '....k....',
+  '...sss...',
+  '..sssss..'
+]
+
+/** Bell frame; palette: k wood, G/y brass, e clapper, q ring lines, v/V plaque */
+const BELL: Grid = [
+  'kkkkkkkkk',
+  '.k.....k.',
+  '.k..k..k.',
+  '.k.GGG.k.',
+  '.k.GyG.k.',
+  '.k.GGG.k.',
+  '.kGGGGGk.',
+  '.k..e..k.',
+  '.k.....k.',
+  '.k.....k.',
+  '.kvvvvvk.',
+  '.kvVVVvk.',
+  '.kvvvvvk.',
+  '.k.....k.',
+  '.k.....k.',
+  'kkk...kkk'
+]
+
+function ringBell(clapperCol: number, side: 'left' | 'right'): Grid {
+  return BELL.map((row, i) => {
+    let out = row
+    if (i === 7) out = '.k.....k.'.slice(0, clapperCol) + 'e' + '.k.....k.'.slice(clapperCol + 1)
+    if (i === 3 || i === 5) {
+      const col = side === 'left' ? 0 : 8
+      out = out.slice(0, col) + 'q' + out.slice(col + 1)
+    }
+    return out
+  })
+}
+
+/** Flag pole; palette: y finial, k pole, v/V flag, s stone base. The flag droops until a run works */
+const FLAG_DROOP: Grid = [
+  '.y.......',
+  '.k.......',
+  '.kvvv....',
+  '.kvVv....',
+  '.kvvv....',
+  '.kvvv....',
+  '.kvv.....',
+  '.kv......',
+  '.k.......',
+  '.k.......',
+  '.k.......',
+  '.k.......',
+  '.k.......',
+  '.k.......',
+  'sss......',
+  'sss......'
+]
+
+const FLAG_WAVE_1: Grid = [
+  '.y.......',
+  '.k.......',
+  '.kvvvvv..',
+  '.kvVvvvv.',
+  '.kvvvvvvv',
+  '.kvvvvv..',
+  '.k.......',
+  '.k.......',
+  ...FLAG_DROOP.slice(8)
+]
+
+const FLAG_WAVE_2: Grid = [
+  '.y.......',
+  '.k.......',
+  '.kvvvvvv.',
+  '.kvVvvvvv',
+  '.kvvvvv..',
+  '.kvvvv...',
+  '.k.......',
+  '.k.......',
+  ...FLAG_DROOP.slice(8)
+]
+
+/** Pinwheel on a stick; palette: v/V blades, e hub, k stick, s stone base */
+const PINWHEEL_PLUS: Grid = [
+  '....v....',
+  '....v....',
+  '....v....',
+  '.VVVeVVV.',
+  '....v....',
+  '....v....',
+  '....v....',
+  '....k....',
+  '....k....',
+  '....k....',
+  '....k....',
+  '....k....',
+  '....k....',
+  '....k....',
+  '...sss...',
+  '..sssss..'
+]
+
+const PINWHEEL_CROSS: Grid = [
+  '.v.....V.',
+  '..v...V..',
+  '...v.V...',
+  '....e....',
+  '...V.v...',
+  '..V...v..',
+  '.V.....v.',
+  ...PINWHEEL_PLUS.slice(7)
+]
+
+export const DECORATIONS: readonly DecorationSprite[] = [
+  { icon: '🏮', idle: LAMP, running: [LAMP], glow: { x: 4.5, y: 3.5 } },
+  { icon: '🔔', idle: BELL, running: [ringBell(3, 'left'), BELL, ringBell(5, 'right'), BELL] },
+  { icon: '🚩', idle: FLAG_DROOP, running: [FLAG_WAVE_1, FLAG_WAVE_2] },
+  { icon: '🌀', idle: PINWHEEL_PLUS, running: [PINWHEEL_PLUS, PINWHEEL_CROSS] }
+]
+
+/** Accent colours (pennant, plaque, flag, blades) so neighbouring decorations differ */
+export const DECORATION_ACCENTS: readonly Palette[] = [
+  { v: '#ff7aa2', V: '#c2456c' },
+  { v: '#5ab0ff', V: '#2f6fb8' },
+  { v: '#ffd84d', V: '#c99a1a' },
+  { v: '#7ad67a', V: '#3f8f4a' },
+  { v: '#b58cff', V: '#7650c0' },
+  { v: '#ff9f50', V: '#c4621f' }
+]
+
+/** The automation at `index` (town-square order) gets this decoration and accent */
+export function decorationFor(index: number): { sprite: DecorationSprite; accent: Palette } {
+  return {
+    sprite: DECORATIONS[index % DECORATIONS.length],
+    accent: DECORATION_ACCENTS[index % DECORATION_ACCENTS.length]
+  }
+}
+
+/** Lamp glass colours; palette key u */
+export const LAMP_LIT = '#ffd84d'
+export const LAMP_UNLIT = '#5b6573'
+
+/** 2×6 "!" over an automation whose last run failed; palette: X */
+export const BANG: Grid = ['XX', 'XX', 'XX', 'XX', '..', 'XX']
+export const BANG_PALETTE: Palette = { X: '#e5484d' }
 
 // ── Palettes ─────────────────────────────────────────────────────
 

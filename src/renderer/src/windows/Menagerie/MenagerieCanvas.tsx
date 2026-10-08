@@ -1,43 +1,50 @@
 import { useEffect, useLayoutEffect, useRef } from 'react'
-import type { MenagerieSnapshot } from '../../../../shared/types/menagerie'
+import type { Automation, MenagerieSnapshot } from '../../../../shared/types/menagerie'
 import {
   buildLayout,
+  decorationRect,
   HOUSE_H,
   HOUSE_W,
   NEIGHBORHOOD_TINTS,
   villageScale,
   wildScenery,
+  type Rect,
   type VillageLayout,
   type WildScenery
 } from './layout'
 import { drawHouseUpgrades, drawNight, drawStreakFlame, housePalette } from './houseUpgrades'
-import { timeOfDay, truncate } from './format'
-import { createSim, syncSim, tickSim, type Actor, type SimState } from './sim'
+import { automationStatusShort, timeOfDay, truncate } from './format'
+import { createSim, syncSim, tickSim, type SimState } from './sim'
 import {
-  COLLAR_COLORS,
+  critterPalette,
+  drawDecoration,
+  drawLabel,
+  drawLampGlow,
+  drawNapSpot,
+  napHitRects,
+  napLabelAnchor,
+  napResidents,
+  type NapResidents
+} from './townProps'
+import {
   drawGrid,
   CRITTER_SIZE,
+  DECORATION_SIZE,
   drawShadow,
   FLOWER,
   FOUNTAIN,
   gridSize,
-  HEART,
   HOUSE,
-  NOTE,
   KATYA,
   KATYA_PALETTE,
   KATYA_SIZE,
   KITTEN,
-  KITTEN_COATS,
   MINI_KITTEN,
   PROP_PALETTE,
   PUPPY,
-  PUPPY_COATS,
   QUESTION,
   TREE,
-  ZZZ,
-  type Grid,
-  type Palette
+  type Grid
 } from './sprites'
 
 export interface ScreenAnchor {
@@ -58,6 +65,14 @@ interface Props {
   onZoom?: (repository: string) => void
   /** Called when Katya herself is clicked */
   onKatya?: () => void
+  /** Fired when a yard's dog house or cat tree is clicked; opens its nap list */
+  onNap?: (repository: string) => void
+  /** Automation whose decoration is selected (shows its bubble) */
+  selectedAutomationId?: string | null
+  /** Fired when a town-square decoration is clicked */
+  onSelectAutomation?: (id: string) => void
+  /** Reports where the selected decoration is on screen (for its bubble) */
+  onAutomationAnchor?: (anchor: ScreenAnchor | null) => void
 }
 
 const SKY = '#1b1a2e'
@@ -70,10 +85,12 @@ function frameOf(frames: Grid[], frame: number): Grid {
   return frames[frame % frames.length]
 }
 
-function paletteFor(actor: Actor): Palette {
-  const coats = actor.critter.species === 'puppy' ? PUPPY_COATS : KITTEN_COATS
-  const coat = coats[actor.critter.coat % coats.length]
-  return { ...PROP_PALETTE, ...coat, c: COLLAR_COLORS[actor.critter.client] }
+function inRect(r: Rect, x: number, y: number): boolean {
+  return x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h
+}
+
+function decorationLabel(a: Automation): string {
+  return `${truncate(a.name, 28)} · ${automationStatusShort(a)}`
 }
 
 export function MenagerieCanvas({
@@ -83,33 +100,47 @@ export function MenagerieCanvas({
   onOpen,
   onAnchor,
   onZoom,
-  onKatya
+  onKatya,
+  onNap,
+  selectedAutomationId = null,
+  onSelectAutomation,
+  onAutomationAnchor
 }: Props): React.JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const simRef = useRef<SimState>(createSim())
   const layoutRef = useRef<VillageLayout | null>(null)
   const selectedRef = useRef<string | null>(selectedId)
+  const selectedAutomationRef = useRef<string | null>(selectedAutomationId)
   const onAnchorRef = useRef(onAnchor)
   const onOpenRef = useRef(onOpen)
   const onZoomRef = useRef(onZoom)
   const onKatyaRef = useRef(onKatya)
+  const onNapRef = useRef(onNap)
+  const onSelectAutomationRef = useRef(onSelectAutomation)
+  const onAutomationAnchorRef = useRef(onAutomationAnchor)
   useLayoutEffect(() => {
     selectedRef.current = selectedId
+    selectedAutomationRef.current = selectedAutomationId
     onAnchorRef.current = onAnchor
     onOpenRef.current = onOpen
     onZoomRef.current = onZoom
     onKatyaRef.current = onKatya
+    onNapRef.current = onNap
+    onSelectAutomationRef.current = onSelectAutomation
+    onAutomationAnchorRef.current = onAutomationAnchor
   })
 
   const snapshotRef = useRef(snapshot)
   const aspectRef = useRef(1)
+  const napsRef = useRef(new Map<string, NapResidents>())
 
   useEffect(() => {
     snapshotRef.current = snapshot
     if (!snapshot) return
+    napsRef.current = napResidents(snapshot)
     const layout = buildLayout(snapshot.yards, aspectRef.current)
     layoutRef.current = layout
-    syncSim(simRef.current, snapshot, layout, Date.now())
+    syncSim(simRef.current, snapshot, layout)
   }, [snapshot])
 
   useEffect(() => {
@@ -121,6 +152,8 @@ export function MenagerieCanvas({
     let raf = 0
     let last = performance.now()
     let hover: string | null = null
+    let hoverAutomation: string | null = null
+    let hoverNap: string | null = null
     let wild: { layout: VillageLayout; key: string; scenery: WildScenery } | null = null
 
     // offX/offY are the applied offsets; panX/panY are the user's scroll
@@ -140,7 +173,7 @@ export function MenagerieCanvas({
         const next = buildLayout(snap.yards, aspect)
         if (next.cols !== current.cols) {
           layoutRef.current = next
-          syncSim(simRef.current, snap, next, Date.now())
+          syncSim(simRef.current, snap, next)
         }
       }
     }
@@ -185,6 +218,35 @@ export function MenagerieCanvas({
       return null
     }
 
+    const toWorld = (cssX: number, cssY: number): { x: number; y: number } => ({
+      x: (cssX - view.offX) / view.scale,
+      y: (cssY - view.offY) / view.scale
+    })
+
+    const hitNap = (cssX: number, cssY: number): string | null => {
+      const layout = layoutRef.current
+      if (!layout) return null
+      const w = toWorld(cssX, cssY)
+      for (const yard of layout.yards) {
+        const residents = napsRef.current.get(yard.repository)
+        if (residents && napHitRects(yard, residents).some((r) => inRect(r, w.x, w.y)))
+          return yard.repository
+      }
+      return null
+    }
+
+    const hitAutomation = (cssX: number, cssY: number): string | null => {
+      const layout = layoutRef.current
+      const automations = snapshotRef.current?.automations ?? []
+      if (!layout) return null
+      const w = toWorld(cssX, cssY)
+      const shown = Math.min(automations.length, layout.decorations.length)
+      for (let i = 0; i < shown; i++) {
+        if (inRect(decorationRect(layout.decorations[i]), w.x, w.y)) return automations[i].id
+      }
+      return null
+    }
+
     // Drag-to-pan when the village overflows the canvas.
     let drag: { x: number; y: number; moved: boolean } | null = null
     const onDown = (e: MouseEvent): void => {
@@ -202,6 +264,8 @@ export function MenagerieCanvas({
       e.preventDefault()
     }
 
+    // Anything that's hit handles the click and stops it, so the window's
+    // "click empty space to deselect" handler doesn't undo the selection.
     const onClick = (e: MouseEvent): void => {
       if (drag?.moved) return
       const rect = canvas.getBoundingClientRect()
@@ -209,16 +273,31 @@ export function MenagerieCanvas({
       const cy = e.clientY - rect.top
       const id = hitTest(cx, cy)
       if (id) {
+        e.stopPropagation()
         onSelect(id)
         onOpenRef.current?.(id)
         return
       }
       if (hitKatya(cx, cy)) {
+        e.stopPropagation()
         onKatyaRef.current?.()
+        return
+      }
+      const automation = hitAutomation(cx, cy)
+      if (automation) {
+        e.stopPropagation()
+        onSelectAutomationRef.current?.(automation)
+        return
+      }
+      const napRepo = hitNap(cx, cy)
+      if (napRepo) {
+        e.stopPropagation()
+        onNapRef.current?.(napRepo)
         return
       }
       const repo = hitHouse(cx, cy)
       if (repo) {
+        e.stopPropagation()
         onZoomRef.current?.(repo)
         return
       }
@@ -242,10 +321,21 @@ export function MenagerieCanvas({
       const cx = e.clientX - rect.left
       const cy = e.clientY - rect.top
       hover = hitTest(cx, cy)
-      canvas.style.cursor = hover || hitKatya(cx, cy) || hitHouse(cx, cy) ? 'pointer' : 'default'
+      hoverAutomation = hover ? null : hitAutomation(cx, cy)
+      hoverNap = hover || hoverAutomation ? null : hitNap(cx, cy)
+      canvas.style.cursor =
+        hover || hoverAutomation || hoverNap || hitKatya(cx, cy) || hitHouse(cx, cy)
+          ? 'pointer'
+          : 'default'
+    }
+    const onLeave = (): void => {
+      hover = null
+      hoverAutomation = null
+      hoverNap = null
     }
     canvas.addEventListener('click', onClick)
     canvas.addEventListener('mousemove', onMove)
+    canvas.addEventListener('mouseleave', onLeave)
     canvas.addEventListener('mousedown', onDown)
     window.addEventListener('mouseup', onUp)
     canvas.addEventListener('wheel', onWheel, { passive: false })
@@ -346,6 +436,23 @@ export function MenagerieCanvas({
         ctx.fillRect((layout.fountain.x + 3) * s, (layout.fountain.y - 1) * s, s, s)
       }
 
+      // Automations decorate the plaza, one lamp, bell, flag or pinwheel each
+      const automations = (snapshotRef.current?.automations ?? []).slice(
+        0,
+        layout.decorations.length
+      )
+      automations.forEach((a, i) =>
+        drawDecoration(
+          ctx,
+          layout.decorations[i],
+          a,
+          i,
+          s,
+          sim.frame,
+          a.id === selectedAutomationRef.current || a.id === hoverAutomation
+        )
+      )
+
       // Wild meadow around and between the yards; recomputed only when the view changes
       const wildKey = `${visible.x},${visible.y},${visible.w},${visible.h}`
       if (wild?.layout !== layout || wild.key !== wildKey) {
@@ -374,6 +481,10 @@ export function MenagerieCanvas({
         drawHouseUpgrades(ctx, yard, s, sim.frame)
         drawStreakFlame(ctx, yard.house.x, yard.house.y, yard.streak, s, sim.frame)
         for (const f of yard.flowers) drawGrid(ctx, FLOWER, PROP_PALETTE, f.x * s, f.y * s, s)
+
+        // Idle and finished critters sleep in the cat tree / dog house out back
+        const residents = napsRef.current.get(yard.repository)
+        if (residents) drawNapSpot(ctx, yard, residents, s, sim.frame)
 
         // Yard label on a sign under the house
         const label = yard.repository.split('/').pop() ?? yard.repository
@@ -404,13 +515,10 @@ export function MenagerieCanvas({
       const actors = [...sim.actors.values()].sort((a, b) => a.y - b.y)
       for (const a of actors) {
         const set = a.critter.species === 'puppy' ? PUPPY : KITTEN
-        const playing = a.action === 'play'
-        const grid = frameOf(set[playing ? 'walk' : a.action], sim.frame)
-        const pal = paletteFor(a)
+        const grid = frameOf(set[a.action], sim.frame)
+        const pal = critterPalette(a.critter)
         const px = Math.round(a.x) * s
-        // Playing critters bounce: alternate frames lift them a pixel off the ground
-        const hop = playing && (sim.frame + (a.playLeader ? 0 : 1)) % 2 === 0 ? 1 : 0
-        const py = (Math.round(a.y) - hop) * s
+        const py = Math.round(a.y) * s
         const selected = a.id === selectedRef.current
         const { w: cw, h: ch } = CRITTER_SIZE
         if (selected || a.id === hover) {
@@ -427,8 +535,8 @@ export function MenagerieCanvas({
           )
           ctx.fill()
         }
-        drawShadow(ctx, px, py + hop * s, cw, ch, s, a.alpha)
-        drawGrid(ctx, grid, pal, px, py, s, a.facingLeft, a.alpha)
+        drawShadow(ctx, px, py, cw, ch, s)
+        drawGrid(ctx, grid, pal, px, py, s, a.facingLeft)
 
         // Sub-agents trail behind as tiny kittens
         const minis = Math.min(a.critter.subagents, 4)
@@ -437,25 +545,11 @@ export function MenagerieCanvas({
           const back = (i + 1) * 7
           const mx = px + (a.facingLeft ? back : -back + cw - 6) * s
           const bob = (sim.frame + i) % 2
-          drawGrid(ctx, mg, PROP_PALETTE, mx, py + (ch - 5 - bob) * s, s, a.facingLeft, a.alpha)
+          drawGrid(ctx, mg, PROP_PALETTE, mx, py + (ch - 5 - bob) * s, s, a.facingLeft)
         }
 
-        if (playing && sim.frame % 8 < 5) {
-          // Leader hums a note, follower floats a heart
-          const icon = a.playLeader ? NOTE : HEART
-          const g = gridSize(icon)
-          const bob = sim.frame % 4 < 2 ? 0 : 1
-          drawGrid(
-            ctx,
-            icon,
-            PROP_PALETTE,
-            px + Math.round((cw - g.w) / 2) * s,
-            py - (g.h + 1 + bob) * s,
-            s
-          )
-        }
-
-        if (a.critter.status === 'working' && a.critter.currentTool && !playing) {
+        if (a.headingHome) continue
+        if (a.critter.status === 'working' && a.critter.currentTool) {
           // Thought bubble with what the critter is actually doing
           const text = truncate(a.critter.currentTool)
           ctx.font = `${Math.max(8, 2.5 * s)}px ui-monospace, Menlo, monospace`
@@ -481,18 +575,6 @@ export function MenagerieCanvas({
             py - (q.h + 1) * s,
             s
           )
-        } else if (a.action === 'sleep' && sim.frame % 6 < 4) {
-          const zz = gridSize(ZZZ)
-          drawGrid(
-            ctx,
-            ZZZ,
-            PROP_PALETTE,
-            px + (cw - zz.w + 2) * s,
-            py - (zz.h + 1) * s,
-            s,
-            false,
-            a.alpha
-          )
         }
       }
 
@@ -512,14 +594,41 @@ export function MenagerieCanvas({
         k.facingLeft
       )
 
+      const dark = timeOfDay().dark
       drawNight(
         ctx,
-        timeOfDay().dark,
+        dark,
         layout.yards.map((y) => ({ x: y.house.x, y: y.house.y, level: y.level })),
         cover,
         s,
         sim.frame
       )
+      // Lamps lit by a running automation shine through the dark
+      if (dark > 0) {
+        automations.forEach((a, i) =>
+          drawLampGlow(ctx, layout.decorations[i], a, i, s, sim.frame, true)
+        )
+      }
+
+      // Hover labels last so nothing covers them
+      const hoveredIndex = automations.findIndex((a) => a.id === hoverAutomation)
+      if (hoveredIndex >= 0 && automations[hoveredIndex].id !== selectedAutomationRef.current) {
+        const slot = layout.decorations[hoveredIndex]
+        drawLabel(
+          ctx,
+          decorationLabel(automations[hoveredIndex]),
+          slot.x + DECORATION_SIZE.w / 2,
+          slot.y - 9,
+          s
+        )
+      }
+      const napYard = hoverNap ? layout.yards.find((y) => y.repository === hoverNap) : null
+      const napCrowd = hoverNap ? napsRef.current.get(hoverNap) : null
+      if (napYard && napCrowd) {
+        const n = napCrowd.puppies.length + napCrowd.kittens.length
+        const at = napLabelAnchor(napYard)
+        drawLabel(ctx, `${n} napping · click for the list`, at.x, at.y, s)
+      }
 
       ctx.restore()
 
@@ -532,6 +641,16 @@ export function MenagerieCanvas({
         onAnchorRef.current(null)
       }
 
+      // …and the selected decoration's, for the automation bubble
+      const selIndex = automations.findIndex((a) => a.id === selectedAutomationRef.current)
+      if (selIndex >= 0) {
+        const slot = layout.decorations[selIndex]
+        const p = worldToScreen(slot.x + DECORATION_SIZE.w / 2, slot.y - 8)
+        onAutomationAnchorRef.current?.({ x: p.x, y: p.y })
+      } else {
+        onAutomationAnchorRef.current?.(null)
+      }
+
       raf = requestAnimationFrame(draw)
     }
     raf = requestAnimationFrame(draw)
@@ -541,6 +660,7 @@ export function MenagerieCanvas({
       ro.disconnect()
       canvas.removeEventListener('click', onClick)
       canvas.removeEventListener('mousemove', onMove)
+      canvas.removeEventListener('mouseleave', onLeave)
       canvas.removeEventListener('mousedown', onDown)
       window.removeEventListener('mouseup', onUp)
       canvas.removeEventListener('wheel', onWheel)

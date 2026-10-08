@@ -3,13 +3,62 @@
  * centre cell is the town square where Katya hangs out. All coordinates are
  * in unscaled "world" pixels — the canvas multiplies by an integer scale.
  */
-import type { Yard } from '../../../../shared/types/menagerie'
+import type { CritterSpecies, Yard } from '../../../../shared/types/menagerie'
 import { houseLevel } from '../../../../shared/types/menagerie'
+import {
+  CAT_TREE,
+  CRITTER_SIZE,
+  DECORATION_SIZE,
+  DOG_HOUSE,
+  FLOWER,
+  TREE,
+  gridSize
+} from './sprites'
 
 export const CELL_W = 112
 export const CELL_H = 88
 export const HOUSE_W = 32
 export const HOUSE_H = 28
+
+const DOG_HOUSE_SIZE = gridSize(DOG_HOUSE)
+const CAT_TREE_SIZE = gridSize(CAT_TREE)
+
+/**
+ * The back of each yard, beside the cottage, holds the cat tree and dog house
+ * where napping critters sleep (offsets from the cell's top-left). Both stand
+ * on one ground line; critters roam below it so nobody walks over the
+ * sleepers, and the yard's tree keeps to the far corner.
+ */
+const NAP_GROUND = 33
+const CAT_TREE_X = 64
+const DOG_HOUSE_X = 79
+const ROAM_TOP = 37
+const TREE_X = 98
+
+/**
+ * Spots for automation decorations around the town-square plaza (offsets from
+ * the square's top-left), corners first so a few automations look balanced.
+ * All of them stay clear of the roads and the fountain.
+ */
+const DECORATION_SLOTS: readonly (readonly [number, number])[] = [
+  [9, 8],
+  [94, 8],
+  [9, 64],
+  [94, 64],
+  [23, 8],
+  [80, 8],
+  [23, 64],
+  [80, 64],
+  [37, 8],
+  [66, 8],
+  [37, 64],
+  [66, 64]
+]
+
+export interface Point {
+  x: number
+  y: number
+}
 
 export interface Rect {
   x: number
@@ -30,6 +79,8 @@ export interface YardLayout {
   /** Trees / flowers for decoration, deterministic per repo */
   trees: { x: number; y: number }[]
   flowers: { x: number; y: number }[]
+  /** Top-left corners of the dog house and cat tree in the back of the yard */
+  nap: { dogHouse: Point; catTree: Point }
   /** Upgrade tier 0..6 derived from completed tasks in the repo */
   level: number
   completedTasks: number
@@ -65,6 +116,8 @@ export interface VillageLayout {
   world: { w: number; h: number }
   square: Rect
   fountain: { x: number; y: number }
+  /** Top-left corners for automation decorations in the square, in fill order */
+  decorations: Point[]
   yards: YardLayout[]
   neighborhoods: NeighborhoodLayout[]
 }
@@ -121,6 +174,7 @@ export function buildLayout(yards: Yard[], aspect = 1): VillageLayout {
   const sqRow = Math.floor(squareIndex / cols)
   const square: Rect = { x: sqCol * CELL_W, y: sqRow * CELL_H, w: CELL_W, h: CELL_H }
   const fountain = { x: square.x + CELL_W / 2 - 4, y: square.y + CELL_H / 2 - 3 }
+  const decorations = DECORATION_SLOTS.map(([x, y]) => ({ x: square.x + x, y: square.y + y }))
 
   const tintFor = new Map<string, number>()
   for (const yard of yards) {
@@ -143,19 +197,16 @@ export function buildLayout(yards: Yard[], aspect = 1): VillageLayout {
     const door = { x: houseX + HOUSE_W / 2, y: houseY + HOUSE_H - 5 }
     const roam: Rect = {
       x: cell.x + 4,
-      y: houseY + HOUSE_H - 2,
+      y: cell.y + ROAM_TOP,
       w: CELL_W - 8,
-      h: cell.y + CELL_H - (houseY + HOUSE_H - 2) - 4
+      h: CELL_H - ROAM_TOP - 4
+    }
+    const nap = {
+      dogHouse: { x: cell.x + DOG_HOUSE_X, y: cell.y + NAP_GROUND - DOG_HOUSE_SIZE.h + 1 },
+      catTree: { x: cell.x + CAT_TREE_X, y: cell.y + NAP_GROUND - CAT_TREE_SIZE.h + 1 }
     }
 
-    const trees: { x: number; y: number }[] = []
-    const treeCount = 1 + Math.floor(rnd() * 2)
-    for (let i = 0; i < treeCount; i++) {
-      trees.push({
-        x: cell.x + CELL_W - 20 - Math.floor(rnd() * 24),
-        y: cell.y + 2 + Math.floor(rnd() * 8)
-      })
-    }
+    const trees = [{ x: cell.x + TREE_X, y: cell.y + 1 + Math.floor(rnd() * 3) }]
     const flowers: { x: number; y: number }[] = []
     const flowerCount = 2 + Math.floor(rnd() * 3)
     for (let i = 0; i < flowerCount; i++) {
@@ -173,6 +224,7 @@ export function buildLayout(yards: Yard[], aspect = 1): VillageLayout {
       roam,
       trees,
       flowers,
+      nap,
       level: houseLevel(yard.completedTasks ?? 0),
       completedTasks: yard.completedTasks ?? 0,
       streak: yard.streak ?? 0,
@@ -197,12 +249,29 @@ export function buildLayout(yards: Yard[], aspect = 1): VillageLayout {
     n.cells.push(l.cell)
   }
 
-  return { cols, rows, world, square, fountain, yards: layouts, neighborhoods }
+  return { cols, rows, world, square, fountain, decorations, yards: layouts, neighborhoods }
 }
 
-/** Footprints of TREE and FLOWER in sprites.ts */
-const WILD_TREE = { w: 12, h: 16 }
-const WILD_FLOWER = { w: 5, h: 6 }
+/** Where a critter heading off to nap disappears: the dog house door or the foot of the cat tree */
+export function napEntrance(yard: YardLayout, species: CritterSpecies): Point {
+  if (species === 'puppy') {
+    const d = yard.nap.dogHouse
+    return {
+      x: d.x + (DOG_HOUSE_SIZE.w - CRITTER_SIZE.w) / 2,
+      y: d.y + DOG_HOUSE_SIZE.h - CRITTER_SIZE.h
+    }
+  }
+  const c = yard.nap.catTree
+  return { x: c.x, y: c.y + CAT_TREE_SIZE.h - CRITTER_SIZE.h }
+}
+
+/** Area a decoration covers in the square, including the "?" or "!" floating over it */
+export function decorationRect(slot: Point): Rect {
+  return { x: slot.x, y: slot.y - 8, w: DECORATION_SIZE.w, h: DECORATION_SIZE.h + 8 }
+}
+
+const WILD_TREE = gridSize(TREE)
+const WILD_FLOWER = gridSize(FLOWER)
 
 export interface WildScenery {
   trees: { x: number; y: number }[]

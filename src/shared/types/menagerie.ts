@@ -12,6 +12,14 @@ export type CritterStatus =
   | 'recent' // no live process, updated within the retention window
   | 'done' // last event was session.shutdown, still inside retention window
 
+/**
+ * Critters that aren't working or waiting on you nap in their yard's dog
+ * house (puppies) or cat tree (kittens) instead of roaming the yard.
+ */
+export function isNapping(status: CritterStatus): boolean {
+  return status === 'idle' || status === 'recent' || status === 'done'
+}
+
 export type CritterSpecies = 'puppy' | 'kitten'
 
 export type CritterClient = 'cli' | 'autopilot' | 'unknown'
@@ -99,6 +107,56 @@ export interface Neighborhood {
   source: 'collection' | 'config'
 }
 
+/** Run status as the GitHub Copilot app records it in `workflow_runs` */
+export type AutomationRunStatus = 'pending' | 'running' | 'completed' | 'failed'
+
+export interface AutomationRun {
+  status: AutomationRunStatus
+  /** Session the run started, when it got that far */
+  sessionId: string | null
+  startedAt: string
+  /** First line of the failure message, for failed runs */
+  error: string | null
+}
+
+/**
+ * An automation from the GitHub Copilot app's Automations view. Each run is an
+ * ordinary session, but runs live in the town square as one decoration per
+ * automation instead of piling up in a yard.
+ */
+export interface Automation {
+  id: string
+  name: string
+  enabled: boolean
+  /** Human-readable cadence, e.g. "Daily at 9:30 AM & 4:30 PM" */
+  schedule: string
+  /** Project the runs start in, when the automation has one */
+  project: string | null
+  /** Next scheduled run; null when paused or manual */
+  nextRunAt: string | null
+  /** Newest run, even when it's older than the retention window */
+  lastRun: AutomationRun | null
+  /** Sessions its runs started that are still inside the retention window, newest first */
+  runs: Critter[]
+}
+
+/** What an automation's town-square decoration shows */
+export type AutomationState = 'waiting' | 'running' | 'failed' | 'paused' | 'idle'
+
+export function automationState(a: Automation): AutomationState {
+  if (a.runs.some((c) => c.status === 'waiting')) return 'waiting'
+  if (a.runs.some((c) => c.status === 'working')) return 'running'
+  const last = a.lastRun
+  // The app marks a run started before its session shows up on disk
+  const starting =
+    last !== null &&
+    (last.status === 'pending' || last.status === 'running') &&
+    !a.runs.some((c) => c.id === last.sessionId)
+  if (starting) return 'running'
+  if (last?.status === 'failed') return 'failed'
+  return a.enabled ? 'idle' : 'paused'
+}
+
 /** Completed-task thresholds at which the cottage gains its next upgrade */
 export const HOUSE_UPGRADE_THRESHOLDS = [5, 15, 30, 50, 80, 120] as const
 
@@ -158,10 +216,20 @@ export interface MenagerieSnapshot {
   neighborhoods: Neighborhood[]
   /** Where the user can edit their own groupings */
   neighborhoodsConfigPath: string | null
-  /** Convenience counters for the window header */
+  /** Automations decorating the town square, in a stable order */
+  automations: Automation[]
+  /** Convenience counters for the window header; automation runs included */
   counts: Record<CritterStatus, number>
   /** Non-fatal issues (e.g. sqlite3 missing, falling back to yaml scan) */
   warnings: string[]
+}
+
+/** Every critter in the snapshot: yard residents plus automation runs */
+export function allCritters(snapshot: Pick<MenagerieSnapshot, 'yards' | 'automations'>): Critter[] {
+  return [
+    ...snapshot.yards.flatMap((y) => y.critters),
+    ...snapshot.automations.flatMap((a) => a.runs)
+  ]
 }
 
 export const MENAGERIE_RETENTION_HOURS = 24

@@ -1,14 +1,17 @@
 /**
- * Tiny behaviour sim: each critter has a position, facing, and an "action"
- * chosen from its status. The sim is deterministic-ish (seeded per session id)
- * so critters don't teleport when the snapshot refreshes.
+ * Tiny behaviour sim for the critters roaming the yards. Only sessions that
+ * are working or waiting on you roam; everyone else naps in the yard's dog
+ * house or cat tree, which the canvas draws straight from the snapshot. A
+ * critter whose session just went idle walks home before it disappears.
+ * The sim is deterministic-ish (seeded per session id) so critters don't
+ * teleport when the snapshot refreshes.
  */
 import type { Critter, MenagerieSnapshot } from '../../../../shared/types/menagerie'
-import { MENAGERIE_RETENTION_HOURS } from '../../../../shared/types/menagerie'
-import type { Rect, VillageLayout, YardLayout } from './layout'
+import { isNapping } from '../../../../shared/types/menagerie'
+import { napEntrance, type Rect, type VillageLayout, type YardLayout } from './layout'
 import { CRITTER_SIZE, KATYA_SIZE } from './sprites'
 
-export type Action = 'idle' | 'walk' | 'chore' | 'sit' | 'sleep' | 'play'
+export type Action = 'idle' | 'walk' | 'chore' | 'sit'
 
 export interface Actor {
   id: string
@@ -18,19 +21,11 @@ export interface Actor {
   y: number
   facingLeft: boolean
   action: Action
-  /** seconds until the actor picks a new action */
+  /** seconds until the actor picks a new action; while heading home, until it stops walking */
   timer: number
   target: { x: number; y: number } | null
-  /** 0..1 — fades out `recent` critters as they age */
-  alpha: number
-  /** position in the yard's porch queue for recent/done critters */
-  porchSlot: number
-  /** id of the critter this one is playing with, if any */
-  playmate: string | null
-  /** where the pair is playing (a yard's roam rect or the square) */
-  playArea: Rect | null
-  /** true for the actor that picks the chase targets */
-  playLeader: boolean
+  /** Its session went idle: walking to the dog house or cat tree, then gone */
+  headingHome: boolean
 }
 
 export interface KatyaActor {
@@ -52,6 +47,8 @@ export interface SimState {
 
 const SPRITE = CRITTER_SIZE.w
 const SPEED = { puppy: 12, kitten: 14, katya: 10 }
+/** Give up walking home after this long and just pop into the nap spot */
+const HOMEWARD_TIMEOUT_S = 8
 
 function seeded(id: string): () => number {
   let a = 0
@@ -72,14 +69,6 @@ function randomPoint(rect: Rect, rnd: () => number): { x: number; y: number } {
   }
 }
 
-export function ageAlpha(critter: Critter, now: number): number {
-  if (critter.status !== 'recent' && critter.status !== 'done') return 1
-  const ageMs = now - Date.parse(critter.lastActivityAt)
-  const span = MENAGERIE_RETENTION_HOURS * 3_600_000
-  const t = Math.min(1, Math.max(0, ageMs / span))
-  return 1 - t * 0.65
-}
-
 export function createSim(): SimState {
   return {
     actors: new Map(),
@@ -90,35 +79,40 @@ export function createSim(): SimState {
 }
 
 /** Reconcile actors with a fresh snapshot/layout without resetting positions. */
-export function syncSim(
-  sim: SimState,
-  snapshot: MenagerieSnapshot,
-  layout: VillageLayout,
-  now: number
-): void {
+export function syncSim(sim: SimState, snapshot: MenagerieSnapshot, layout: VillageLayout): void {
   const seen = new Set<string>()
   const yardByRepo = new Map(layout.yards.map((y) => [y.repository, y]))
 
   for (const yard of snapshot.yards) {
     const yl = yardByRepo.get(yard.repository)
     if (!yl) continue
-    let porch = 0
     for (const critter of yard.critters) {
-      seen.add(critter.id)
       const existing = sim.actors.get(critter.id)
-      const isPorch = critter.status === 'recent' || critter.status === 'done'
-      const slot = isPorch ? porch++ : -1
+      if (isNapping(critter.status)) {
+        // Already asleep: the nap spot draws it. Just went idle: walk home first.
+        if (!existing) continue
+        seen.add(critter.id)
+        if (!existing.headingHome) {
+          existing.headingHome = true
+          existing.timer = HOMEWARD_TIMEOUT_S
+        }
+        existing.critter = critter
+        existing.yard = yl
+        existing.target = napEntrance(yl, critter.species)
+        existing.action = 'walk'
+        continue
+      }
+
+      seen.add(critter.id)
       if (existing) {
-        const statusChanged = existing.critter.status !== critter.status
+        const statusChanged = existing.critter.status !== critter.status || existing.headingHome
         const yardChanged = existing.yard.repository !== yl.repository
         existing.critter = critter
         existing.yard = yl
-        existing.alpha = ageAlpha(critter, now)
-        existing.porchSlot = slot
+        existing.headingHome = false
         if (statusChanged || yardChanged) {
           existing.timer = 0
           existing.target = null
-          if (existing.playmate) breakPlay(sim, existing)
           if (yardChanged) {
             const p = randomPoint(yl.roam, seeded(critter.id))
             existing.x = p.x
@@ -139,20 +133,13 @@ export function syncSim(
         action: 'idle',
         timer: 0,
         target: null,
-        alpha: ageAlpha(critter, now),
-        porchSlot: slot,
-        playmate: null,
-        playArea: null,
-        playLeader: false
+        headingHome: false
       })
     }
   }
 
   for (const id of [...sim.actors.keys()]) {
-    if (seen.has(id)) continue
-    const gone = sim.actors.get(id)
-    if (gone?.playmate) breakPlay(sim, gone)
-    sim.actors.delete(id)
+    if (!seen.has(id)) sim.actors.delete(id)
   }
 
   // Keep Katya inside the world after a relayout
@@ -163,13 +150,6 @@ export function syncSim(
   }
   sim.katya.x = Math.min(Math.max(sim.katya.x, 0), layout.world.w - KATYA_SIZE.w)
   sim.katya.y = Math.min(Math.max(sim.katya.y, 0), layout.world.h - KATYA_SIZE.h)
-}
-
-function porchSpot(yard: YardLayout, slot: number): { x: number; y: number } {
-  // Alternate left/right of the door, stepping outward
-  const side = slot % 2 === 0 ? 1 : -1
-  const step = Math.floor(slot / 2) + (slot === 0 ? 0 : 1)
-  return { x: yard.door.x - SPRITE / 2 + side * step * (SPRITE + 2), y: yard.door.y - 4 }
 }
 
 function stepTowards(
@@ -197,171 +177,46 @@ export function tickSim(sim: SimState, layout: VillageLayout, dt: number): void 
     sim.frame++
   }
 
-  pairIdlePlaymates(sim, layout)
   for (const actor of sim.actors.values()) tickActor(sim, actor, dt)
   tickKatya(sim.katya, layout, dt)
 }
 
-// ── Playtime ──────────────────────────────────────────────────────
-
-const PLAY_PAIR_CHANCE_PER_SEC = 0.35
-const PLAY_RADIUS = SPRITE * 0.9
-
-function inset(r: Rect, by: number): Rect {
-  return {
-    x: r.x + by,
-    y: r.y + by,
-    w: Math.max(SPRITE, r.w - by * 2),
-    h: Math.max(SPRITE, r.h - by * 2)
-  }
-}
-
-function startPlay(a: Actor, b: Actor, area: Rect): void {
-  const leader = a.id < b.id ? a : b
-  const follower = leader === a ? b : a
-  for (const actor of [a, b]) {
-    actor.playmate = actor === a ? b.id : a.id
-    actor.playArea = area
-    actor.playLeader = actor === leader
-    actor.action = 'walk'
-    actor.timer = 8 + Math.random() * 8
-    actor.target = null
-  }
-  leader.target = randomPoint(area, Math.random)
-  follower.target = { ...leader.target }
-}
-
-function breakPlay(sim: SimState, a: Actor): void {
-  const mate = a.playmate ? sim.actors.get(a.playmate) : null
-  for (const actor of [a, mate]) {
-    if (!actor) continue
-    actor.playmate = null
-    actor.playArea = null
-    actor.playLeader = false
-    if (actor.action === 'play') actor.action = 'idle'
-    actor.target = null
-    actor.timer = 1 + Math.random() * 2
-  }
-}
-
-/** Occasionally match up two idle, unpaired critters and send them off to play. */
-function pairIdlePlaymates(sim: SimState, layout: VillageLayout): void {
-  const free: Actor[] = []
-  for (const a of sim.actors.values()) {
-    if (a.critter.status === 'idle' && !a.playmate && a.action !== 'sleep') free.push(a)
-  }
-  if (free.length < 2) return
-  // One pairing attempt per tick at most; dt is ~1/60 so scale the chance.
-  if (Math.random() > PLAY_PAIR_CHANCE_PER_SEC / 60) return
-
-  const i = Math.floor(Math.random() * free.length)
-  let j = Math.floor(Math.random() * (free.length - 1))
-  if (j >= i) j++
-  const a = free[i]
-  const b = free[j]
-  const sameYard = a.yard.repository === b.yard.repository
-  const area = sameYard ? a.yard.roam : inset(layout.square, 6)
-  startPlay(a, b, area)
-}
-
-function tickPlay(sim: SimState, a: Actor, dt: number): void {
-  const mate = a.playmate ? sim.actors.get(a.playmate) : null
-  if (!mate || mate.playmate !== a.id || mate.critter.status !== 'idle' || !a.playArea) {
-    breakPlay(sim, a)
-    return
-  }
-  const speed = SPEED[a.critter.species] * 1.25
-  a.timer -= dt
-  if (a.timer <= 0) {
-    breakPlay(sim, a)
-    return
-  }
-
-  if (a.playLeader) {
-    // Leader scampers between random points; pauses briefly when it arrives.
-    if (!a.target) a.target = randomPoint(a.playArea, Math.random)
-    a.facingLeft = a.target.x < a.x
-    if (stepTowards(a, a.target, speed * dt)) a.target = null
-  } else {
-    // Follower chases the leader and hops around it once close.
-    const dx = mate.x - a.x
-    const dy = mate.y - a.y
-    const dist = Math.hypot(dx, dy)
-    a.facingLeft = dx < 0
-    if (dist > PLAY_RADIUS) {
-      stepTowards(a, { x: mate.x - Math.sign(dx || 1) * SPRITE * 0.6, y: mate.y }, speed * dt)
-    }
-  }
-  a.action = 'play'
-}
-
 function tickActor(sim: SimState, a: Actor, dt: number): void {
-  const status = a.critter.status
   const rnd = Math.random
   const speed = SPEED[a.critter.species]
 
-  if (a.playmate) {
-    if (status === 'idle') {
-      tickPlay(sim, a, dt)
-      return
-    }
-    breakPlay(sim, a)
-  }
-
-  // Porch dwellers go straight to their spot and stay put.
-  if (status === 'recent' || status === 'done') {
-    const spot = porchSpot(a.yard, Math.max(0, a.porchSlot))
-    if (Math.hypot(spot.x - a.x, spot.y - a.y) > 0.5) {
-      a.facingLeft = spot.x < a.x
-      a.action = 'walk'
-      stepTowards(a, spot, speed * dt)
-      return
-    }
-    a.action = status === 'done' ? 'sleep' : 'sit'
-    a.facingLeft = a.porchSlot % 2 === 1
+  if (a.headingHome) {
+    a.timer -= dt
+    const home = a.target ?? napEntrance(a.yard, a.critter.species)
+    a.facingLeft = home.x < a.x
+    a.action = 'walk'
+    if (stepTowards(a, home, speed * dt) || a.timer <= 0) sim.actors.delete(a.id)
     return
   }
 
-  if (status === 'waiting') {
+  if (a.critter.status === 'waiting') {
     a.action = 'sit'
     return
   }
 
+  // Working: mostly keep doing the chore, wander to a new spot now and then.
   if (a.action === 'walk' && a.target) {
     a.facingLeft = a.target.x < a.x
     if (stepTowards(a, a.target, speed * dt)) {
       a.target = null
-      a.action = status === 'working' ? 'chore' : 'idle'
-      a.timer = status === 'working' ? 6 + rnd() * 8 : 2 + rnd() * 4
+      a.action = 'chore'
+      a.timer = 6 + rnd() * 8
     }
     return
   }
 
   a.timer -= dt
   if (a.timer > 0) return
-
-  if (status === 'working') {
-    // Mostly keep doing the chore; wander occasionally.
-    if (a.action !== 'chore' || rnd() < 0.3) {
-      a.target = randomPoint(a.yard.roam, rnd)
-      a.action = 'walk'
-    } else {
-      a.timer = 5 + rnd() * 6
-    }
-    return
-  }
-
-  // idle: wander, pause, sometimes nap
-  const roll = rnd()
-  if (roll < 0.5) {
+  if (a.action !== 'chore' || rnd() < 0.3) {
     a.target = randomPoint(a.yard.roam, rnd)
     a.action = 'walk'
-  } else if (roll < 0.8) {
-    a.action = 'idle'
-    a.timer = 2 + rnd() * 4
   } else {
-    a.action = 'sleep'
-    a.timer = 6 + rnd() * 8
+    a.timer = 5 + rnd() * 6
   }
 }
 

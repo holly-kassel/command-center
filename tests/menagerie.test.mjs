@@ -435,9 +435,18 @@ test('assembleSnapshot groups neighborhood yards together and lists them', () =>
   assert.equal(plain.yards[0].neighborhood, null)
 })
 
+const sprites = load('src/renderer/src/windows/Menagerie/sprites.ts')
 const village = load('src/renderer/src/windows/Menagerie/layout.ts', {
-  '../../../../shared/types/menagerie': types
+  '../../../../shared/types/menagerie': types,
+  './sprites': sprites
 })
+const sim = load('src/renderer/src/windows/Menagerie/sim.ts', {
+  '../../../../shared/types/menagerie': types,
+  './layout': village,
+  './sprites': sprites
+})
+
+const overlaps = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h
 
 test('villageScale uses whole-number zoom with no upper cap, never below 2x', () => {
   const world = { w: 224, h: 176 }
@@ -496,4 +505,403 @@ test('wildScenery plants plots around and between yards, off the roads, and stay
     trees: [],
     flowers: []
   })
+})
+
+test('parseWorkspaceYaml reads block-scalar names without letting their lines override keys', () => {
+  const meta = src.parseWorkspaceYaml(
+    [
+      'id: s1',
+      'repository: holly/notes',
+      'name: |-',
+      '  Run the /day workflow for the vault',
+      '',
+      '  repository: evil/override',
+      '  1. Check the time: 4:00pm',
+      'branch: main',
+      'summary: >-',
+      '  folded',
+      '  text',
+      'client_name: github/autopilot'
+    ].join('\n')
+  )
+  assert.equal(meta.repository, 'holly/notes')
+  assert.equal(meta.branch, 'main')
+  assert.equal(meta.client_name, 'github/autopilot')
+  assert.equal(
+    meta.name,
+    'Run the /day workflow for the vault\n\nrepository: evil/override\n1. Check the time: 4:00pm'
+  )
+  assert.equal(meta.summary, 'folded text')
+})
+
+test('buildCritter names a session after the first line of a multi-line name', () => {
+  const critter = src.buildCritter({
+    row: null,
+    meta: { id: 's2', name: 'Run the /day workflow\n\nmore steps', updated_at: iso(1) },
+    events: [],
+    pid: null,
+    alive: false
+  })
+  assert.equal(critter.name, 'Run the /day workflow')
+})
+
+test('describeSchedule turns automation schedules into plain English', () => {
+  const base = {
+    interval: 'daily',
+    schedule_hour: 9,
+    schedule_minute: 30,
+    schedule_day: 1,
+    cron_expression: null
+  }
+  assert.equal(src.describeSchedule(base), 'Daily at 9:30 AM')
+  assert.equal(
+    src.describeSchedule({
+      ...base,
+      interval: 'weekly',
+      schedule_day: 4,
+      schedule_hour: 14,
+      schedule_minute: 0
+    }),
+    'Thursdays at 2:00 PM'
+  )
+  assert.equal(
+    src.describeSchedule({ ...base, interval: 'hourly', schedule_minute: 5 }),
+    'Hourly at :05'
+  )
+  assert.equal(src.describeSchedule({ ...base, interval: 'manual' }), 'Manual')
+  assert.equal(
+    src.describeSchedule({ ...base, cron_expression: '30 9,16 * * *' }),
+    'Daily at 9:30 AM & 4:30 PM'
+  )
+  assert.equal(
+    src.describeSchedule({ ...base, cron_expression: '0 0 * * 1-5' }),
+    'Weekdays at 12:00 AM'
+  )
+  assert.equal(
+    src.describeSchedule({ ...base, cron_expression: '15 12 * * 1,3' }),
+    'Mon, Wed at 12:15 PM'
+  )
+  assert.equal(
+    src.describeSchedule({ ...base, cron_expression: '*/5 * * * *' }),
+    'Cron */5 * * * *'
+  )
+  assert.equal(src.describeSchedule({ ...base, cron_expression: '0 9 1 * *' }), 'Cron 0 9 1 * *')
+})
+
+test('assembleSnapshot moves automation runs out of the yards and into the town square', () => {
+  const mk = (id, repository, status, hoursAgo = 1) => ({
+    id,
+    name: id,
+    repository,
+    branch: null,
+    cwd: null,
+    status,
+    client: 'autopilot',
+    species: 'puppy',
+    coat: 0,
+    lastActivityAt: iso(hoursAgo),
+    lastActivity: null,
+    pid: null,
+    currentTool: null,
+    subagents: 0,
+    pendingPermission: null
+  })
+  const wf = (id, name, enabled, created) => ({
+    id,
+    name,
+    enabled,
+    interval: 'daily',
+    schedule_hour: 9,
+    schedule_minute: 30,
+    schedule_day: 1,
+    cron_expression: null,
+    project: 'notes',
+    created_at: created,
+    next_run_at: '2026-03-10T21:30:00Z'
+  })
+  const run = (task_id, session_id, hoursAgo, status = 'completed', extra = {}) => ({
+    task_id,
+    status,
+    session_id,
+    started_at: iso(hoursAgo),
+    error_message: null,
+    taken_over_at: null,
+    ...extra
+  })
+  const snap = src.assembleSnapshot(
+    [
+      mk('day-1', 'holly/notes', 'done', 2),
+      mk('day-2', 'holly/notes', 'working', 0.1),
+      mk('mine', 'holly/notes', 'idle'),
+      mk('taken', 'holly/notes', 'idle'),
+      mk('lonely-run', 'holly/other', 'done'),
+      mk('paused-run', 'holly/other', 'waiting')
+    ],
+    now,
+    [],
+    {},
+    {},
+    undefined,
+    {
+      workflows: [
+        wf('w-day', 'Day', 1, '2026-01-02T00:00:00Z'),
+        wf('w-quiet', 'Quiet', 1, '2026-01-01T00:00:00Z'),
+        wf('w-off', 'Off', 0, '2026-01-03T00:00:00Z'),
+        wf('w-gone', 'Gone', 0, '2026-01-04T00:00:00Z'),
+        wf('w-other', 'Other\nsecond line', 1, '2026-01-05T00:00:00Z')
+      ],
+      runs: [
+        run('w-day', 'day-1', 2),
+        run('w-day', 'day-2', 0.1, 'running'),
+        run('w-day', 'taken', 5, 'completed', { taken_over_at: iso(4) }),
+        run('w-quiet', null, 30, 'failed', { error_message: 'Failed to create session\nstack' }),
+        run('w-off', 'paused-run', 1, 'running'),
+        run('w-other', 'lonely-run', 3, 'cancelled'),
+        run('w-ghost', 'mine', 1)
+      ]
+    }
+  )
+  // Runs leave their yards; your own sessions and a run you took over stay
+  assert.deepEqual(
+    snap.yards.map((y) => y.repository),
+    ['holly/notes']
+  )
+  assert.deepEqual(snap.yards[0].critters.map((c) => c.id).sort(), ['mine', 'taken'])
+  // Enabled automations show without recent runs; paused ones only while a run is around
+  assert.deepEqual(
+    snap.automations.map((a) => a.name),
+    ['Quiet', 'Day', 'Off', 'Other']
+  )
+  const [quiet, day, off, other] = snap.automations
+  assert.deepEqual(
+    day.runs.map((c) => c.id),
+    ['day-2', 'day-1']
+  )
+  assert.deepEqual(day.lastRun, {
+    status: 'running',
+    sessionId: 'day-2',
+    startedAt: iso(0.1),
+    error: null
+  })
+  assert.equal(day.schedule, 'Daily at 9:30 AM')
+  assert.equal(day.project, 'notes')
+  assert.equal(quiet.runs.length, 0)
+  assert.equal(quiet.lastRun.status, 'failed')
+  assert.equal(quiet.lastRun.error, 'Failed to create session')
+  assert.equal(off.enabled, false)
+  assert.equal(off.nextRunAt, null)
+  assert.deepEqual(
+    off.runs.map((c) => c.id),
+    ['paused-run']
+  )
+  assert.equal(other.lastRun.status, 'completed', 'unknown run statuses read as finished')
+  // Header counts and the needs-you queue still see every session
+  assert.deepEqual(snap.counts, { working: 1, waiting: 1, idle: 2, recent: 0, done: 2 })
+  assert.deepEqual(
+    types
+      .allCritters(snap)
+      .map((c) => c.id)
+      .sort(),
+    ['day-1', 'day-2', 'lonely-run', 'mine', 'paused-run', 'taken']
+  )
+})
+
+test('automationState: needs-you beats running beats failed; paused while disabled', () => {
+  const c = (id, status) => ({ id, status })
+  const a = (over) => ({ enabled: true, lastRun: null, runs: [], ...over })
+  assert.equal(
+    types.automationState(a({ runs: [c('x', 'working'), c('y', 'waiting')] })),
+    'waiting'
+  )
+  assert.equal(types.automationState(a({ runs: [c('x', 'working')] })), 'running')
+  // Started in the app, but its session hasn't shown up on disk yet
+  assert.equal(
+    types.automationState(a({ lastRun: { status: 'pending', sessionId: null } })),
+    'running'
+  )
+  // The app still says running, but the session already finished
+  assert.equal(
+    types.automationState(
+      a({ lastRun: { status: 'running', sessionId: 'x' }, runs: [c('x', 'done')] })
+    ),
+    'idle'
+  )
+  assert.equal(
+    types.automationState(a({ lastRun: { status: 'failed', sessionId: null } })),
+    'failed'
+  )
+  assert.equal(types.automationState(a({ enabled: false })), 'paused')
+  assert.equal(types.automationState(a({})), 'idle')
+})
+
+test('isNapping: idle, closed, and finished sessions nap; working and waiting ones roam', () => {
+  assert.deepEqual(
+    ['working', 'waiting', 'idle', 'recent', 'done'].map((st) => types.isNapping(st)),
+    [false, false, true, true, true]
+  )
+})
+
+test('layout: nap spots sit beside the cottage, clear of the house, tree, and roaming critters', () => {
+  const yards = ['a/one', 'a/two', 'b/three', 'c/four', 'd/five'].map((repository) => ({
+    repository,
+    critters: [],
+    completedTasks: 500,
+    streak: 9
+  }))
+  const layout = village.buildLayout(yards, 1.6)
+  const dog = sprites.gridSize(sprites.DOG_HOUSE)
+  const cat = sprites.gridSize(sprites.CAT_TREE)
+  const tree = sprites.gridSize(sprites.TREE)
+  for (const y of layout.yards) {
+    const dogRect = { ...y.nap.dogHouse, w: dog.w, h: dog.h }
+    const catRect = { ...y.nap.catTree, w: cat.w, h: cat.h }
+    // A fully upgraded cottage's annex and lantern glow reach 40px right of the house
+    const cottage = { x: y.house.x, y: y.house.y, w: 40, h: 28 }
+    for (const r of [dogRect, catRect]) {
+      assert.ok(r.x >= y.cell.x && r.x + r.w <= y.cell.x + y.cell.w, 'inside the cell')
+      assert.ok(r.y - 12 >= y.cell.y && r.y + r.h <= y.cell.y + y.cell.h, 'z and sleeper inside')
+      assert.ok(!overlaps(r, cottage), 'clear of the cottage')
+      for (const t of y.trees)
+        assert.ok(!overlaps(r, { ...t, w: tree.w, h: tree.h }), 'clear of the tree')
+    }
+    assert.ok(!overlaps(dogRect, catRect))
+    assert.equal(dogRect.y + dog.h, catRect.y + cat.h, 'one ground line')
+    assert.ok(y.roam.y >= dogRect.y + dog.h + 3, 'critters roam below the sleepers')
+    for (const t of y.trees) assert.ok(t.x + tree.w <= y.cell.x + y.cell.w)
+    for (const f of y.flowers) assert.ok(f.y >= y.roam.y)
+    const pupDoor = village.napEntrance(y, 'puppy')
+    assert.ok(pupDoor.x >= dogRect.x && pupDoor.x + 12 <= dogRect.x + dog.w)
+  }
+})
+
+test('layout: automation decorations ring the plaza, clear of the roads, fountain, and each other', () => {
+  const layout = village.buildLayout([{ repository: 'a/one', critters: [] }], 1)
+  const sq = layout.square
+  const { w, h } = sprites.DECORATION_SIZE
+  const rects = layout.decorations.map((p) => ({ ...p, w, h }))
+  assert.equal(rects.length, 12)
+  const plaza = { x: sq.x + 6, y: sq.y + 6, w: sq.w - 12, h: sq.h - 12 }
+  const roads = [
+    { x: sq.x, y: sq.y + sq.h / 2 - 4, w: sq.w, h: 8 },
+    { x: sq.x + sq.w / 2 - 4, y: sq.y, w: 8, h: sq.h }
+  ]
+  const fountain = { ...layout.fountain, w: 8, h: 6 }
+  rects.forEach((r, i) => {
+    assert.ok(
+      r.x >= plaza.x &&
+        r.x + r.w <= plaza.x + plaza.w &&
+        r.y >= plaza.y &&
+        r.y + r.h <= plaza.y + plaza.h,
+      `slot ${i} on the plaza`
+    )
+    for (const road of roads) assert.ok(!overlaps(r, road), `slot ${i} off the roads`)
+    assert.ok(!overlaps(r, fountain), `slot ${i} clear of the fountain`)
+    rects.forEach((o, j) => {
+      if (j !== i) assert.ok(!overlaps(r, o), `slots ${i} and ${j} overlap`)
+    })
+    assert.ok(
+      village.decorationRect(layout.decorations[i]).y >= sq.y,
+      `slot ${i} "?" inside the square`
+    )
+  })
+})
+
+test('sprites: nap spots and decorations are rectangular and only use known colours', () => {
+  const check = (grid, palette, name) => {
+    const width = grid[0].length
+    for (const row of grid) {
+      assert.equal(row.length, width, `${name}: ragged row`)
+      for (const ch of row)
+        if (ch !== '.') assert.ok(palette[ch], `${name}: unknown colour '${ch}'`)
+    }
+  }
+  check(sprites.DOG_HOUSE, sprites.PROP_PALETTE, 'DOG_HOUSE')
+  check(sprites.CAT_TREE, { ...sprites.PROP_PALETTE, ...sprites.CAT_TREE_PALETTE }, 'CAT_TREE')
+  const decoPalette = {
+    ...sprites.PROP_PALETTE,
+    ...sprites.DECORATION_ACCENTS[0],
+    u: sprites.LAMP_LIT
+  }
+  sprites.DECORATIONS.forEach((d, i) => {
+    for (const [label, grid] of [
+      ['idle', d.idle],
+      ...d.running.map((g, f) => [`running ${f}`, g])
+    ]) {
+      check(grid, decoPalette, `decoration ${i} ${label}`)
+      assert.deepEqual(
+        sprites.gridSize(grid),
+        { ...sprites.DECORATION_SIZE },
+        `decoration ${i} ${label} size`
+      )
+    }
+  })
+  check(sprites.BANG, sprites.BANG_PALETTE, 'BANG')
+  assert.notEqual(sprites.decorationFor(0).sprite, sprites.decorationFor(1).sprite)
+  assert.equal(
+    sprites.decorationFor(sprites.DECORATIONS.length).sprite,
+    sprites.decorationFor(0).sprite
+  )
+})
+
+test('sim: only working and waiting critters roam; one that goes idle walks home, then naps', () => {
+  const crit = (id, status, species = 'puppy') => ({
+    id,
+    name: id,
+    repository: 'a/one',
+    branch: null,
+    cwd: null,
+    status,
+    client: 'cli',
+    species,
+    coat: 0,
+    lastActivityAt: iso(1),
+    lastActivity: null,
+    pid: null,
+    currentTool: null,
+    subagents: 0,
+    pendingPermission: null
+  })
+  const snap = (critters) => ({
+    yards: [
+      {
+        repository: 'a/one',
+        critters,
+        completedTasks: 0,
+        activity: {},
+        streak: 0,
+        neighborhood: null
+      }
+    ],
+    automations: []
+  })
+  const first = snap([
+    crit('w', 'working'),
+    crit('q', 'waiting', 'kitten'),
+    crit('i', 'idle'),
+    crit('d', 'done', 'kitten')
+  ])
+  const layout = village.buildLayout(first.yards, 1.6)
+  const state = sim.createSim()
+  sim.syncSim(state, first, layout)
+  assert.deepEqual([...state.actors.keys()].sort(), ['q', 'w'])
+
+  // 'w' finishes its turn: it heads for the dog house instead of vanishing on the spot
+  sim.syncSim(
+    state,
+    snap([crit('w', 'idle'), crit('q', 'waiting', 'kitten'), crit('i', 'idle')]),
+    layout
+  )
+  const w = state.actors.get('w')
+  assert.equal(w.headingHome, true)
+  assert.deepEqual(w.target, village.napEntrance(layout.yards[0], 'puppy'))
+  for (let t = 0; t < 200 && state.actors.has('w'); t++) sim.tickSim(state, layout, 0.1)
+  assert.equal(state.actors.has('w'), false)
+  assert.equal(state.actors.get('q').action, 'sit')
+
+  // Waking up brings a critter back out into the yard
+  sim.syncSim(state, snap([crit('i', 'working'), crit('q', 'waiting', 'kitten')]), layout)
+  assert.deepEqual([...state.actors.keys()].sort(), ['i', 'q'])
+  const roam = layout.yards[0].roam
+  const i = state.actors.get('i')
+  assert.ok(i.x >= roam.x && i.x <= roam.x + roam.w && i.y >= roam.y && i.y <= roam.y + roam.h)
 })

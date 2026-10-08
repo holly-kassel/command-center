@@ -4,6 +4,8 @@
  * easy to unit test. The MenagerieService does the I/O.
  */
 import type {
+  Automation,
+  AutomationRunStatus,
   Neighborhood,
   Critter,
   CritterClient,
@@ -58,18 +60,34 @@ export interface SessionEvent {
 
 /**
  * workspace.yaml is a flat `key: value` file written by Copilot CLI.
- * Values may be quoted. We deliberately avoid a yaml dependency.
+ * Values may be quoted, and long ones (like names taken from a multi-line
+ * prompt) use a `|-` block whose text sits on the indented lines below.
+ * We deliberately avoid a yaml dependency.
  */
 export function parseWorkspaceYaml(text: string): WorkspaceMeta {
   const out: Record<string, string> = {}
-  for (const rawLine of text.split('\n')) {
+  const lines = text.split('\n')
+  for (let i = 0; i < lines.length; i++) {
+    const rawLine = lines[i]
+    // Keys sit at the start of the line; indented lines belong to a block value.
+    if (/^\s/.test(rawLine)) continue
     const line = rawLine.trim()
     if (!line || line.startsWith('#')) continue
     const idx = line.indexOf(':')
     if (idx <= 0) continue
     const key = line.slice(0, idx).trim()
     let value = line.slice(idx + 1).trim()
-    if (
+    const block = /^([|>])[-+0-9]*$/.exec(value)
+    if (block) {
+      const body: string[] = []
+      while (i + 1 < lines.length && (lines[i + 1] === '' || /^\s/.test(lines[i + 1]))) {
+        body.push(lines[++i].trimEnd())
+      }
+      const indents = body.filter((l) => l.trim()).map((l) => l.length - l.trimStart().length)
+      const indent = indents.length ? Math.min(...indents) : 0
+      const dedented = body.map((l) => l.slice(indent))
+      value = (block[1] === '|' ? dedented.join('\n') : dedented.join(' ')).trim()
+    } else if (
       (value.startsWith('"') && value.endsWith('"')) ||
       (value.startsWith("'") && value.endsWith("'"))
     ) {
@@ -79,6 +97,15 @@ export function parseWorkspaceYaml(text: string): WorkspaceMeta {
     out[key] = value
   }
   return out as WorkspaceMeta
+}
+
+/** First non-empty line, trimmed; names taken from multi-line prompts keep only their opening line */
+export function firstLine(text: string | null | undefined): string {
+  for (const line of (text ?? '').split('\n')) {
+    const trimmed = line.trim()
+    if (trimmed) return trimmed
+  }
+  return ''
 }
 
 /** Parse the trailing lines of events.jsonl, skipping partial/corrupt lines. */
@@ -390,7 +417,7 @@ export function buildCritter(input: BuildCritterInput): Critter | null {
   if (!lastActivityAt) return null
 
   const { species, coat } = speciesFor(id)
-  const name = meta?.name?.trim() || row?.summary?.trim() || id.slice(0, 8)
+  const name = firstLine(meta?.name) || firstLine(row?.summary) || id.slice(0, 8)
   const status = deriveStatus({ alive, events })
 
   return {
@@ -456,19 +483,188 @@ export interface NeighborhoodInput {
 
 const EMPTY_NEIGHBORHOODS: NeighborhoodInput = { byRepo: {}, sources: {}, configPath: null }
 
+/** Row shape from data.db `workflows`: the Copilot app's Automations */
+export interface AutomationRow {
+  id: string
+  name: string
+  enabled: number | boolean
+  interval: string
+  schedule_hour: number | null
+  schedule_minute: number | null
+  schedule_day: number | null
+  cron_expression: string | null
+  /** Name of the project the runs start in */
+  project: string | null
+  created_at: string
+  next_run_at: string | null
+}
+
+/** Row shape from data.db `workflow_runs` */
+export interface AutomationRunRow {
+  task_id: string
+  status: string
+  session_id: string | null
+  started_at: string
+  error_message: string | null
+  taken_over_at: string | null
+}
+
+export interface AutomationInput {
+  workflows: AutomationRow[]
+  runs: AutomationRunRow[]
+}
+
+const EMPTY_AUTOMATIONS: AutomationInput = { workflows: [], runs: [] }
+
+const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+const WEEKLY_DAYS = [
+  'Sundays',
+  'Mondays',
+  'Tuesdays',
+  'Wednesdays',
+  'Thursdays',
+  'Fridays',
+  'Saturdays'
+]
+
+/** 24-hour clock → "9:30 AM" */
+export function clock(hour: number, minute: number): string {
+  const h12 = hour % 12 === 0 ? 12 : hour % 12
+  return `${h12}:${String(minute).padStart(2, '0')} ${hour < 12 ? 'AM' : 'PM'}`
+}
+
+function describeDays(dow: string): string | null {
+  if (dow === '*') return 'Daily'
+  if (dow === '1-5') return 'Weekdays'
+  const days: number[] = []
+  for (const part of dow.split(',')) {
+    const range = /^(\d)(?:-(\d))?$/.exec(part)
+    if (!range) return null
+    const from = Number(range[1])
+    const to = range[2] === undefined ? from : Number(range[2])
+    if (from > 7 || to > 7 || to < from) return null
+    for (let d = from; d <= to; d++) days.push(d % 7)
+  }
+  return days.map((d) => DAY_NAMES[d]).join(', ')
+}
+
+/**
+ * Plain English for the simple cron shapes the Copilot app writes
+ * (fixed minute, listed hours, any day of month); null for anything fancier.
+ */
+export function describeCron(expr: string): string | null {
+  const parts = expr.trim().split(/\s+/)
+  if (parts.length !== 5) return null
+  const [min, hour, dom, month, dow] = parts
+  if (!/^\d{1,2}$/.test(min) || Number(min) > 59 || dom !== '*' || month !== '*') return null
+  const minute = Number(min)
+  if (hour === '*') return dow === '*' ? `Hourly at :${min.padStart(2, '0')}` : null
+  const hours = hour.split(',')
+  if (!hours.every((h) => /^\d{1,2}$/.test(h) && Number(h) <= 23)) return null
+  const days = describeDays(dow)
+  if (!days) return null
+  return `${days} at ${hours.map((h) => clock(Number(h), minute)).join(' & ')}`
+}
+
+export function describeSchedule(
+  row: Pick<
+    AutomationRow,
+    'interval' | 'schedule_hour' | 'schedule_minute' | 'schedule_day' | 'cron_expression'
+  >
+): string {
+  const cron = row.cron_expression?.trim()
+  if (cron) return describeCron(cron) ?? `Cron ${cron}`
+  const hour = row.schedule_hour ?? 9
+  const minute = row.schedule_minute ?? 0
+  switch (row.interval) {
+    case 'hourly':
+      return `Hourly at :${String(minute).padStart(2, '0')}`
+    case 'daily':
+      return `Daily at ${clock(hour, minute)}`
+    case 'weekly':
+      return `${WEEKLY_DAYS[(row.schedule_day ?? 1) % 7]} at ${clock(hour, minute)}`
+    default:
+      return 'Manual'
+  }
+}
+
+const RUN_STATUSES: readonly AutomationRunStatus[] = ['pending', 'running', 'completed', 'failed']
+
+/**
+ * Pull automation runs out of the yards: each run's session joins its
+ * automation instead. Automations show when enabled, or when a paused one
+ * still has a run inside the retention window.
+ */
+function assembleAutomations(
+  input: AutomationInput,
+  kept: Critter[]
+): { automations: Automation[]; owned: Set<string> } {
+  const known = new Set(input.workflows.map((w) => w.id))
+  const owner = new Map<string, string>()
+  const newest = new Map<string, AutomationRunRow>()
+  for (const run of input.runs) {
+    if (!known.has(run.task_id)) continue
+    const prev = newest.get(run.task_id)
+    if (!prev || run.started_at > prev.started_at) newest.set(run.task_id, run)
+    // A run you took over is your session now, so it stays in its yard
+    if (run.session_id && !run.taken_over_at) owner.set(run.session_id, run.task_id)
+  }
+
+  const runsOf = new Map<string, Critter[]>()
+  const owned = new Set<string>()
+  for (const c of kept) {
+    const id = owner.get(c.id)
+    if (!id) continue
+    owned.add(c.id)
+    runsOf.set(id, [...(runsOf.get(id) ?? []), c])
+  }
+
+  const automations = input.workflows
+    .filter((w) => Boolean(w.enabled) || runsOf.has(w.id))
+    .sort((a, b) => a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id))
+    .map((w): Automation => {
+      const last = newest.get(w.id)
+      const enabled = Boolean(w.enabled)
+      return {
+        id: w.id,
+        name: firstLine(w.name) || 'Automation',
+        enabled,
+        schedule: describeSchedule(w),
+        project: w.project || null,
+        nextRunAt: enabled ? w.next_run_at || null : null,
+        lastRun: last
+          ? {
+              // Statuses this build doesn't know read as a finished run
+              status: RUN_STATUSES.find((s) => s === last.status) ?? 'completed',
+              sessionId: last.session_id || null,
+              startedAt: last.started_at,
+              error: last.error_message ? firstLine(last.error_message).slice(0, 200) : null
+            }
+          : null,
+        runs: (runsOf.get(w.id) ?? []).sort((a, b) =>
+          b.lastActivityAt.localeCompare(a.lastActivityAt)
+        )
+      }
+    })
+  return { automations, owned }
+}
+
 export function assembleSnapshot(
   critters: Critter[],
   now: Date,
   warnings: string[] = [],
   completedByRepo: Record<string, number> = {},
   activityByRepo: Record<string, Record<string, number>> = {},
-  neighborhoods: NeighborhoodInput = EMPTY_NEIGHBORHOODS
+  neighborhoods: NeighborhoodInput = EMPTY_NEIGHBORHOODS,
+  automationInput: AutomationInput = EMPTY_AUTOMATIONS
 ): MenagerieSnapshot {
   const today = dayKey(now)
   const kept = critters.filter((c) => isLive(c.status) || isWithinRetention(c.lastActivityAt, now))
+  const { automations, owned } = assembleAutomations(automationInput, kept)
 
   const byRepo = new Map<string, Critter[]>()
   for (const c of kept) {
+    if (owned.has(c.id)) continue
     const list = byRepo.get(c.repository) ?? []
     list.push(c)
     byRepo.set(c.repository, list)
@@ -539,6 +735,7 @@ export function assembleSnapshot(
     yards: grouped,
     neighborhoods: groups,
     neighborhoodsConfigPath: neighborhoods.configPath,
+    automations,
     counts,
     warnings
   }

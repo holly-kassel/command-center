@@ -1,7 +1,22 @@
 import { useEffect, useRef, useState } from 'react'
-import type { Critter, MenagerieSnapshot } from '../../../../shared/types/menagerie'
-import { HOUSE_UPGRADE_THRESHOLDS, houseLevel } from '../../../../shared/types/menagerie'
-import { FONT, INK, PAPER, STATUS_COLOR, STATUS_LABEL, relativeTime, timeOfDay } from './format'
+import type { Automation, Critter, MenagerieSnapshot } from '../../../../shared/types/menagerie'
+import {
+  allCritters,
+  automationState,
+  HOUSE_UPGRADE_THRESHOLDS,
+  houseLevel
+} from '../../../../shared/types/menagerie'
+import {
+  AUTOMATION_STATE_COLOR,
+  FONT,
+  INK,
+  PAPER,
+  STATUS_COLOR,
+  STATUS_LABEL,
+  automationStatusShort,
+  relativeTime,
+  timeOfDay
+} from './format'
 import { drawNight } from './houseUpgrades'
 import { Btn, Row, Section } from './panel'
 import { PermissionCard } from './PermissionCard'
@@ -15,6 +30,7 @@ import {
   KATYA_PORTRAIT_SIZE,
   PROP_PALETTE,
   TREE,
+  decorationFor,
   drawGrid,
   drawShadow,
   gridSize
@@ -264,13 +280,14 @@ export function KatyaCloseUp({ snapshot, onClose, onOpenSession }: Props): React
     }
   }, [])
 
-  const { counts, yards, warnings, neighborhoods } = snapshot
+  const { counts, yards, warnings, neighborhoods, automations } = snapshot
   const totalTasks = yards.reduce((n, y) => n + y.completedTasks, 0)
   const upgraded = yards.filter((y) => houseLevel(y.completedTasks) >= 1).length
   const maxed = yards.filter(
     (y) => houseLevel(y.completedTasks) >= HOUSE_UPGRADE_THRESHOLDS.length
   ).length
-  const critters = yards.flatMap((y) => y.critters)
+  // Automation runs live in the square, but they still wait on you like anyone else
+  const critters = allCritters(snapshot)
   // Longest-waiting first — Katya herds you to whoever has been patient the longest.
   const needsYou = critters
     .filter((c) => c.status === 'waiting')
@@ -410,6 +427,19 @@ export function KatyaCloseUp({ snapshot, onClose, onOpenSession }: Props): React
           </Section>
         )}
 
+        {automations.length > 0 && (
+          <Section title="Town square automations">
+            {automations.map((a, i) => (
+              <AutomationRow
+                key={a.id}
+                automation={a}
+                index={i}
+                onOpen={(id) => onOpenSession(id)}
+              />
+            ))}
+          </Section>
+        )}
+
         {warnings.length > 0 && (
           <Section title="Warnings">
             {warnings.map((w, i) => (
@@ -428,6 +458,49 @@ export function KatyaCloseUp({ snapshot, onClose, onOpenSession }: Props): React
           </div>
         </Section>
       </aside>
+    </div>
+  )
+}
+
+function AutomationRow({
+  automation: a,
+  index,
+  onOpen
+}: {
+  automation: Automation
+  index: number
+  onOpen: (sessionId: string) => void
+}): React.JSX.Element {
+  const latest = a.lastRun?.sessionId ?? a.runs[0]?.id ?? null
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
+      <span>{decorationFor(index).sprite.icon}</span>
+      <span
+        style={{
+          width: 8,
+          height: 8,
+          flexShrink: 0,
+          background: AUTOMATION_STATE_COLOR[automationState(a)],
+          border: `1px solid ${INK}`
+        }}
+      />
+      <span
+        style={{
+          flex: 1,
+          minWidth: 0,
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap'
+        }}
+        title={`${a.name} · ${a.schedule}`}
+      >
+        {a.name} <span style={{ opacity: 0.6 }}>· {automationStatusShort(a)}</span>
+      </span>
+      {latest && (
+        <span style={{ flexShrink: 0 }}>
+          <Btn onClick={() => onOpen(latest)}>Last run</Btn>
+        </span>
+      )}
     </div>
   )
 }

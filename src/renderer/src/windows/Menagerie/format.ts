@@ -1,8 +1,11 @@
 import type {
+  Automation,
+  AutomationState,
   CritterStatus,
   PendingPermission,
   PermissionKind
 } from '../../../../shared/types/menagerie'
+import { automationState, dayKey, shiftDay } from '../../../../shared/types/menagerie'
 
 export const FONT = 'ui-monospace, Menlo, monospace'
 export const INK = '#2a2320'
@@ -33,6 +36,51 @@ export function relativeTime(iso: string, now = Date.now()): string {
   if (h < 24) return `${h}h ago`
   const d = Math.floor(h / 24)
   return `${d}d ago`
+}
+
+export const AUTOMATION_STATE_LABEL: Record<AutomationState, string> = {
+  waiting: 'Needs you',
+  running: 'Running now',
+  failed: 'Last run failed',
+  paused: 'Paused',
+  idle: 'Idle'
+}
+
+export const AUTOMATION_STATE_COLOR: Record<AutomationState, string> = {
+  waiting: '#ffd84d',
+  running: '#43c466',
+  failed: '#e5484d',
+  paused: '#8a8f99',
+  idle: '#9fb7ff'
+}
+
+/** A calendar-ish time: "today 4:30 PM", "tomorrow 9:00 AM", "Mon 8:00 AM", "Oct 20 9:00 AM" */
+export function whenLabel(iso: string, now = new Date()): string {
+  const t = new Date(iso)
+  if (Number.isNaN(t.getTime())) return iso
+  const time = t.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+  const day = dayKey(t)
+  const today = dayKey(now)
+  if (day === today) return `today ${time}`
+  if (day === shiftDay(today, 1)) return `tomorrow ${time}`
+  if (day === shiftDay(today, -1)) return `yesterday ${time}`
+  if (Math.abs(t.getTime() - now.getTime()) < 6 * 86_400_000) {
+    return `${t.toLocaleDateString([], { weekday: 'short' })} ${time}`
+  }
+  return `${t.toLocaleDateString([], { month: 'short', day: 'numeric' })} ${time}`
+}
+
+/** "next today 4:30 PM", or "due …" once the scheduled time has passed */
+export function nextRunLabel(iso: string, now = new Date()): string {
+  const overdue = Date.parse(iso) < now.getTime()
+  return `${overdue ? 'due' : 'next'} ${whenLabel(iso, now)}`
+}
+
+/** One-line status for a decoration label or list row: "running now", "next today 4:30 PM", … */
+export function automationStatusShort(a: Automation, now = new Date()): string {
+  const state = automationState(a)
+  if (state === 'idle' && a.nextRunAt) return nextRunLabel(a.nextRunAt, now)
+  return AUTOMATION_STATE_LABEL[state].toLowerCase()
 }
 
 export type DayPhase = 'day' | 'dusk' | 'night' | 'dawn'

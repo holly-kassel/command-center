@@ -1,12 +1,31 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { selectCritter, selectZoomedYard, useMenagerieStore } from '../../store/menagerieStore'
+import {
+  selectCritter,
+  selectNapYard,
+  selectZoomedYard,
+  useMenagerieStore
+} from '../../store/menagerieStore'
 import { MenagerieCanvas, type ScreenAnchor } from './MenagerieCanvas'
 import { SpeechBubble } from './SpeechBubble'
+import { AutomationBubble } from './AutomationBubble'
 import { YardCloseUp } from './YardCloseUp'
+import { NapCloseUp } from './NapCloseUp'
 import { KatyaCloseUp } from './KatyaCloseUp'
 import { COLLAR_COLORS } from './sprites'
 
 const FONT = 'ui-monospace, Menlo, monospace'
+
+/** Moves an absolutely positioned bubble to follow its anchor, without re-rendering React */
+function followAnchor(el: HTMLDivElement | null, a: ScreenAnchor | null): void {
+  if (!el) return
+  if (!a) {
+    el.style.visibility = 'hidden'
+    return
+  }
+  el.style.visibility = 'visible'
+  el.style.left = `${a.x}px`
+  el.style.top = `${a.y}px`
+}
 
 export function MenagerieWindow(): React.JSX.Element {
   const snapshot = useMenagerieStore((s) => s.snapshot)
@@ -15,14 +34,19 @@ export function MenagerieWindow(): React.JSX.Element {
   const selectedId = useMenagerieStore((s) => s.selectedId)
   const selected = useMenagerieStore(selectCritter)
   const select = useMenagerieStore((s) => s.select)
+  const focusedAutomationId = useMenagerieStore((s) => s.focusedAutomationId)
+  const focusAutomation = useMenagerieStore((s) => s.focusAutomation)
   const zoomedYard = useMenagerieStore(selectZoomedYard)
   const zoom = useMenagerieStore((s) => s.zoom)
+  const napYard = useMenagerieStore(selectNapYard)
+  const openNap = useMenagerieStore((s) => s.openNap)
   const katyaOpen = useMenagerieStore((s) => s.katyaOpen)
   const openKatya = useMenagerieStore((s) => s.openKatya)
   const connect = useMenagerieStore((s) => s.connect)
   const refresh = useMenagerieStore((s) => s.refresh)
 
   const bubbleRef = useRef<HTMLDivElement>(null)
+  const automationBubbleRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => connect(), [connect])
 
@@ -31,26 +55,24 @@ export function MenagerieWindow(): React.JSX.Element {
       if (e.key !== 'Escape') return
       const st = useMenagerieStore.getState()
       if (st.katyaOpen) openKatya(false)
+      else if (st.napRepo) openNap(null)
       else if (st.zoomedRepo) zoom(null)
       else select(null)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [select, zoom, openKatya])
+  }, [select, zoom, openNap, openKatya])
 
-  const onAnchor = useCallback((a: ScreenAnchor | null) => {
-    const el = bubbleRef.current
-    if (!el) return
-    if (!a) {
-      el.style.visibility = 'hidden'
-      return
-    }
-    el.style.visibility = 'visible'
-    el.style.left = `${a.x}px`
-    el.style.top = `${a.y}px`
-  }, [])
+  const onAnchor = useCallback((a: ScreenAnchor | null) => followAnchor(bubbleRef.current, a), [])
+  const onAutomationAnchor = useCallback(
+    (a: ScreenAnchor | null) => followAnchor(automationBubbleRef.current, a),
+    []
+  )
 
   const counts = snapshot?.counts
+  const automations = snapshot?.automations ?? []
+  const focusedIndex = automations.findIndex((a) => a.id === focusedAutomationId)
+  const focusedAutomation = focusedIndex >= 0 ? automations[focusedIndex] : null
 
   return (
     <div
@@ -127,6 +149,10 @@ export function MenagerieWindow(): React.JSX.Element {
           onAnchor={onAnchor}
           onZoom={zoom}
           onKatya={() => openKatya(true)}
+          onNap={openNap}
+          selectedAutomationId={focusedAutomationId}
+          onSelectAutomation={focusAutomation}
+          onAutomationAnchor={onAutomationAnchor}
         />
 
         {selected && (
@@ -138,7 +164,18 @@ export function MenagerieWindow(): React.JSX.Element {
           />
         )}
 
+        {focusedAutomation && (
+          <AutomationBubble
+            key={focusedAutomation.id}
+            ref={automationBubbleRef}
+            automation={focusedAutomation}
+            index={focusedIndex}
+            onClose={() => focusAutomation(null)}
+          />
+        )}
+
         {zoomedYard && <YardCloseUp yard={zoomedYard} onClose={() => zoom(null)} />}
+        {napYard && <NapCloseUp yard={napYard} onClose={() => openNap(null)} />}
         {katyaOpen && snapshot && (
           <KatyaCloseUp
             snapshot={snapshot}
@@ -149,7 +186,7 @@ export function MenagerieWindow(): React.JSX.Element {
 
         {loading && !snapshot && <Overlay>Waking up the puppies and kittens…</Overlay>}
         {error && <Overlay tone="error">{error}</Overlay>}
-        {snapshot && snapshot.yards.length === 0 && (
+        {snapshot && snapshot.yards.length === 0 && automations.length === 0 && (
           <Overlay>
             No Copilot sessions in the last 24 hours.
             <br />
@@ -174,9 +211,9 @@ export function MenagerieWindow(): React.JSX.Element {
         <Legend color={COLLAR_COLORS.autopilot} label="Autopilot collar" />
         <Legend color={COLLAR_COLORS.unknown} label="Unknown collar" />
         <span style={{ opacity: 0.6 }}>
-          🐶 digs / 🐱 yarn = working · ? = waiting · zz = idle/done · ♥♪ = playing · click a
-          critter to open its session · click a cottage to zoom in · click Katya for the town report
-          · finished tasks upgrade the cottage
+          🐶 digs / 🐱 yarn = working · ? = waiting · z on a cat tree or dog house = napping (click
+          for the list) · lamps, bells, flags & pinwheels in the square = automations · click a
+          critter, cottage or Katya to open it · finished tasks upgrade the cottage
         </span>
         <div style={{ flex: 1 }} />
         <NotificationsToggle />

@@ -908,3 +908,42 @@ test('sim: only working and waiting critters roam; one that goes idle walks home
   const i = state.actors.get('i')
   assert.ok(i.x >= roam.x && i.x <= roam.x + roam.w && i.y >= roam.y && i.y <= roam.y + roam.h)
 })
+
+test('sprites: critters keep their size, every coat colours every pixel, and outlines are closed', () => {
+  const sets = [
+    ['puppy', sprites.PUPPY, sprites.PUPPY_PORTRAIT, sprites.PUPPY_COATS],
+    ['kitten', sprites.KITTEN, sprites.KITTEN_PORTRAIT, sprites.KITTEN_COATS]
+  ]
+  // Like Katya, fur that meets open air is outlined; dirt, yarn and the ground row are exempt
+  const openFur = (grid) => {
+    const at = (r, c) =>
+      r < 0 || c < 0 || c >= grid[0].length ? '.' : r >= grid.length ? 'G' : grid[r][c]
+    const gaps = []
+    grid.forEach((row, r) =>
+      [...row].forEach((ch, c) => {
+        if ('.Dxp'.includes(ch)) return
+        const near = [at(r - 1, c), at(r + 1, c), at(r, c - 1), at(r, c + 1)]
+        if (near.includes('.')) gaps.push(`row ${r} col ${c}`)
+      })
+    )
+    return gaps
+  }
+  for (const [name, set, portraits, coats] of sets) {
+    const frames = Object.values(set).flat()
+    for (const g of frames)
+      assert.deepEqual(sprites.gridSize(g), { ...sprites.CRITTER_SIZE }, `${name} frame size`)
+    for (const g of portraits)
+      assert.deepEqual(sprites.gridSize(g), { ...sprites.PORTRAIT_SIZE }, `${name} portrait size`)
+    for (const g of [...frames, ...portraits]) {
+      for (const row of g) assert.equal(row.length, g[0].length, `${name}: ragged row`)
+      assert.deepEqual(openFur(g), [], `${name}: outline has gaps`)
+    }
+    coats.forEach((coat, i) => {
+      const palette = { ...sprites.PROP_PALETTE, ...coat, c: sprites.COLLAR_COLORS.cli }
+      for (const g of [...frames, ...portraits]) {
+        for (const ch of g.join(''))
+          if (ch !== '.') assert.ok(palette[ch], `${name} coat ${i}: no colour for '${ch}'`)
+      }
+    })
+  }
+})

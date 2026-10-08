@@ -6,13 +6,15 @@
  * them horizontally when a critter walks left.
  *
  * Palette keys:
- *   b  base coat         d  dark coat (shading)     l  light coat (highlight)
- *   w  white (muzzle)    e  eye                     n  nose
- *   p  pink (ear, yarn)  c  collar                  x  accent (dirt, zzz)
+ *   D  outline           b  base coat               d  dark coat (ears, markings)
+ *   l  light coat        w  white (muzzle, chest)   e  eye
+ *   n  nose              p  pink (ears, tongue)     c  collar
+ *   x  accent (dirt)
  *
- * Critters are 12×12 in a Stardew-style 3/4 chibi view (big round head,
- * tucked body, stubby legs) with no hard outline — shading comes from the
- * dark coat tone and a ground shadow drawn by the canvas.
+ * Critters are 12×12 front-facing chibis drawn like Katya: a 1px outline in
+ * the coat's darkest tone around the whole silhouette, a big head with wide-set
+ * eyes, and a ground shadow drawn by the canvas. Puppies have floppy ears and
+ * their tongue out; kittens have pink-lined ears, a pink nose and rosy cheeks.
  */
 
 export type Grid = readonly string[]
@@ -26,100 +28,83 @@ export interface SpriteSet {
   sleep: Grid[]
 }
 
-// ── Puppy (12×12, 3/4 chibi view) ───────────────────────────────
+// ── Puppy (12×12, front-facing chibi) ───────────────────────────
 
 export const CRITTER_SIZE = { w: 12, h: 12 } as const
 export const KATYA_SIZE = { w: 16, h: 14 } as const
 
+/** Floppy-eared head shared by every upright puppy frame, tongue out */
+const PUPPY_HEAD: Grid = [
+  '...DDDDDD...',
+  '..DbbllbbD..',
+  '.DdbbbbbbdD.',
+  'DddbebbebddD',
+  'DddbbwwbbddD',
+  '.DdbwnnwbdD.',
+  '..DbwppwbD..'
+]
+
 const PUPPY_STAND: Grid = [
-  '............',
-  '....lllbb...',
-  '..dbbbbbbbbd',
-  '.ddbbbbbbbbd',
-  '.ddbbebbbebd',
-  '..dbbbwnwbb.',
-  '...bbbwwwb..',
-  '...dcccccd..',
-  '..dbbbbbbbb.',
-  '.dbbbbbbbbd.',
-  '...bb..bb...',
-  '...dd..dd...'
+  ...PUPPY_HEAD,
+  'DD.DccccD...',
+  'DbDbbwwbbD..',
+  '.DbbbwwbbbD.',
+  '..DbbDDbbD..',
+  '..DwwDDwwD..'
 ]
 
+// Waddle: legs splay and the tail swings down
 const PUPPY_WALK_2: Grid = [
-  '....lllbb...',
-  '..dbbbbbbbbd',
-  '.ddbbbbbbbbd',
-  '.ddbbebbbebd',
-  '..dbbbwnwbb.',
-  '...bbbwwwb..',
-  '...dcccccd..',
-  '..dbbbbbbbb.',
-  '.dbbbbbbbbd.',
-  '..bb....bb..',
-  '..bb....bb..',
-  '..dd....dd..'
+  ...PUPPY_HEAD,
+  '...DccccD...',
+  'DDDbbwwbbD..',
+  'DbbbbwwbbbD.',
+  '.DbbDDDDbbD.',
+  '.DwwD..DwwD.'
 ]
 
-// Digging: rump up on the left, nose down on the right, dirt flying behind
+// Digging: paws take turns scraping a hole while dirt flies out to the side
 const PUPPY_DIG_1: Grid = [
-  '............',
-  '.d..........',
-  '.dbbbbbb....',
-  '.bbbbbbbbbd.',
-  '.bbbccbbbbbd',
-  '..bbbbbbebbd',
-  '..bb.dbbbbbd',
-  '..bb.dbbwnwd',
-  '..dd.dbbwwd.',
-  '.x...dd.dd..',
-  'x.x.........',
-  '............'
+  ...PUPPY_HEAD,
+  'DD.DccccD..x',
+  'DbDbbwwbbDx.',
+  '.DbbbwwbbbD.',
+  '..DbDwwDbD..',
+  '..DwDxxDDD..'
 ]
 
 const PUPPY_DIG_2: Grid = [
-  '............',
-  '..d.........',
-  '.dbbbbbb....',
-  '.bbbbbbbbbd.',
-  '.bbbccbbbbbd',
-  '..bbbbbbebbd',
-  '..bb.dbbbbbd',
-  '..bb.dbbwnwd',
-  '..dd.dbbwwd.',
-  '...x.dd.dd..',
-  '.x.x........',
-  'x...........'
+  ...PUPPY_HEAD,
+  'x..DccccD...',
+  'DxDbbwwbbD..',
+  '.DbbbwwbbbD.',
+  '..DbDwwDbD..',
+  '..DDDxxDwD..'
 ]
 
 const PUPPY_SIT: Grid = [
-  '............',
-  '....lllbb...',
-  '..dbbbbbbbbd',
-  '.ddbbbbbbbbd',
-  '.ddbbebbbebd',
-  '..dbbbwnwbb.',
-  '...bbbwwwb..',
-  '...dcccccd..',
-  '..bbbbwwbbb.',
-  '.dbbbbwwbbbb',
-  '.dbbbbbbbbbb',
-  '..dd..dd.dd.'
+  ...PUPPY_HEAD,
+  '...DccccD...',
+  '..DbbwwbbD..',
+  '.DbbbwwbbbD.',
+  'DdbbDwwDbbbD',
+  '.DDDDwwDDDD.'
 ]
 
+// Curled up asleep facing right: ear draped over the head, eyes shut, chin on paws
 const PUPPY_SLEEP: Grid = [
   '............',
   '............',
   '............',
   '............',
-  '............',
-  '....bbbbb...',
-  '..bbbbbbbbd.',
-  '.bbbbbbbbbbd',
-  '.bbcccbbbddd',
-  '.bbbbbbbbdbd',
-  '.dbbbbbbbwnd',
-  '..ddddddddd.'
+  '......DDDD..',
+  '..DDDDbbbbD.',
+  '.DbbbDddbbbD',
+  'DbbbbDddbbbD',
+  'DbbbbcDdDbbD',
+  'DbbbbcbbbwwD',
+  'DddbbcbwwwnD',
+  '.DDDDDDDDDD.'
 ]
 
 export const PUPPY: SpriteSet = {
@@ -130,97 +115,79 @@ export const PUPPY: SpriteSet = {
   sleep: [PUPPY_SLEEP]
 }
 
-// ── Kitten (12×12, 3/4 chibi view) ──────────────────────────────
+// ── Kitten (12×12, front-facing chibi) ──────────────────────────
+
+/** Pointy-eared head shared by every upright kitten frame: pink ears and nose, rosy cheeks */
+const KITTEN_HEAD: Grid = [
+  '..D......D..',
+  '.DpD....DpD.',
+  '.DppDDDDppD.',
+  '.DbbbllbbbD.',
+  '.DbebbbbebD.',
+  '.DpbbnnbbpD.',
+  '..DbbwwbbD..'
+]
 
 const KITTEN_STAND: Grid = [
-  '............',
-  '...d...d....',
-  '...dpbbpd...',
-  '...blbbbbb..',
-  '...bebbebb..',
-  '...bbbwnwb..',
-  '....bbwwb...',
-  '....cccc....',
-  '.d.bbbbbbb..',
-  '.dbbbbbbbbd.',
-  '...bb...bb..',
-  '...dd...dd..'
+  ...KITTEN_HEAD,
+  'DD.DccccD...',
+  'DdDbbwwbbD..',
+  '.DDbbwwbbD..',
+  '..DbDDDDbD..',
+  '..DwD..DwD..'
 ]
 
 const KITTEN_WALK_2: Grid = [
-  '...d...d....',
-  '...dpbbpd...',
-  '...blbbbbb..',
-  '...bebbebb..',
-  '...bbbwnwb..',
-  '....bbwwb...',
-  '....cccc....',
-  '..d.bbbbbbb.',
-  '.dbbbbbbbbd.',
-  '..bb....bb..',
-  '..bb....bb..',
-  '..dd....dd..'
+  ...KITTEN_HEAD,
+  'DD.DccccD...',
+  'DdDbbwwbbD..',
+  'DDDbbwwbbD..',
+  '.DbDDDDDDbD.',
+  '.DwD....DwD.'
 ]
 
-// Batting a pink ball of yarn
+// Batting a pink ball of yarn (with a loose thread) back and forth
 const KITTEN_PLAY_1: Grid = [
-  '............',
-  '...d...d....',
-  '...dpbbpd...',
-  '...blbbbbb..',
-  '...bebbebb..',
-  '...bbbwnwb..',
-  '....bbwwb...',
-  '....cccc....',
-  '.d.bbbbbbb..',
-  '.dbbbbbbbbbb',
-  '...bb..bb.pp',
-  '...dd..dd.pp'
+  ...KITTEN_HEAD,
+  'DD.DccccD...',
+  'DdDbbwwbbDD.',
+  '.DDbbwwbbDwD',
+  '..DbDDDDbDDp',
+  '..DwD..DwDpp'
 ]
 
 const KITTEN_PLAY_2: Grid = [
-  '............',
-  '...d...d....',
-  '...dpbbpd...',
-  '...blbbbbb..',
-  '...bebbebb..',
-  '...bbbwnwb..',
-  '....bbwwb...',
-  '....cccc....',
-  '.d.bbbbbbb..',
-  '.dbbbbbbbbbb',
-  '...bb..bb..b',
-  '...dd..ddpp.'
+  ...KITTEN_HEAD,
+  'DD.DccccD...',
+  'DdDbbwwbbD..',
+  '.DDbbwwbbbD.',
+  '..DbDDDDbDwD',
+  '..DwD..DwDpp'
 ]
 
 const KITTEN_SIT: Grid = [
-  '............',
-  '...d...d....',
-  '...dpbbpd...',
-  '...blbbbbb..',
-  '...bebbebb..',
-  '...bbbwnwb..',
-  '....bbwwb...',
-  '....cccc....',
-  '...bbbwwbb..',
-  '..bbbbwwbbb.',
-  '.dbbbbbbbbb.',
-  'dd.dd...dd..'
+  ...KITTEN_HEAD,
+  '...DccccD...',
+  '..DbbwwbbD..',
+  '.DbbbwwbbbD.',
+  'DdDbbwwbbbD.',
+  'DddDwwDwwDD.'
 ]
 
+// Curled into a loaf facing right: ears up, eyes shut, tail tucked round the front
 const KITTEN_SLEEP: Grid = [
   '............',
   '............',
   '............',
   '............',
-  '............',
-  '.........d.d',
-  '....bbbbbdpd',
-  '..bbbbbbbbbb',
-  '.bbcccbbbbbb',
-  '.bbbbbbbbdbd',
-  '.dbbbbbbbwnb',
-  '..dddddddddd'
+  '.......D..D.',
+  '......DpDDpD',
+  '..DDDDDbbbbD',
+  '.DbbbbcbDbDD',
+  'DbbbbbcbbnbD',
+  'DdbbbbcbbbbD',
+  'DddDDDDDDDD.',
+  '.DD.........'
 ]
 
 export const KITTEN: SpriteSet = {
@@ -231,118 +198,89 @@ export const KITTEN: SpriteSet = {
   sleep: [KITTEN_SLEEP]
 }
 
-// ── Portraits (24×24) — close-up view, bigger head, sparkly eyes ──
+// ── Portraits (24×24) — close-up view, bigger head, shiny eyes ──
 
 export const PORTRAIT_SIZE = { w: 24, h: 24 } as const
 
 const PUPPY_PORTRAIT_1: Grid = [
   '........................',
-  '........................',
-  '......llllbbbb..........',
-  '....ddbbbbbbbbbbd.......',
-  '...ddbbbbbbbbbbbbbd.....',
-  '..dddbbbbbbbbbbbbbbd....',
-  '..dddbbbbbbbbbbbbbbbd...',
-  '..ddbbbbbbbbbbbbbbbbd...',
-  '..ddbbbbeebbbbbbeebbd...',
-  '..ddbbbbewbbbbbbewbbd...',
-  '...dbbbbeebbbbbbeebbd...',
-  '...dbbbbbbbbwwwwbbbbd...',
-  '....bbbbbbbwwnnwwbbb....',
-  '....dbbbbbbwwwwwwbb.....',
-  '.....dbbbbbbwwwwbbb.....',
-  '......dbbccccccccbd.....',
-  '.....dbbbbbbbbbbbbbd....',
-  '....dbbbbbbbbbbbbbbbd...',
-  '...dbbbbbbbbbbbbbbbbbd..',
-  '...dbbbbbbbbbbbbbbbbbd..',
-  '....bbbbbbbbbbbbbbbbb...',
-  '.....bbbb......bbbb.....',
-  '.....bbbb......bbbb.....',
-  '.....dddd......dddd.....'
+  '........DDDDDDDD........',
+  '......DDbbbllbbbDD......',
+  '.....DdbbbbbbbbbbdD.....',
+  '....DdddbbbbbbbbdddD....',
+  '...DddddbbbbbbbbddddD...',
+  '...DddddbewbbbewbddddD..',
+  '...DddddbeebbbeebddddD..',
+  '...DddddbbbwwwbbbddddD..',
+  '...DddddbpwwnnwwpbdddD..',
+  '....DdddbbwwwwwwbbddD...',
+  '.....DDDbbDwppwDbbDD....',
+  '.......DbbbDppDbbbD.....',
+  '..D.....DccccccccD......',
+  '.DbD...DbbbwwwwbbbD.....',
+  '.DbbD.DbbbbwwwwbbbbD....',
+  '..DbbDbbbbbwwwwbbbbbD...',
+  '...DbbbbbbbwwwwbbbbbD...',
+  '....DbbbbbbbbbbbbbbbD...',
+  '.....DbbbbbbbbbbbbbD....',
+  '.....DbbbDDDDDDbbbD.....',
+  '.....DbbbD....DbbbD.....',
+  '.....DwwwD....DwwwD.....',
+  '.....DDDDD....DDDDD.....'
 ]
 
 // Blink + tail wag
 const PUPPY_PORTRAIT_2: Grid = [
-  '........................',
-  '........................',
-  '......llllbbbb..........',
-  '....ddbbbbbbbbbbd.......',
-  '...ddbbbbbbbbbbbbbd.....',
-  '..dddbbbbbbbbbbbbbbd....',
-  '..dddbbbbbbbbbbbbbbbd...',
-  '..ddbbbbbbbbbbbbbbbbd...',
-  '..ddbbbbbbbbbbbbbbbbd...',
-  '..ddbbbbeebbbbbbeebbd...',
-  '...dbbbbbbbbbbbbbbbbd...',
-  '...dbbbbbbbbwwwwbbbbd...',
-  '....bbbbbbbwwnnwwbbb....',
-  '....dbbbbbbwwwwwwbb.....',
-  '.....dbbbbbbwwwwbbb.....',
-  '......dbbccccccccbd.....',
-  '.....dbbbbbbbbbbbbbd....',
-  '....dbbbbbbbbbbbbbbbddb.',
-  '...dbbbbbbbbbbbbbbbbbdb.',
-  '...dbbbbbbbbbbbbbbbbbd..',
-  '....bbbbbbbbbbbbbbbbb...',
-  '.....bbbb......bbbb.....',
-  '.....bbbb......bbbb.....',
-  '.....dddd......dddd.....'
+  ...PUPPY_PORTRAIT_1.slice(0, 6),
+  '...DddddbbbbbbbbbddddD..',
+  '...DddddbDDbbbDDbddddD..',
+  ...PUPPY_PORTRAIT_1.slice(8, 13),
+  '........DccccccccD......',
+  'DD.....DbbbwwwwbbbD.....',
+  'DbDD..DbbbbwwwwbbbbD....',
+  '.DbbDDbbbbbwwwwbbbbbD...',
+  '..DDbbbbbbbwwwwbbbbbD...',
+  ...PUPPY_PORTRAIT_1.slice(18)
 ]
 
 const KITTEN_PORTRAIT_1: Grid = [
-  '........................',
-  '....d..........d........',
-  '....dd........dd........',
-  '....dpd......dpd........',
-  '....dppd....dppd........',
-  '....dbppbbbbppbbd.......',
-  '...dbbbbbbbbbbbbbd......',
-  '..dbbbbbbbbbbbbbbbd.....',
-  '..dbbbbbbbbbbbbbbbbd....',
-  '..dbbbeebbbbbbeebbbd....',
-  '..dbbbewbbbbbbewbbbd....',
-  '..dbbbeebbbbbbeebbbd....',
-  '..dbbbbbbbwwwwbbbbbd....',
-  '...dbbbbbwwpnwwbbbd.....',
-  '...dbbbbbwwwwwwbbbd.....',
-  '....dbbbbbwwwwbbbd......',
-  '.....dbccccccccbd.......',
-  '....dbbbbbbbbbbbbd......',
-  '...dbbbbbbbbbbbbbbd.....',
-  '...dbbbbbbbbbbbbbbd.d...',
-  '...dbbbbbbbbbbbbbbddb...',
-  '....bbbb......bbbbbbd...',
-  '....bbbb......bbbb......',
-  '....dddd......dddd......'
+  '....D............D......',
+  '....DD..........DD......',
+  '....DpD........DpD......',
+  '....DppD......DppD......',
+  '....DpppDDDDDDpppD......',
+  '...DbbppbbllbbppbbD.....',
+  '..DbbbbbbbbbbbbbbbbD....',
+  '..DbbbbbbbbbbbbbbbbD....',
+  '..DbbbewbbbbbbewbbbD....',
+  '..DbbbeebbbbbbeebbbD....',
+  'DD.DbbeebbbbbbeebbD.DD..',
+  '..DbpbbbbbnnbbbbpbbD....',
+  'DDDDbpbbbwDDwbbbpbDDDD..',
+  '....DbbbbbwwbbbbbD......',
+  '.....DDccccccccDD.....D.',
+  '....DbbbbwwwwbbbbD...DdD',
+  '...DbbbbbwwwwbbbbbD..DdD',
+  '...DbbbbbwwwwbbbbbD.DdD.',
+  '...DbbbbbbbbbbbbbbbDDdD.',
+  '...DbbbbbbbbbbbbbbbbddD.',
+  '....DbbbbbbbbbbbbbbbDD..',
+  '....DbbbDDDDDDDDbbbD....',
+  '....DwwwD......DwwwD....',
+  '....DDDDD......DDDDD....'
 ]
 
 // Blink + tail curl
 const KITTEN_PORTRAIT_2: Grid = [
-  '........................',
-  '....d..........d........',
-  '....dd........dd........',
-  '....dpd......dpd........',
-  '....dppd....dppd........',
-  '....dbppbbbbppbbd.......',
-  '...dbbbbbbbbbbbbbd......',
-  '..dbbbbbbbbbbbbbbbd.....',
-  '..dbbbbbbbbbbbbbbbbd....',
-  '..dbbbbbbbbbbbbbbbbd....',
-  '..dbbbeebbbbbbeebbbd....',
-  '..dbbbbbbbbbbbbbbbbd....',
-  '..dbbbbbbbwwwwbbbbbd....',
-  '...dbbbbbwwpnwwbbbd.....',
-  '...dbbbbbwwwwwwbbbd.....',
-  '....dbbbbbwwwwbbbd......',
-  '.....dbccccccccbd.......',
-  '....dbbbbbbbbbbbbd......',
-  '...dbbbbbbbbbbbbbbd.....',
-  '...dbbbbbbbbbbbbbbd.....',
-  '...dbbbbbbbbbbbbbbbdd...',
-  '....bbbb......bbbbbbd...',
-  '....bbbb......bbbbd.....',
-  '....dddd......dddd......'
+  ...KITTEN_PORTRAIT_1.slice(0, 8),
+  '..DbbbbbbbbbbbbbbbbD....',
+  '..DbbbDDbbbbbbDDbbbD....',
+  'DD.DbbbbbbbbbbbbbbD.DD..',
+  ...KITTEN_PORTRAIT_1.slice(11, 14),
+  '.....DDccccccccDD.......',
+  '....DbbbbwwwwbbbbD...DD.',
+  '...DbbbbbwwwwbbbbbD.DddD',
+  ...KITTEN_PORTRAIT_1.slice(17)
 ]
 
 export const PUPPY_PORTRAIT: Grid[] = [
@@ -884,78 +822,86 @@ export const BANG_PALETTE: Palette = { X: '#e5484d' }
 
 export const PUPPY_COATS: Palette[] = [
   {
-    b: '#c98b4e',
-    d: '#8a5a2a',
-    l: '#e0b07a',
-    w: '#f6e8d3',
-    e: '#1a1a1a',
+    D: '#5a3416',
+    b: '#d4955a',
+    d: '#a8682f',
+    l: '#ecc08c',
+    w: '#fbf0de',
+    e: '#1e1410',
     n: '#2a1a12',
-    p: '#e8a0a0'
+    p: '#f08a9a'
   }, // golden
   {
-    b: '#4a3b35',
-    d: '#2e221e',
-    l: '#6a5750',
-    w: '#d8cfc8',
-    e: '#f2f2f2',
-    n: '#000000',
-    p: '#c98888'
+    D: '#24160e',
+    b: '#7a543c',
+    d: '#553826',
+    l: '#9a7258',
+    w: '#eadccc',
+    e: '#140e0c',
+    n: '#0e0a08',
+    p: '#f08a9a'
   }, // chocolate
   {
-    b: '#e9e2d8',
-    d: '#b5a99a',
+    D: '#7c6a56',
+    b: '#eee6da',
+    d: '#c9b8a2',
     l: '#ffffff',
     w: '#ffffff',
-    e: '#1a1a1a',
-    n: '#2a2a2a',
-    p: '#f0b0b0'
+    e: '#2a201a',
+    n: '#3a2a22',
+    p: '#f4a0ac'
   }, // cream
   {
-    b: '#8a8f99',
-    d: '#5a5f6b',
-    l: '#aab0ba',
-    w: '#e3e6ec',
-    e: '#1a1a1a',
-    n: '#111111',
-    p: '#e0a0a8'
+    D: '#30343e',
+    b: '#8e94a0',
+    d: '#646a78',
+    l: '#b4bac6',
+    w: '#e8ebf0',
+    e: '#16181c',
+    n: '#1a1c22',
+    p: '#f08a9a'
   } // blue-gray
 ]
 
 export const KITTEN_COATS: Palette[] = [
   {
-    b: '#e07a3e',
-    d: '#a0501f',
-    l: '#f0a070',
-    w: '#fff0e0',
-    e: '#2f8f3a',
-    n: '#d06070',
-    p: '#f0a0a0'
+    D: '#5e2a0c',
+    b: '#e8843f',
+    d: '#b0571c',
+    l: '#f6ae78',
+    w: '#fff3e6',
+    e: '#2d7d36',
+    n: '#e07080',
+    p: '#f6a8b4'
   }, // orange tabby
   {
-    b: '#2b2b33',
-    d: '#16161c',
-    l: '#4a4a55',
-    w: '#dcdce4',
-    e: '#e6c84a',
-    n: '#5a4a52',
-    p: '#a07080'
+    D: '#0c0c10',
+    b: '#30303a',
+    d: '#1c1c24',
+    l: '#50505e',
+    w: '#e2e2ea',
+    e: '#f0d050',
+    n: '#d07888',
+    p: '#d890a0'
   }, // black
   {
-    b: '#9b9ba8',
-    d: '#6a6a7a',
-    l: '#c0c0cc',
-    w: '#f0f0f6',
-    e: '#5fb0d8',
-    n: '#c48090',
-    p: '#f0b0b8'
+    D: '#363846',
+    b: '#a0a2b0',
+    d: '#74768a',
+    l: '#c8cad6',
+    w: '#f4f4f8',
+    e: '#4aa8dc',
+    n: '#e08898',
+    p: '#f6b4c0'
   }, // gray
   {
-    b: '#f0e6d2',
-    d: '#b8a888',
-    l: '#fff8ea',
+    D: '#5e4a34',
+    b: '#f2e8d4',
+    d: '#7a5c44',
+    l: '#fffaee',
     w: '#ffffff',
-    e: '#4a90d0',
-    n: '#d08090',
+    e: '#3a88d6',
+    n: '#d07888',
     p: '#f6b8c0'
   } // cream siamese-ish
 ]

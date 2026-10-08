@@ -296,12 +296,12 @@ export const KITTEN_PORTRAIT: Grid[] = [
   KITTEN_PORTRAIT_2
 ]
 
-// ── Katya (Samoyed, 16×14) — still the big fluffy boss ───────────
+// ── Katya (Samoyed, 16×14) — still the big fluffy boss, teal bow on her ear ──
 
 const KATYA_1: Grid = [
-  '...dd......dd...',
-  '..dpdbbbbbbdpd..',
-  '..dbbbbbbbbbbd..',
+  '...dd......vv.vv',
+  '..dpdbbbbbbvvVvv',
+  '..dbbbbbbbbvvdvv',
   '.dbbbebbbbbebbd.',
   '.dbbbbbbwwwbbbd.',
   '.dbbbbbwwnwwbbd.',
@@ -316,9 +316,9 @@ const KATYA_1: Grid = [
 ]
 
 const KATYA_2: Grid = [
-  '...dd......dd...',
-  '..dpdbbbbbbdpd..',
-  '..dbbbbbbbbbbd..',
+  '...dd......vv.vv',
+  '..dpdbbbbbbvvVvv',
+  '..dbbbbbbbbvvdvv',
   '.dbbbebbbbbebbd.',
   '.dbbbbbbwwwbbbd.',
   '.dbbbbbwwnwwbbd.',
@@ -333,9 +333,9 @@ const KATYA_2: Grid = [
 ]
 
 const KATYA_SIT: Grid = [
-  '...dd......dd...',
-  '..dpdbbbbbbdpd..',
-  '..dbbbbbbbbbbd..',
+  '...dd......vv.vv',
+  '..dpdbbbbbbvvVvv',
+  '..dbbbbbbbbvvdvv',
   '.dbbbebbbbbebbd.',
   '.dbbbbbbwwwbbbd.',
   '.dbbbbbwwnwwbbd.',
@@ -353,9 +353,9 @@ const KATYA_SLEEP: Grid = [
   '................',
   '................',
   '................',
-  '................',
-  '...........dp.dp',
-  '.....bbbbbbdbbdb',
+  '...........vv.vv',
+  '...........vvVvv',
+  '.....bbbbbbvvbvv',
   '...bbbbbbbbbbbbb',
   '..bbbbbbbbbbbbbb',
   '.dbbbbccccbbdbdb',
@@ -380,11 +380,11 @@ export const KATYA_PORTRAIT_SIZE = { w: 28, h: 24 } as const
 
 // Tail plume up
 const KATYA_PORTRAIT_1: Grid = [
-  '.....dd..............dd.....',
-  '....dpdbbbbbbbbbbbbbbdpd....',
-  '...dbbbbbbbbbbbbbbbbbbbbd...',
-  '..dbbbbbbbbbbbbbbbbbbbbbbd..',
-  '..dbbbbbbbbbbbbbbbbbbbbbbd..',
+  '.....dd.............vvd..vv.',
+  '....dpdbbbbbbbbbbbbbvvvdvvv.',
+  '...dbbbbbbbbbbbbbbbbvvVVVvv.',
+  '..dbbbbbbbbbbbbbbbbbvvvbvvv.',
+  '..dbbbbbbbbbbbbbbbbbvvbbbvv.',
   '.dbbbbbbelbbbbbbbbbelbbbbbd.',
   '.dbbbbbbeebbbbbbbbbeebbbbbd.',
   '.dbbbbbbbbbbwwwwwbbbbbbbbbd.',
@@ -408,11 +408,11 @@ const KATYA_PORTRAIT_1: Grid = [
 
 // Tail plume down (wag)
 const KATYA_PORTRAIT_2: Grid = [
-  '.....dd..............dd.....',
-  '....dpdbbbbbbbbbbbbbbdpd....',
-  '...dbbbbbbbbbbbbbbbbbbbbd...',
-  '..dbbbbbbbbbbbbbbbbbbbbbbd..',
-  '..dbbbbbbbbbbbbbbbbbbbbbbd..',
+  '.....dd.............vvd..vv.',
+  '....dpdbbbbbbbbbbbbbvvvdvvv.',
+  '...dbbbbbbbbbbbbbbbbvvVVVvv.',
+  '..dbbbbbbbbbbbbbbbbbvvvbvvv.',
+  '..dbbbbbbbbbbbbbbbbbvvbbbvv.',
   '.dbbbbbbelbbbbbbbbbelbbbbbd.',
   '.dbbbbbbeebbbbbbbbbeebbbbbd.',
   '.dbbbbbbbbbbwwwwwbbbbbbbbbd.',
@@ -451,75 +451,77 @@ export const KATYA_PORTRAIT_HAPPY: Grid[] = KATYA_PORTRAIT.map(happyEyes)
 export const LULU_SIZE = { w: 16, h: 14 } as const
 
 /**
- * Lulu: D outline, b black fur, l/s long-hair sheen, w white mittens and
- * whiskers, e amber eyes, n nose, p ears, c collar, q/G bell
+ * Lulu: D outline, b black fur, h tail sheen, s shut eyes, w white mittens and
+ * whiskers, e/E amber eyes, n nose, p ears, k blush, v/V pink bow. All black,
+ * no collar: anything pale on her chest makes her look like she's in a suit.
  */
 export const LULU_PALETTE: Palette = {
   D: '#0b0a10',
-  b: '#2b2833',
-  l: '#5b5570',
-  s: '#8d86a6',
+  b: '#26232f',
+  h: '#45405c',
+  s: '#7d7896',
   w: '#f7f5fa',
   e: '#f5c443',
-  n: '#f09ab0',
-  p: '#c9708a',
-  c: '#b58cff',
-  q: '#ffd84d',
-  G: '#f0a030'
+  E: '#ffe39a',
+  n: '#f59ab8',
+  p: '#e48aa6',
+  k: '#d4628f',
+  v: '#ff6fb0',
+  V: '#c93f86'
 }
 
-// Standing: big shiny eyes, whiskers out, fluffy bib under the collar bell, plume up the right
+// Standing: pink bow on her ear, big shiny eyes, whiskers out, fluffy ruff, plume up the right
 const LULU_STAND: Grid = [
   '...D.......D....',
-  '..DpD.....DpD...',
-  '..DppDDDDDppD...',
-  '.DbbbbbbbbbbbD..',
+  '..DpD.....Dvv.vv',
+  '..DppDDDDDpvvVvv',
+  '.DbbbbbbbbbvvDvv',
   '.DbbwebbbwebbD..',
   '.DbbeebbbeebbD..',
-  'wwlbbbbnbbbblww.',
-  'DllbbblblbbbllDD',
-  '.DllcccqcccllDlD',
-  '.DblllbbbllllDlD',
-  '.DbbbllbllbbbDlD',
-  '..DbbbblbbbbDlD.',
-  '...DwwDDDwwDDD..',
-  '...DDDD.DDDD....'
+  'wwkbbbbnbbbbkww.',
+  'DbbbbbbbbbbbbbD.',
+  '.DDbbbbbbbbbDDDD',
+  '...DbbbbbbbDDhbD',
+  '...DbbbbbbbDhbbD',
+  '...DbbDbDbbDhbD.',
+  '...DwwDDDwwDbD..',
+  '...DDDD.DDDDD...'
 ]
 
 // Mid-stride: paws apart, tail tip flicked up
 const LULU_STEP: Grid = [
   '...D.......D....',
-  '..DpD.....DpD...',
-  '..DppDDDDDppD...',
-  '.DbbbbbbbbbbbD..',
+  '..DpD.....Dvv.vv',
+  '..DppDDDDDpvvVvv',
+  '.DbbbbbbbbbvvDvv',
   '.DbbwebbbwebbD..',
   '.DbbeebbbeebbD..',
-  'wwlbbbbnbbbblwwD',
-  'DllbbblblbbbllDl',
-  '.DllcccqcccllDlD',
-  '.DblllbbbllllDlD',
-  '.DbbbllbllbbbDlD',
-  '..DbbbblbbbbDDD.',
-  '..DwwDDDDDwwD...',
+  'wwkbbbbnbbbbkww.',
+  'DbbbbbbbbbbbbbD.',
+  '.DDbbbbbbbbbDD.D',
+  '...DbbbbbbbDDDhD',
+  '...DbbbbbbbDhbbD',
+  '..DbbDDDDDbbDbD.',
+  '..DwwD...DwwDD..',
   '..DDDD...DDDD...'
 ]
 
-// Sitting with her tail wrapped round the front paws
+// Sitting pretty, plume curled up her side
 const LULU_SIT: Grid = [
   '...D.......D....',
-  '..DpD.....DpD...',
-  '..DppDDDDDppD...',
-  '.DbbbbbbbbbbbD..',
+  '..DpD.....Dvv.vv',
+  '..DppDDDDDpvvVvv',
+  '.DbbbbbbbbbvvDvv',
   '.DbbwebbbwebbD..',
   '.DbbeebbbeebbD..',
-  'wwlbbbbnbbbblww.',
-  'DllbbblblbbbllDD',
-  '.DllcccqcccllD..',
-  '.DblllbbbllllD..',
-  'DbbbbllbllbbbbD.',
-  'DbbbbbblbbbbbbDD',
-  'DbbDwwDbDwwDbDlD',
-  '.DDDDDDDDllllDD.'
+  'wwkbbbbnbbbbkww.',
+  'DbbbbbbbbbbbbbD.',
+  '.DDbbbbbbbbbDDDD',
+  '..DbbbbbbbbbDhbD',
+  '.DbbbbbbbbbbDhbD',
+  '.DbbbbbbbbbbbDbD',
+  '.DbbDwwDwwDbbbD.',
+  '..DDDDDDDDDDDD..'
 ]
 
 // A loaf from the front: eyes shut, mittens tucked, tail round the side
@@ -528,15 +530,15 @@ const LULU_SLEEP: Grid = [
   '................',
   '................',
   '...D.......D....',
-  '..DpD.....DpD...',
-  '..DppDDDDDppD...',
-  '.DbbbbbbbbbbbD..',
+  '..DpD.....Dvv.vv',
+  '..DppDDDDDpvvVvv',
+  '.DbbbbbbbbbvvDvv',
   '.DbssbbbbbssbD..',
-  'wwlbbbbnbbbblww.',
-  'DllbbbbbbbbbllDD',
-  'DlllbbbbbbbllDlD',
-  'DbbbbbbbbbbbbDlD',
-  'DbDwwDbbbDwwDllD',
+  'wwkbbbbnbbbbkww.',
+  'DbbbbbbbbbbbbbDD',
+  'DbbbbbbbbbbbbDhD',
+  'DbbbbbbbbbbbbDhD',
+  'DbDwwDbbbDwwDbbD',
   '.DDDDDDDDDDDDDD.'
 ]
 
@@ -554,65 +556,65 @@ export const LULU_PORTRAIT_SIZE = { w: 28, h: 24 } as const
 
 // Tail plume up
 const LULU_PORTRAIT_1: Grid = [
-  '....l..................l....',
-  '....D..................D....',
-  '...DpD................DpD...',
-  '...DppD..............DppD...',
-  '..DpppDDDDDDDDDDDDDDDDpppD..',
-  '..DbppbbbbbbbbbbbbbbbbppbD..',
-  '.DbbbbbbblbbbbbbbblbbbbbbbD.',
-  '.DbbbbbbbbbbbbbbbbbbbbbbbbD.',
-  '.DbbbbbeebbbbbbbbbbeebbbbbD.',
-  'DbbbbbewDebbbbbbbbewDebbbbbD',
-  'DbbbbbeDDebbbbbbbbeDDebbbbbD',
-  'DbbbbbeDDebbbbbbbbeDDebbbbbD',
-  'DbbbbbbeebbbbbbbbbbeebbbbbbD',
-  'wwwwwbbbbbbbnnnnbbbbbbbwwwww',
-  'DbbbbbbbbbbbbnnbbbbbbbbbbbbD',
-  '.wwwwbbbbbbblbblbbbbbbbwwww.',
-  '.DlbbbbbbbbbbbbbbbbbbbbbbDD.',
-  '..DbbbbbbccccqqccccbbbbDlsD.',
-  '.DlbbbbbbblssGGsslbbbbDlssD.',
-  '.DblbbbbbbssssssssbbbbDllsD.',
-  '..DDbbbbbblsssssslbbbbDlllD.',
-  '....DbbDwwwwDssDwwwwDDlllD..',
-  '....DbbDwwwwDDDDwwwwDDDDD...',
+  '.....D................D.....',
+  '....DpD............vvDpDvv..',
+  '....DppD...........vvvpvvv..',
+  '...DpppDDDDDDDDDDDDvvVVVvv..',
+  '...Dbpppbbbbbbbbbbbvvvpvvv..',
+  '...Dbbbbbbbbbbbbbbbvvbbbvv..',
+  '...DbbbbbbbbbbbbbbbbbbbbD...',
+  '...DbbbbeebbbbbbbbeebbbbD...',
+  '...DbbbewDebbbbbbewDebbbD...',
+  '...DbbbeDDebbbbbbeDDebbbD...',
+  '...DbbbEEEEbbbbbbEEEEbbbD...',
+  'wwwwwbbbEEbbbnnbbbEEbbbwwwww',
+  '...DbbkkkbbbbbbbbbbkkkbbD...',
+  'wwwwwbbbbbbbbbbbbbbbbbbwwwww',
+  '...DbbbbbbbbbbbbbbbbbbbbDDD.',
+  '....DbbbbbbbbbbbbbbbbbbDDhhD',
+  '..DDbbbbbbbbbbbbbbbbbbbDhbbD',
+  '.DbbbbbbbbbbbbbbbbbbbbbDhbbD',
+  '..DbbbbbbbbbbbbbbbbbbbbDhbD.',
+  '...DbbbbbbbbbbbbbbbbbbDhbD..',
+  '....DbbDbbbbDbbDbbbbDbDbbD..',
+  '....DbbDbwwbDbbDbwwbDbDbD...',
+  '....DbbDwwwwDDDDwwwwDbDD....',
   '.....DDDDDDDD..DDDDDDDD.....'
 ]
 
 // Tail plume down (swish)
 const LULU_PORTRAIT_2: Grid = [
-  '....l..................l....',
-  '....D..................D....',
-  '...DpD................DpD...',
-  '...DppD..............DppD...',
-  '..DpppDDDDDDDDDDDDDDDDpppD..',
-  '..DbppbbbbbbbbbbbbbbbbppbD..',
-  '.DbbbbbbblbbbbbbbblbbbbbbbD.',
-  '.DbbbbbbbbbbbbbbbbbbbbbbbbD.',
-  '.DbbbbbeebbbbbbbbbbeebbbbbD.',
-  'DbbbbbewDebbbbbbbbewDebbbbbD',
-  'DbbbbbeDDebbbbbbbbeDDebbbbbD',
-  'DbbbbbeDDebbbbbbbbeDDebbbbbD',
-  'DbbbbbbeebbbbbbbbbbeebbbbbbD',
-  'wwwwwbbbbbbbnnnnbbbbbbbwwwww',
-  'DbbbbbbbbbbbbnnbbbbbbbbbbbbD',
-  '.wwwwbbbbbbblbblbbbbbbbwwww.',
-  '.DlbbbbbbbbbbbbbbbbbbbbbblD.',
-  '..DbbbbbbccccqqccccbbbbbbD..',
-  '.DlbbbbbbblssGGsslbbbbbbDDD.',
-  '.DblbbbbbbssssssssbbbbbDlsD.',
-  '..DDbbbbbblsssssslbbbbDllsD.',
-  '....DbbDwwwwDssDwwwwDDllsD..',
-  '....DbbDwwwwDDDDwwwwDDDDD...',
+  '.....D................D.....',
+  '....DpD............vvDpDvv..',
+  '....DppD...........vvvpvvv..',
+  '...DpppDDDDDDDDDDDDvvVVVvv..',
+  '...Dbpppbbbbbbbbbbbvvvpvvv..',
+  '...Dbbbbbbbbbbbbbbbvvbbbvv..',
+  '...DbbbbbbbbbbbbbbbbbbbbD...',
+  '...DbbbbeebbbbbbbbeebbbbD...',
+  '...DbbbewDebbbbbbewDebbbD...',
+  '...DbbbeDDebbbbbbeDDebbbD...',
+  '...DbbbEEEEbbbbbbEEEEbbbD...',
+  'wwwwwbbbEEbbbnnbbbEEbbbwwwww',
+  '...DbbkkkbbbbbbbbbbkkkbbD...',
+  'wwwwwbbbbbbbbbbbbbbbbbbwwwww',
+  '...DbbbbbbbbbbbbbbbbbbbbD...',
+  '....DbbbbbbbbbbbbbbbbbbD....',
+  '..DDbbbbbbbbbbbbbbbbbbbbDD..',
+  '.DbbbbbbbbbbbbbbbbbbbbbbbDD.',
+  '..DbbbbbbbbbbbbbbbbbbbbbDhhD',
+  '...DbbbbbbbbbbbbbbbbbbbDhbbD',
+  '....DbbDbbbbDbbDbbbbDbbDhbbD',
+  '....DbbDbwwbDbbDbwwbDbDbbD..',
+  '....DbbDwwwwDDDDwwwwDbDDD...',
   '.....DDDDDDDD..DDDDDDDD.....'
 ]
 
 /** Content squint (^ ^) for when she is being petted: eyes become little arcs */
 function contentEyes(grid: Grid): Grid {
-  const arcs: Record<number, string> = { 8: 'bbbb', 9: 'bbbb', 10: 'bssb', 11: 'sbbs', 12: 'bbbb' }
+  const arcs: Record<number, string> = { 7: 'bbbb', 8: 'bbbb', 9: 'bssb', 10: 'sbbs', 11: 'bbbb' }
   return grid.map((row, i) =>
-    arcs[i] ? row.slice(0, 6) + arcs[i] + row.slice(10, 18) + arcs[i] + row.slice(22) : row
+    arcs[i] ? row.slice(0, 7) + arcs[i] + row.slice(11, 17) + arcs[i] + row.slice(21) : row
   )
 }
 
@@ -1082,6 +1084,7 @@ export const KITTEN_COATS: Palette[] = [
   } // cream siamese-ish
 ]
 
+/** Katya: b/l white fur, d outline, w muzzle, e eyes, n nose, p ears, v/V teal bow */
 export const KATYA_PALETTE: Palette = {
   b: '#f7f7fb',
   d: '#c9ccd9',
@@ -1089,7 +1092,9 @@ export const KATYA_PALETTE: Palette = {
   w: '#f3ece0',
   e: '#1b1b1f',
   n: '#1b1b1f',
-  p: '#f4a4b0'
+  p: '#f4a4b0',
+  v: '#2ec4b6',
+  V: '#14857c'
 }
 
 export const COLLAR_COLORS = {

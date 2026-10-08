@@ -69,9 +69,9 @@ function drawCatCorner(ctx: CanvasRenderingContext2D, v: SceneView): void {
 }
 
 /**
- * Lulu, a black long-haired cat with white mittens and whiskers, manages the
- * cats: her report lists every kitten that needs you, what the working ones
- * are doing, and where the rest are napping.
+ * Lulu, a black long-haired cat with white mittens and whiskers and a pink
+ * bow, manages the cats: her report lists every kitten that needs you, what
+ * the working ones are doing, and where the rest are napping.
  */
 export function LuluCloseUp({
   snapshot,
@@ -186,8 +186,8 @@ export function LuluCloseUp({
           <Row label="Pets">{pets === 0 ? 'none yet — she pretends not to mind' : pets}</Row>
           <Row label="Meows">{meows}</Row>
           <div style={{ marginTop: 6, opacity: 0.7 }}>
-            Black long-haired cat · Manager of the cats · white mittens and whiskers · likes
-            sunbeams and quiet terminals
+            Black long-haired cat · Manager of the cats · white mittens and whiskers · pink bow ·
+            likes sunbeams and quiet terminals
           </div>
         </Section>
       </aside>

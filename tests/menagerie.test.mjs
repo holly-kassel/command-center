@@ -948,7 +948,7 @@ test('sprites: critters keep their size, every coat colours every pixel, and out
   }
 })
 
-test('sprites: Lulu is drawn like Katya, a black long-haired cat with white mittens and whiskers', () => {
+test('sprites: Lulu is drawn like Katya, a black long-haired cat with white mittens, whiskers, and a pink bow', () => {
   const palette = { ...sprites.PROP_PALETTE, ...sprites.LULU_PALETTE }
   const luminance = (hex) => {
     const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)
@@ -956,6 +956,8 @@ test('sprites: Lulu is drawn like Katya, a black long-haired cat with white mitt
   }
   assert.ok(luminance(sprites.LULU_PALETTE.b) < 0.2, 'black fur')
   assert.ok(luminance(sprites.LULU_PALETTE.w) > 0.9, 'white mittens and whiskers')
+  const [red, green, blue] = [1, 3, 5].map((i) => parseInt(sprites.LULU_PALETTE.v.slice(i, i + 2), 16))
+  assert.ok(red > green && blue > green, 'her bow is pink')
   const check = (g, size, name) => {
     assert.deepEqual(sprites.gridSize(g), { ...size }, `${name} size`)
     for (const row of g) assert.equal(row.length, g[0].length, `${name}: ragged row`)
@@ -966,10 +968,14 @@ test('sprites: Lulu is drawn like Katya, a black long-haired cat with white mitt
       g.slice(-3).some((r) => r.includes('w')),
       `${name}: white mittens`
     )
-    assert.ok(
-      g.some((r) => r[0] === 'w' && (r[width - 1] === 'w' || r[width - 2] === 'w')),
-      `${name}: whiskers out both sides`
-    )
+    const whiskers = g.filter((r) => r[0] === 'w' && (r[width - 1] === 'w' || r[width - 2] === 'w'))
+    assert.ok(whiskers.length, `${name}: whiskers out both sides`)
+    assert.ok(g.join('').includes('v'), `${name}: wears her bow`)
+    // A pale bib, collar, or bell made her look like a cat in a suit: below the
+    // whiskers, everything but her mittens is black fur (outline, fur, tail sheen)
+    const body = g.slice(g.lastIndexOf(whiskers.at(-1)) + 1, -3).join('')
+    for (const ch of body)
+      if (ch !== '.') assert.ok('Dbh'.includes(ch), `${name}: '${ch}' on her body`)
   }
   for (const [action, frames] of Object.entries(sprites.LULU)) {
     frames.forEach((g, i) => check(g, sprites.LULU_SIZE, `LULU.${action}[${i}]`))
@@ -980,8 +986,31 @@ test('sprites: Lulu is drawn like Katya, a black long-haired cat with white mitt
   })
   sprites.LULU_PORTRAIT_HAPPY.forEach((g, i) => {
     check(g, sprites.LULU_PORTRAIT_SIZE, `happy portrait ${i}`)
-    assert.ok(!g.join('').includes('e'), 'petting squeezes her eyes shut')
+    assert.ok(!/[eE]/.test(g.join('')), 'petting squeezes her eyes shut')
   })
+})
+
+test('sprites: Katya wears a teal bow in every frame and portrait', () => {
+  const palette = { ...sprites.PROP_PALETTE, ...sprites.KATYA_PALETTE, c: '#f2a7b5' }
+  const [red, green, blue] = [1, 3, 5].map((i) => parseInt(palette.v.slice(i, i + 2), 16))
+  assert.ok(green > red && blue > red, 'teal')
+  const grids = [
+    ...Object.entries(sprites.KATYA).flatMap(([action, frames]) =>
+      frames.map((g, i) => [`KATYA.${action}[${i}]`, g, sprites.KATYA_SIZE])
+    ),
+    ...[...sprites.KATYA_PORTRAIT, ...sprites.KATYA_PORTRAIT_HAPPY].map((g, i) => [
+      `portrait ${i}`,
+      g,
+      sprites.KATYA_PORTRAIT_SIZE
+    ])
+  ]
+  for (const [name, g, size] of grids) {
+    assert.deepEqual(sprites.gridSize(g), { ...size }, `${name} size`)
+    for (const row of g) assert.equal(row.length, g[0].length, `${name}: ragged row`)
+    for (const ch of g.join(''))
+      if (ch !== '.') assert.ok(palette[ch], `${name}: no colour for '${ch}'`)
+    assert.ok(g.join('').includes('v') && g.join('').includes('V'), `${name}: bow and knot`)
+  }
 })
 
 const lulusCritter = (id, status, species, extra = {}) => ({

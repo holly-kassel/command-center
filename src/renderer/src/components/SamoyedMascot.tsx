@@ -71,6 +71,22 @@ export function SamoyedMascot({
       {/* Forehead tuft */}
       <ellipse cx="256" cy="155" rx="60" ry="30" fill="#fafafa" />
 
+      {/* Teal bow at the base of her right ear */}
+      <g transform="translate(344 164) rotate(16)">
+        <path d="M -3 6 L -18 40 L -7 37 L 3 9 Z" fill="#1fa99c" />
+        <path d="M 3 6 L 18 40 L 7 37 L -3 9 Z" fill="#1fa99c" />
+        <path d="M 0 0 C -12 -30 -50 -34 -52 -6 C -54 20 -16 22 0 0 Z" fill="#2ec4b6" />
+        <path d="M 0 0 C 12 -30 50 -34 52 -6 C 54 20 16 22 0 0 Z" fill="#2ec4b6" />
+        <path
+          d="M -8 -4 C -18 -18 -36 -20 -40 -8"
+          fill="none"
+          stroke="#7fe3d9"
+          strokeWidth="4"
+          strokeLinecap="round"
+        />
+        <ellipse cx="0" cy="0" rx="10" ry="12" fill="#14857c" />
+      </g>
+
       {/* Eyes */}
       <ellipse cx="215" cy="245" rx="16" ry="17" fill="#1a1a1a" />
       <circle cx="210" cy="240" r="5" fill="rgba(255,255,255,0.85)" />

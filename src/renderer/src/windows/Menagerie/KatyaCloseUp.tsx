@@ -218,8 +218,8 @@ export function KatyaCloseUp({ snapshot, onClose, onOpenSession }: Props): React
           <Row label="Pets">{pets === 0 ? 'none yet — she\u2019s waiting' : pets}</Row>
           <Row label="Barks">{barks}</Row>
           <div style={{ marginTop: 6, opacity: 0.7 }}>
-            Samoyed · Mayor of the Menagerie · minds the puppies while Lulu manages the cats · likes
-            belly rubs and finished tasks
+            Samoyed · Mayor of the Menagerie · minds the puppies while Lulu manages the cats · teal
+            bow · likes belly rubs and finished tasks
           </div>
         </Section>
       </aside>

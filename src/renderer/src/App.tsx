@@ -56,7 +56,7 @@ function App(): React.JSX.Element {
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', resolved)
     // Also update body background for the transition
-    document.body.style.background = resolved === 'light' ? '#f8f9fb' : '#0f1117'
+    document.body.style.background = resolved === 'light' ? '#e9e1cf' : '#1b1a2e'
   }, [resolved])
 
   // Listen for OS theme changes when set to 'system'
@@ -75,18 +75,20 @@ function App(): React.JSX.Element {
     () =>
       resolved === 'light'
         ? {
-            background: 'rgba(255, 255, 255, 0.95)',
-            color: '#1f2937',
-            border: '1px solid rgba(209, 213, 219, 0.5)',
-            backdropFilter: 'blur(12px)',
-            fontSize: '13px',
+            background: '#fff8ea',
+            color: '#2a2320',
+            border: '3px solid #2a2320',
+            borderRadius: '4px',
+            boxShadow: '4px 4px 0 #2a2320',
+            fontSize: '13px'
           }
         : {
-            background: 'rgba(30, 32, 44, 0.95)',
-            color: '#e8eaf0',
-            border: '1px solid rgba(100, 110, 140, 0.25)',
-            backdropFilter: 'blur(12px)',
-            fontSize: '13px',
+            background: '#262544',
+            color: '#f3eee4',
+            border: '3px solid #0f0e1c',
+            borderRadius: '4px',
+            boxShadow: '4px 4px 0 #0f0e1c',
+            fontSize: '13px'
           },
     [resolved]
   )
@@ -109,7 +111,7 @@ function App(): React.JSX.Element {
         position="bottom-right"
         toastOptions={{
           duration: 3000,
-          style: toastStyle,
+          style: toastStyle
         }}
       />
     </ErrorBoundary>

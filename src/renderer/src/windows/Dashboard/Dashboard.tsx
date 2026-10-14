@@ -21,7 +21,7 @@ import { TranscriptsPanel } from './TranscriptsPanel'
 import { NotesView } from '../../components/Notes/NotesView'
 import { SettingsPanel } from '../Settings/SettingsPanel'
 import { FocusModeOverlay } from '../FocusMode/FocusModeOverlay'
-import { SamoyedMascot } from '../../components/SamoyedMascot'
+import { PixelKatya } from '../../components/PixelKatya'
 import { RitualMetrics } from '../../components/rituals/RitualMetrics'
 import { MorningRitualFlow } from '../../components/rituals/MorningRitualFlow'
 import { EveningRitualFlow } from '../../components/rituals/EveningRitualFlow'
@@ -220,11 +220,9 @@ export function Dashboard(): React.ReactElement {
             {/* Header — greeting + date + refresh */}
             <div className="flex items-end justify-between">
               <div className="flex items-center gap-3">
-                <SamoyedMascot size={44} className="mascot-idle drop-shadow-sm" />
+                <PixelKatya size={44} className="mascot-idle" />
                 <div>
-                  <h1 className="bg-gradient-to-r from-focus via-primary to-accent bg-clip-text text-xl font-bold text-transparent">
-                    {getGreeting()}, Holly
-                  </h1>
+                  <h1 className="pixel-title text-2xl font-bold">{getGreeting()}, Holly</h1>
                   <p className="mt-0.5 text-xs text-text-tertiary">{getFormattedDate()}</p>
                 </div>
               </div>

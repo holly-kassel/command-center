@@ -86,7 +86,7 @@ Legacy records are backed up before migration. Saved timestamps recover dates in
 - Waiting critters carry a "Needs approval" card (in the speech bubble, yard close-up, and Katya's "Needs you" queue, longest-waiting first) showing what the agent wants — shell command, file write, URL, MCP tool, extension access — with its stated intention and a read-only/writes badge, plus "Open to approve ↗". Approving still happens in the session itself: Copilot CLI exposes no control channel for another process to answer a permission prompt
 - Projects that span several repos become a **neighborhood**: those yards sit together on a shared grass tint under a named banner, show up in the yard close-up and Katya's town report. Neighborhoods come from Collection projects in the GitHub Copilot app automatically, or from `menagerie-neighborhoods.json` in the app's user-data folder (`{ "Billing": ["github/billing-product", "github/billing-platform"] }`); the footer's "⌂ neighborhoods" button opens that file, and it wins over collections
 - Each cottage tracks activity: a GitHub-style 8-week heatmap in the yard close-up, and a 🔥 flame by the sign for repos with a 3+ day streak
-- Sessions archived in the GitHub Copilot app (read from `~/.copilot/data.db`) are hidden; live sessions always shown; finished sessions nap until they drop out after 24 hours
+- Only chats pinned in the GitHub Copilot app sidebar get a critter (read from `~/.copilot/data.db`); unpinned and archived sessions are hidden; live sessions always shown; finished sessions nap until they drop out after 24 hours
 - Run `npm run test:menagerie` for the status, retention, grouping, automation, and layout unit tests
 
 ### Other

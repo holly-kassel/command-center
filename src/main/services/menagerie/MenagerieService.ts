@@ -69,6 +69,8 @@ export class MenagerieService {
   private rows = new Map<string, SessionRow>()
   /** Session ids archived in the GitHub Copilot app (~/.copilot/data.db) */
   private archived = new Set<string>()
+  /** Session ids pinned in the Copilot app sidebar; only these get critters */
+  private pinned = new Set<string>()
   private lastHash = ''
   private lastSnapshot: MenagerieSnapshot | null = null
   private warnings: string[] = []
@@ -152,6 +154,7 @@ export class MenagerieService {
         await Promise.all([
           this.loadRows(),
           this.loadArchived(),
+          this.loadPinned(),
           this.loadNeighborhoods(),
           this.loadAutomations()
         ])
@@ -160,7 +163,7 @@ export class MenagerieService {
       const now = new Date()
       const stateDir = join(this.copilotDir, 'session-state')
       const candidateIds = (await this.candidateSessionIds(stateDir, now)).filter(
-        (id) => !this.archived.has(id)
+        (id) => !this.archived.has(id) && this.pinned.has(id)
       )
 
       const critters: Critter[] = []
@@ -326,6 +329,29 @@ export class MenagerieService {
       this.archived = new Set(parsed.map((r) => r.id).filter(Boolean))
     } catch (error) {
       logger.warn('[Menagerie] could not read archived sessions from data.db:', error)
+    }
+  }
+
+  /**
+   * Pinned sessions live in the sidebar store's `pinnedWorkspaceIds`
+   * (app_state key `sidebar-project-groups`). Those are workspace ids, which
+   * match the session id for branch/worktree sessions but not always, so we
+   * also resolve them through `workspaces.session_id`.
+   */
+  private async loadPinned(): Promise<void> {
+    const dbPath = join(this.copilotDir, 'data.db')
+    try {
+      await fs.access(dbPath)
+      const json = await runSqlite(dbPath, PINNED_SQL)
+      const parsed = JSON.parse(json || '[]') as { id: string }[]
+      this.pinned = new Set(parsed.map((r) => r.id).filter(Boolean))
+      this.clearWarning('pinned')
+      if (this.pinned.size === 0)
+        this.setWarning('pinned', 'No pinned chats — pin a session in the Copilot app sidebar')
+    } catch (error) {
+      logger.warn('[Menagerie] could not read pinned sessions from data.db:', error)
+      this.pinned.clear()
+      this.setWarning('pinned', 'Could not read pinned chats from the Copilot app')
     }
   }
 
@@ -568,6 +594,17 @@ const ROWS_SQL =
   "SELECT id, cwd, repository, branch, summary, created_at, updated_at FROM sessions WHERE updated_at >= datetime('now', '-8 days');"
 
 // Archived flag can sit on the session row, the workspace row, or a workspace alias.
+// Pinned ids are a JSON array inside the sidebar's persisted zustand state.
+const PINNED_SQL = `
+  WITH ids AS (
+    SELECT j.value AS id
+    FROM app_state s, json_each(json_extract(s.value, '$.state.pinnedWorkspaceIds')) j
+    WHERE s.key = 'sidebar-project-groups'
+  )
+  SELECT id FROM ids
+  UNION SELECT w.session_id AS id FROM workspaces w JOIN ids ON ids.id = w.id
+    WHERE w.session_id IS NOT NULL;`
+
 const ARCHIVED_SQL = `
   SELECT id FROM sessions WHERE archived_at IS NOT NULL
   UNION SELECT id FROM workspaces WHERE archived_at IS NOT NULL

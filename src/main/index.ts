@@ -18,7 +18,7 @@ import {
   registerTranscriptionIpc,
   registerChatIpc,
   registerDecisionEvalIpc,
-  registerMenagerieIpc,
+  registerMenagerieIpc
 } from './ipc'
 import { HotkeyManager } from './services/hotkey/HotkeyManager'
 import { getSyncManager } from './services/sync/SyncManager'
@@ -77,8 +77,8 @@ app.whenReady().then(() => {
   // Set app user model id for windows
   electronApp.setAppUserModelId('com.hollykassel.command-center')
 
-  // Set Dock icon on macOS
-  if (process.platform === 'darwin' && app.dock) {
+  // Dev-only Dock icon on macOS; packaged builds use build/icon.icns so the OS applies its own mask
+  if (process.platform === 'darwin' && app.dock && !app.isPackaged) {
     app.dock.setIcon(nativeImage.createFromPath(icon))
   }
 
